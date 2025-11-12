@@ -1,0 +1,128 @@
+[
+  {
+    "inputs": [
+      {"internalType": "string", "name": "ipAsset", "type": "string"},
+      {"internalType": "uint256", "name": "pilId", "type": "uint256"},
+      {"internalType": "string", "name": "biocid", "type": "string"}
+    ],
+    "name": "attachLicenseTerms",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "string", "name": "biocid", "type": "string"},
+      {"internalType": "uint256", "name": "licenseType", "type": "uint256"},
+      {"internalType": "address", "name": "receiver", "type": "address"},
+      {"internalType": "uint256", "name": "amount", "type": "uint256"}
+    ],
+    "name": "mintLicenseToken",
+    "outputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "string", "name": "biocid", "type": "string"},
+      {"internalType": "address", "name": "wallet", "type": "address"}
+    ],
+    "name": "hasLicenseToken",
+    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "string", "name": "biocid", "type": "string"},
+      {"internalType": "address", "name": "wallet", "type": "address"}
+    ],
+    "name": "getLicenseToken",
+    "outputs": [
+      {
+        "components": [
+          {"internalType": "uint256", "name": "id", "type": "uint256"},
+          {"internalType": "string", "name": "biocid", "type": "string"},
+          {"internalType": "address", "name": "holder", "type": "address"},
+          {"internalType": "uint256", "name": "type", "type": "uint256"},
+          {"internalType": "uint256", "name": "grantedAt", "type": "uint256"},
+          {"internalType": "uint256", "name": "expiresAt", "type": "uint256"},
+          {"internalType": "string", "name": "status", "type": "string"}
+        ],
+        "internalType": "struct BioPIL.LicenseToken",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "string", "name": "biocid", "type": "string"}],
+    "name": "getLicenseTokens",
+    "outputs": [
+      {
+        "components": [
+          {"internalType": "uint256", "name": "id", "type": "uint256"},
+          {"internalType": "string", "name": "biocid", "type": "string"},
+          {"internalType": "address", "name": "holder", "type": "address"},
+          {"internalType": "uint256", "name": "type", "type": "uint256"},
+          {"internalType": "uint256", "name": "grantedAt", "type": "uint256"},
+          {"internalType": "uint256", "name": "expiresAt", "type": "uint256"},
+          {"internalType": "string", "name": "status", "type": "string"}
+        ],
+        "internalType": "struct BioPIL.LicenseToken[]",
+        "name": "",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    "name": "revokeLicenseToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    "name": "burnLicenseToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "string", "name": "biocid", "type": "string"}],
+    "name": "getLicenseTerms",
+    "outputs": [
+      {
+        "components": [
+          {"internalType": "uint256", "name": "pilId", "type": "uint256"},
+          {"internalType": "bool", "name": "commercialUse", "type": "bool"},
+          {"internalType": "bool", "name": "derivativesAllowed", "type": "bool"},
+          {"internalType": "bool", "name": "attributionRequired", "type": "bool"},
+          {"internalType": "uint256", "name": "revenueShare", "type": "uint256"},
+          {"internalType": "bool", "name": "gdprCompliant", "type": "bool"},
+          {"internalType": "string", "name": "description", "type": "string"}
+        ],
+        "internalType": "struct BioPIL.LicenseTerms",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"},
+      {"indexed": true, "internalType": "string", "name": "biocid", "type": "string"},
+      {"indexed": true, "internalType": "address", "name": "holder", "type": "address"}
+    ],
+    "name": "LicenseTokenMinted",
+    "type": "event"
+  }
+]

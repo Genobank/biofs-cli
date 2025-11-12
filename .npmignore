@@ -1,0 +1,51 @@
+# Source files (we only need dist/)
+src/
+tsconfig.json
+
+# Development
+node_modules/
+.git/
+.github/
+
+# Test files
+test/
+*.test.ts
+*.spec.ts
+
+# Backups
+*.bkp.*
+*.backup
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary
+tmp/
+temp/
+
+# Debug utilities (should not be published)
+debug_credentials.js
+
+# Build artifacts (keep dist/)
+*.tgz
+
+# Documentation (keep README.md but not detailed docs)
+BIOFS_ARCHITECTURE_ASSESSMENT.md
+BIONFT_GATED_S3_ARCHITECTURE.md
+ENHANCED_V1.3.0_ROADMAP.md
+IMPLEMENTATION_SUMMARY.md
+STORY_PIL_ACCESS_CONTROL_DESIGN.md
+STORY_PIL_IMPLEMENTATION_COMPLETE.md
+V1.2.0_IMPLEMENTATION_SUMMARY.md
+V1.2.0_TODO.md
+V1.2.1_PIL_IMPLEMENTATION_SUMMARY.md
+DEMO_LOGIN_FLOW.md
