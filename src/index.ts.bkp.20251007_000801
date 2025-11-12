@@ -1,0 +1,278 @@
+#!/usr/bin/env node
+
+import { Command } from 'commander';
+import chalk from 'chalk';
+import { loginCommand, LoginOptions } from './commands/login';
+import { logoutCommand } from './commands/logout';
+import { whoamiCommand, WhoamiOptions } from './commands/whoami';
+import { filesCommand, FilesOptions } from './commands/files';
+import { downloadCommand, DownloadOptions } from './commands/download';
+import { uploadCommand, UploadOptions } from './commands/upload';
+import { tokenizeCommand, TokenizeOptions } from './commands/tokenize';
+import { accessRequestCommand, AccessRequestOptions } from './commands/access/request';
+import { accessGrantCommand, AccessGrantOptions } from './commands/access/grant';
+import { accessRevokeCommand, AccessRevokeOptions } from './commands/access/revoke';
+import { accessListCommand, AccessListOptions } from './commands/access/list';
+import { accessCheckCommand } from './commands/access/check';
+import { Logger } from './lib/utils/logger';
+
+const program = new Command();
+
+// Set up the CLI
+program
+  .name('biofs')
+  .description('BioFS by GenoBank.io - BioNFT-Gated S3 CLI for genomic data')
+  .version('1.2.6');
+
+// Login command
+program
+  .command('login')
+  .description('Authenticate with GenoBank.io using Web3 signature')
+  .option('--port <number>', 'Callback server port', parseInt)
+  .option('--no-browser', "Don't auto-open browser")
+  .option('--timeout <seconds>', 'Auth timeout in seconds', parseInt)
+  .action(async (options: LoginOptions) => {
+    try {
+      await loginCommand(options);
+    } catch (error) {
+      Logger.error(`Login failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Logout command
+program
+  .command('logout')
+  .description('Clear stored credentials')
+  .action(async () => {
+    try {
+      await logoutCommand();
+    } catch (error) {
+      Logger.error(`Logout failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Whoami command
+program
+  .command('whoami')
+  .description('Show current authenticated wallet')
+  .option('--json', 'Output as JSON')
+  .action(async (options: WhoamiOptions) => {
+    try {
+      await whoamiCommand(options);
+    } catch (error) {
+      Logger.error(`Error: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Files command
+program
+  .command('files')
+  .alias('ls')
+  .description('List your BioFiles from all sources')
+  .option('--filter <type>', 'Filter by file type (vcf, fastq, bam, pdf, etc.)')
+  .option('--source <source>', 'Filter by source (s3, ipfs, story)')
+  .option('--json', 'Output as JSON')
+  .option('--refresh', 'Clear cache and fetch fresh data')
+  .action(async (options: FilesOptions) => {
+    try {
+      await filesCommand(options);
+    } catch (error) {
+      Logger.error(`Error listing files: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Download command
+program
+  .command('download <biocid_or_filename> [destination]')
+  .alias('get')
+  .description('Download a file by BioCID or filename')
+  .option('--output <path>', 'Output file path')
+  .option('--stream', 'Stream large files (>100MB)')
+  .option('--quiet', 'No progress bar')
+  .action(async (biocidOrFilename: string, destination: string | undefined, options: DownloadOptions) => {
+    try {
+      await downloadCommand(biocidOrFilename, destination, options);
+    } catch (error) {
+      Logger.error(`Download failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Upload command
+program
+  .command('upload <file>')
+  .alias('put')
+  .description('Upload a file to GenoBank')
+  .option('--type <type>', 'File type (vcf, fastq, bam, pdf)')
+  .option('--tokenize', 'Mint as NFT after upload')
+  .option('--share-with <lab>', 'Share with lab after upload')
+  .option('--public', 'Make publicly discoverable')
+  .option('--quiet', 'No progress output')
+  .action(async (filePath: string, options: UploadOptions) => {
+    try {
+      await uploadCommand(filePath, options);
+    } catch (error) {
+      Logger.error(`Upload failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Tokenize command
+program
+  .command('tokenize <file>')
+  .description('Tokenize a genomic dataset as BioIP NFT on Story Protocol')
+  .option('--title <string>', 'Custom title for the NFT')
+  .option('--description <string>', 'Custom description (uses AI if not provided)')
+  .option('--license <type>', 'License type: commercial, non-commercial', 'non-commercial')
+  .option('--collection <address>', 'Manual collection address override')
+  .option('--network <network>', 'Story Protocol network: mainnet, testnet', 'mainnet')
+  .option('--no-ai', 'Skip AI classification')
+  .option('--quiet', 'No interactive prompts')
+  .option('--yes', 'Auto-confirm all prompts')
+  .action(async (file: string, options: TokenizeOptions) => {
+    try {
+      await tokenizeCommand(file, options);
+    } catch (error) {
+      Logger.error(`Tokenization failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Access control commands (v1.2.0)
+const accessCmd = program
+  .command('access')
+  .description('Manage BioNFT access control and permissions');
+
+// access request
+accessCmd
+  .command('request <biocid_or_ip_id>')
+  .description('Request access to a BioNFT asset')
+  .option('--message <string>', 'Optional message to asset owner')
+  .action(async (biocidOrIpId: string, options: AccessRequestOptions) => {
+    try {
+      await accessRequestCommand(biocidOrIpId, options);
+    } catch (error) {
+      Logger.error(`Access request failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// access grant
+accessCmd
+  .command('grant <biocid_or_ip_id> <wallet_address>')
+  .description('Grant access to a wallet address (owner only)')
+  .option('--expires-in <duration>', 'Access expiry duration (e.g., 30d, 90d)')
+  .action(async (biocidOrIpId: string, walletAddress: string, options: AccessGrantOptions) => {
+    try {
+      await accessGrantCommand(biocidOrIpId, walletAddress, options);
+    } catch (error) {
+      Logger.error(`Access grant failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// access revoke
+accessCmd
+  .command('revoke <biocid_or_ip_id> <wallet_address>')
+  .description('Revoke access from a wallet address (owner only)')
+  .option('--yes', 'Skip confirmation prompt')
+  .action(async (biocidOrIpId: string, walletAddress: string, options: AccessRevokeOptions) => {
+    try {
+      await accessRevokeCommand(biocidOrIpId, walletAddress, options);
+    } catch (error) {
+      Logger.error(`Access revocation failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// access list
+accessCmd
+  .command('list [biocid_or_ip_id]')
+  .description('List permittees for an asset, or assets you can access')
+  .option('--mine', 'List assets you have permission to access')
+  .option('--status <status>', 'Filter by status: active, pending, revoked')
+  .option('--json', 'Output as JSON')
+  .action(async (biocidOrIpId: string | undefined, options: AccessListOptions) => {
+    try {
+      await accessListCommand(biocidOrIpId, options);
+    } catch (error) {
+      Logger.error(`List failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// access check
+accessCmd
+  .command('check <biocid_or_ip_id>')
+  .description('Check your access level to a BioNFT asset')
+  .action(async (biocidOrIpId: string) => {
+    try {
+      await accessCheckCommand(biocidOrIpId);
+    } catch (error) {
+      Logger.error(`Access check failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Help command
+program
+  .command('help [command]')
+  .description('Display help for a command')
+  .action((cmd?: string) => {
+    if (cmd) {
+      const command = program.commands.find(c => c.name() === cmd);
+      if (command) {
+        command.outputHelp();
+      } else {
+        Logger.error(`Unknown command: ${cmd}`);
+      }
+    } else {
+      program.outputHelp();
+    }
+  });
+
+// Show welcome message if no command
+if (process.argv.length === 2) {
+  console.log(chalk.cyan('\n╔════════════════════════════════════╗'));
+  console.log(chalk.cyan('║     BioFS CLI v1.2.0               ║'));
+  console.log(chalk.cyan('║     BioNFT-Gated S3 CLI            ║'));
+  console.log(chalk.cyan('╚════════════════════════════════════╝\n'));
+
+  console.log('Available commands:');
+  console.log(`  ${chalk.green('login')}       - Authenticate with Web3 wallet`);
+  console.log(`  ${chalk.green('logout')}      - Clear credentials`);
+  console.log(`  ${chalk.green('whoami')}      - Show current wallet`);
+  console.log(`  ${chalk.green('files')}       - List your BioFiles`);
+  console.log(`  ${chalk.green('download')}    - Download files`);
+  console.log(`  ${chalk.green('upload')}      - Upload files`);
+  console.log(`  ${chalk.green('tokenize')}    - Tokenize as BioIP NFT`);
+  console.log(`  ${chalk.green('access')}      - Manage BioNFT access control`);
+  console.log(`  ${chalk.green('help')}        - Show help\n`);
+
+  console.log('Access control subcommands:');
+  console.log(`  ${chalk.cyan('access request')} <biocid>         - Request access to asset`);
+  console.log(`  ${chalk.cyan('access grant')} <biocid> <wallet> - Grant access (owner)`);
+  console.log(`  ${chalk.cyan('access revoke')} <biocid> <wallet> - Revoke access (owner)`);
+  console.log(`  ${chalk.cyan('access list')} [biocid]          - List permittees or permissions`);
+  console.log(`  ${chalk.cyan('access check')} <biocid>         - Check your access level\n`);
+
+  console.log(`Run ${chalk.cyan('biofs help <command>')} for detailed usage.\n`);
+} else {
+  // Parse command line arguments
+  program.parse(process.argv);
+}
+
+// Handle uncaught errors
+process.on('unhandledRejection', (error) => {
+  Logger.error(`Unexpected error: ${error}`);
+  process.exit(1);
+});
+
+process.on('SIGINT', () => {
+  console.log('\n\nInterrupted. Goodbye!');
+  process.exit(0);
+});
