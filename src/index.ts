@@ -23,6 +23,7 @@ import { jobStatusCommand, JobStatusOptions } from './commands/job/status';
 import { jobResultsCommand, JobResultsOptions } from './commands/job/results';
 import { jobListCommand, JobListOptions } from './commands/job/list';
 import { pipelinesCommand, PipelinesOptions } from './commands/job/pipelines';
+import { submitClaraCommand, ClaraJobOptions } from './commands/job/submit-clara';
 import { labNFTsCommand, LabNFTsOptions } from './commands/labs/list';
 import { shareCommand, ShareOptions } from './commands/share';
 import { sharesCommand, SharesOptions } from './commands/shares';
@@ -397,6 +398,25 @@ jobCmd
       await pipelinesCommand(options);
     } catch (error) {
       Logger.error(`Failed to list pipelines: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// job submit-clara - Submit Clara Parabricks FASTQ→VCF job
+jobCmd
+  .command('submit-clara <biosample_id> <fastq_r1> <fastq_r2>')
+  .description('Submit Clara Parabricks GPU variant calling job (FASTQ → VCF)')
+  .option('--job-id <id>', 'Custom job ID (default: auto-generated UUID)')
+  .option('--reference <genome>', 'Reference genome (default: hg38)')
+  .option('--capture-kit <kit>', 'Capture kit name (default: agilent_v8)')
+  .option('--sequencing-type <type>', 'Sequencing type: WES or WGS (default: WES)')
+  .option('--interval-file <path>', 'BED file path for targeted sequencing')
+  .option('--json', 'Output as JSON')
+  .action(async (biosampleId: string, fastqR1: string, fastqR2: string, options: ClaraJobOptions) => {
+    try {
+      await submitClaraCommand(biosampleId, fastqR1, fastqR2, options);
+    } catch (error) {
+      Logger.error(`Clara job submission failed: ${error}`);
       process.exit(1);
     }
   });

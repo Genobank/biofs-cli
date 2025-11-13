@@ -21,12 +21,20 @@ import inquirer from 'inquirer';
 import axios from 'axios';
 import * as dotenv from 'dotenv';
 
-// Load environment variables from production API
-dotenv.config({ path: '/home/ubuntu/Genobank_APIs/production_api/.env' });
+// Load environment variables (try production API path, then local)
+const envPath = process.env.BIOFS_ENV_PATH || '/home/ubuntu/Genobank_APIs/production_api/.env';
+dotenv.config({ path: envPath });
 
 // GenoBank API Configuration
 const GENOBANK_API = process.env.GENOBANK_API_URL || 'https://genobank.app';
-const ADMIN_SIGNATURE = process.env.ADMIN_SIGNATURE || '0xa5141ae955bba91ad46a940aefc3b05120489b8b776a180668e5b849f16254d44982fb867724390b388ea3bbc606ab4128e264c7b4d3de4082aeb63c3144af501c';
+const ADMIN_SIGNATURE = process.env.ADMIN_SIGNATURE;
+
+if (!ADMIN_SIGNATURE) {
+  console.error(chalk.red('\n❌ Error: ADMIN_SIGNATURE environment variable not set'));
+  console.error(chalk.gray('   This command requires admin privileges'));
+  console.error(chalk.gray('   Set ADMIN_SIGNATURE environment variable or BIOFS_ENV_PATH'));
+  process.exit(1);
+}
 
 // Sequentia Network Configuration (for display)
 const SEQUENTIA_CONFIG = {

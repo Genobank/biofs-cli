@@ -17,8 +17,9 @@ import ora from 'ora';
 import { LabNFT } from '../../lib/sequentia';
 import * as dotenv from 'dotenv';
 
-// Load environment variables
-dotenv.config({ path: '/home/ubuntu/Genobank_APIs/production_api/.env' });
+// Load environment variables (try production API path, then local)
+const envPath = process.env.BIOFS_ENV_PATH || '/home/ubuntu/Genobank_APIs/production_api/.env';
+dotenv.config({ path: envPath });
 
 const SEQUENTIA_EXECUTOR_KEY = process.env.SEQUENTIA_EXECUTOR_KEY;
 
