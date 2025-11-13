@@ -1,0 +1,21 @@
+{
+  "biofsNode": {
+    "url": "http://89.169.108.206:8081",
+    "timeout": 30000
+  },
+  "wallet": {
+    "address": "0x5f5a60eaef242c0d51a21c703f520347b96ed19a"
+  },
+  "services": {
+    "clara": {
+      "enabled": true,
+      "defaultReference": "hg38",
+      "defaultCaptureKit": "agilent_v8",
+      "defaultSequencingType": "WES",
+      "defaultIntervalFile": "/Samples1/hg38/Agilent_V8_SureSelect_hg38.bed"
+    }
+  },
+  "storage": {
+    "vault": "s3://vault.genobank.io"
+  }
+}
