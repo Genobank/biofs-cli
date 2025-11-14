@@ -6,6 +6,7 @@ import { CONFIG } from '../lib/config/constants';
 import { BioFilesCacheManager } from '../lib/storage/biofiles-cache';
 import { BioCIDResolver } from '../lib/biofiles/resolver';
 import chalk from 'chalk';
+import * as readline from 'readline';
 
 export interface LoginOptions {
   port?: number;
@@ -21,19 +22,19 @@ export async function loginCommand(options: LoginOptions): Promise<void> {
   // NEW: Direct authentication with provided credentials
   if (options.wallet && options.signature) {
     Logger.info('Using provided credentials for direct authentication...');
-    
+
     // Validate wallet address format (Ethereum address)
     if (!options.wallet.match(/^0x[a-fA-F0-9]{40}$/)) {
       Logger.error('Invalid wallet address format. Expected Ethereum address (0x...)');
       process.exit(1);
     }
-    
+
     // Validate signature format
     if (!options.signature.match(/^0x[a-fA-F0-9]{130}$/)) {
       Logger.error('Invalid signature format. Expected 65-byte signature (0x...)');
       process.exit(1);
     }
-    
+
     // Save credentials directly
     await credManager.saveCredentials(options.wallet, options.signature);
 
@@ -65,6 +66,13 @@ export async function loginCommand(options: LoginOptions): Promise<void> {
     }
   }
 
+  // NEW: Headless mode (for servers without browser)
+  // Triggered when --no-browser flag is used
+  if (options.browser !== undefined && options.browser === false) {
+    await headlessLogin();
+    return;
+  }
+
   const config = await credManager.loadConfig();
   const port = options.port || config.callback_port || CONFIG.CALLBACK_PORT;
 
@@ -81,7 +89,7 @@ export async function loginCommand(options: LoginOptions): Promise<void> {
   );
 
   // Open browser
-  if (options.browser !== false && config.auto_open_browser !== false) {
+  if ((options.browser === undefined || options.browser === true) && config.auto_open_browser !== false) {
     Logger.info('Opening browser for authentication...');
     await BrowserLauncher.openAuthUrl(authUrl);
   } else {
@@ -162,5 +170,106 @@ async function initializeBioFilesCache(walletAddress: string): Promise<void> {
   } catch (error) {
     spinner.warn('Failed to initialize BioFiles cache - will fetch on demand');
     Logger.debug(`Cache initialization error: ${error}`);
+  }
+}
+
+/**
+ * Headless login mode - for servers without browser
+ * Displays URL for user to open on another machine, then prompts for credentials
+ */
+async function headlessLogin(): Promise<void> {
+  const credManager = CredentialsManager.getInstance();
+
+  console.log('\n' + chalk.cyan('═══════════════════════════════════════════════════════════════'));
+  console.log(chalk.bold.yellow('  Headless Authentication Mode'));
+  console.log(chalk.cyan('═══════════════════════════════════════════════════════════════\n'));
+
+  console.log(chalk.white('Since you\'re on a server without a browser, follow these steps:\n'));
+
+  console.log(chalk.yellow('1.') + chalk.white(' Open this URL on a machine with MetaMask:'));
+  console.log(chalk.cyan.underline(`\n   ${CONFIG.HEADLESS_AUTH_URL}\n`));
+
+  console.log(chalk.yellow('2.') + chalk.white(' Connect your wallet and sign the message'));
+  console.log(chalk.yellow('3.') + chalk.white(' Copy the wallet address and signature'));
+  console.log(chalk.yellow('4.') + chalk.white(' Paste them below\n'));
+
+  console.log(chalk.cyan('───────────────────────────────────────────────────────────────\n'));
+
+  // Create readline interface
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  // Helper to prompt for input
+  const question = (query: string): Promise<string> => {
+    return new Promise(resolve => rl.question(query, resolve));
+  };
+
+  try {
+    // Prompt for wallet
+    const wallet = await question(chalk.green('Enter wallet address: '));
+
+    if (!wallet || !wallet.trim()) {
+      Logger.error('Wallet address is required');
+      rl.close();
+      process.exit(1);
+    }
+
+    // Validate wallet format
+    if (!wallet.trim().match(/^0x[a-fA-F0-9]{40}$/)) {
+      Logger.error('Invalid wallet address format. Expected Ethereum address (0x...)');
+      rl.close();
+      process.exit(1);
+    }
+
+    // Prompt for signature
+    const signature = await question(chalk.green('Enter signature: '));
+
+    if (!signature || !signature.trim()) {
+      Logger.error('Signature is required');
+      rl.close();
+      process.exit(1);
+    }
+
+    // Validate signature format
+    if (!signature.trim().match(/^0x[a-fA-F0-9]{130}$/)) {
+      Logger.error('Invalid signature format. Expected 65-byte signature (0x...)');
+      rl.close();
+      process.exit(1);
+    }
+
+    rl.close();
+
+    console.log('\n' + chalk.cyan('───────────────────────────────────────────────────────────────\n'));
+
+    const spinner = Logger.spinner('Saving credentials...');
+
+    // Save credentials
+    await credManager.saveCredentials(wallet.trim(), signature.trim());
+
+    spinner.succeed('Credentials saved!');
+
+    // Initialize biofiles cache
+    await initializeBioFilesCache(wallet.trim());
+
+    // Show success message
+    Logger.box(
+      `Wallet: ${chalk.green(wallet.trim())}\n\n` +
+      `You can now use:\n` +
+      `  ${chalk.cyan('biofs files')}      - List your BioFiles\n` +
+      `  ${chalk.cyan('biofs download')}   - Download files\n` +
+      `  ${chalk.cyan('biofs upload')}     - Upload files\n` +
+      `  ${chalk.cyan('biofs mount')}      - Mount BioNFT-gated files\n` +
+      `  ${chalk.cyan('biofs whoami')}     - Show current wallet`,
+      'Authentication Successful'
+    );
+
+    Logger.success(`Credentials saved to: ~/.biofs/credentials.json`);
+
+  } catch (error) {
+    rl.close();
+    Logger.error(`Authentication failed: ${error}`);
+    process.exit(1);
   }
 }
