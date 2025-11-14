@@ -8,6 +8,7 @@ export const CONFIG = {
   // API URLs
   API_BASE_URL: process.env.GENOBANK_API_BASE || 'https://genobank.app',
   AUTH_BASE_URL: process.env.GENOBANK_AUTH_BASE || 'https://auth.genobank.app',
+  HEADLESS_AUTH_URL: process.env.GENOBANK_HEADLESS_AUTH || 'https://genobank.io/consent/consent-access.html?headless=true',
   IPFS_GATEWAY: 'https://ipfs.genobank.app/ipfs',
 
   // Local server
