@@ -61,6 +61,7 @@ export const API_CONFIG = {
   base: process.env.GENOBANK_API_BASE || 'https://genobank.app',
   auth: process.env.GENOBANK_AUTH_BASE || 'https://auth.genobank.app',
   bioip: '/api_bioip',
+  fuse: '/api_biofs_fuse',  // Mounted on main API, use relative path
   timeout: 300000 // 5 minutes for large file uploads
 };
 

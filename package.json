@@ -1,6 +1,6 @@
 {
   "name": "@genobank/biofs",
-  "version": "2.3.1",
+  "version": "2.3.3",
   "description": "BioFS - GenoBank.io BioNFT-Gated Filesystem CLI with Sequentia Protocol (BioCIDRegistry, ConsentManager, BioPIL) - 97% cost savings vs Story Protocol",
   "main": "dist/index.js",
   "bin": {
