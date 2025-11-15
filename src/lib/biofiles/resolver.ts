@@ -1,5 +1,7 @@
 import { BioCIDParser } from './biocid';
 import { GenoBankAPIClient } from '../api/client';
+import { FuseAPIClient } from '../api/fuse-client';
+import { CredentialsManager } from '../auth/credentials';
 import { FileLocation, BioFile } from '../../types/biofiles';
 import { CONFIG } from '../config/constants';
 import { Logger } from '../utils/logger';
@@ -223,6 +225,41 @@ export class BioCIDResolver {
       }
     } catch (error) {
       if (verbose) console.error('❌ Error fetching granted BioIP files:', error);
+    }
+
+    // Data Source 5: BioNFT-gated FUSE files (via BioFS FUSE API)
+    try {
+      if (verbose) console.log('🔍 Fetching BioNFT-gated FUSE files...');
+      const credManager = CredentialsManager.getInstance();
+      const creds = await credManager.loadCredentials();
+
+      if (creds && creds.wallet_address && creds.user_signature) {
+        const fuseClient = new FuseAPIClient();
+        const fuseFiles = await fuseClient.getAllFiles(creds.wallet_address, creds.user_signature);
+
+        let totalFuseFiles = 0;
+        for (const biosample of fuseFiles) {
+          for (const filename of biosample.files) {
+            const type = BioCIDParser.detectFileType(filename);
+            bioFiles.push({
+              filename: filename + ' 🔐',  // Lock emoji indicates BioNFT-gated
+              biocid: `biocid://${creds.wallet_address}/fuse/${biosample.biosample}/${filename}`,
+              type,
+              source: 'BioFS',  // BioNFT-Gated via FUSE
+              granted: true,
+              owner: biosample.biosample,  // Store biosample serial as owner
+              created_at: new Date().toISOString()
+            });
+            totalFuseFiles++;
+          }
+        }
+
+        if (verbose) console.log(`✅ Found ${totalFuseFiles} BioNFT-gated FUSE files across ${fuseFiles.length} biosamples`);
+      } else {
+        if (verbose) console.log('⚠️ Skipping FUSE files (no credentials)');
+      }
+    } catch (error) {
+      if (verbose) console.error('❌ Error fetching FUSE files:', error);
     }
 
     if (verbose) console.log(`\n📊 Total BioFiles discovered: ${bioFiles.length}`);
