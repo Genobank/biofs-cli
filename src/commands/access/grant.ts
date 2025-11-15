@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import { GenoBankAPIClient } from '../../lib/api/client';
+import { BioNFTClient } from '../../lib/api/bionft-client';
 import { Logger } from '../../lib/utils/logger';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -16,10 +17,11 @@ export async function accessGrantCommand(
   agentWalletAddress: string,
   options: AccessGrantOptions
 ): Promise<void> {
-  const spinner = ora('Granting Sequentia biosample consent...').start();
+  const spinner = ora('Initializing...').start();
 
   try {
     const api = GenoBankAPIClient.getInstance();
+    const bionft = BioNFTClient.getInstance();
 
     // Validate wallet address format
     if (!agentWalletAddress.startsWith('0x') || agentWalletAddress.length !== 42) {
@@ -31,14 +33,112 @@ export async function accessGrantCommand(
     const isStoryProtocolId = bioSampleOrIpId.startsWith('0x') || bioSampleOrIpId.startsWith('biocid://');
 
     if (isBioSample) {
-      // SEQUENTIA FLOW: Grant biosample consent on Sequentia blockchain
+      // BioNFT FLOW: Check existing consent first, then grant if needed
+      spinner.text = 'Checking existing BioNFT consent...';
+
+      // Step 1: Check if agent already has access
+      const accessCheck = await bionft.checkAccess(bioSampleOrIpId, agentWalletAddress);
+
+      if (accessCheck.hasAccess) {
+        spinner.succeed(chalk.green('✓ Agent already has access to this biosample'));
+
+        console.log('\n' + chalk.cyan('═'.repeat(70)));
+        console.log(chalk.bold('  BioNFT Consent - Already Active'));
+        console.log(chalk.cyan('═'.repeat(70)));
+        console.log(chalk.gray('  Blockchain:'), chalk.blue('Sequentia L1 (Chain ID: 15132025)'));
+        console.log(chalk.gray('  Biosample Serial:'), bioSampleOrIpId);
+        console.log(chalk.gray('  Agent Wallet:'), agentWalletAddress);
+        console.log(chalk.gray('  Operations:'), accessCheck.operations.join(', '));
+        if (accessCheck.consent?.tx_hash) {
+          console.log(chalk.gray('  Transaction Hash:'), chalk.cyan(accessCheck.consent.tx_hash));
+          console.log(chalk.gray('  Block Number:'), accessCheck.consent.block_number);
+        }
+        console.log(chalk.gray('  Status:'), chalk.green('✅ ACTIVE'));
+        console.log(chalk.cyan('═'.repeat(70)));
+        console.log();
+
+        console.log(chalk.green('✓ Agent can already access files:'));
+        console.log(chalk.cyan(`  biofs mount /mnt/genomics --biosample ${bioSampleOrIpId}`));
+        console.log(chalk.cyan(`  biofs job submit-clara ${bioSampleOrIpId}`));
+        console.log();
+        return;
+      }
+
+      // Step 2: Check if biosample is tokenized
+      spinner.text = 'Checking biosample tokenization status...';
+
+      const { isTokenized, consent } = await bionft.checkBiosampleTokenization(bioSampleOrIpId);
+
+      if (!isTokenized) {
+        spinner.warn(chalk.yellow('⚠️  Biosample not tokenized'));
+        console.log();
+        console.log(chalk.yellow('Biosample must be tokenized before granting access.'));
+        console.log();
+
+        // Build pre-filled tokenization URL
+        const tokenizeUrl = `https://genobank.io/consent/tokenize-biosample.html?serial=${bioSampleOrIpId}&agent=${agentWalletAddress}`;
+
+        // Check if display is available (for browser launch)
+        const hasDisplay = process.env.DISPLAY || process.platform === 'darwin' || process.platform === 'win32';
+
+        if (hasDisplay) {
+          // Display environment - open browser automatically
+          console.log(chalk.cyan('Opening tokenization page in browser...'));
+          console.log(chalk.gray(`URL: ${tokenizeUrl}`));
+          console.log();
+
+          try {
+            const { spawn } = await import('child_process');
+            let openCommand: string;
+
+            if (process.platform === 'darwin') {
+              openCommand = 'open';
+            } else if (process.platform === 'win32') {
+              openCommand = 'start';
+            } else {
+              openCommand = 'xdg-open';
+            }
+
+            spawn(openCommand, [tokenizeUrl], { detached: true, stdio: 'ignore' }).unref();
+
+            console.log(chalk.green('✓ Browser opened'));
+            console.log(chalk.gray('Please:'));
+            console.log(chalk.gray('  1. Connect your wallet (MetaMask)'));
+            console.log(chalk.gray('  2. Sign the tokenization transaction (FREE - no gas fee)'));
+            console.log(chalk.gray('  3. Return here and run the command again'));
+            console.log();
+          } catch (error) {
+            console.log(chalk.yellow('⚠️  Could not open browser automatically'));
+            console.log(chalk.cyan(`Manual URL: ${tokenizeUrl}`));
+            console.log();
+          }
+        } else {
+          // Headless environment - provide copy/paste instructions
+          console.log(chalk.bold('🔗 Tokenization Required (Headless Mode)'));
+          console.log();
+          console.log(chalk.gray('To tokenize this biosample, follow these steps:'));
+          console.log();
+          console.log(chalk.cyan('1. On a computer with a browser, open this URL:'));
+          console.log(chalk.bold.blue(`   ${tokenizeUrl}`));
+          console.log();
+          console.log(chalk.cyan('2. Connect your wallet (MetaMask) and sign the transaction'));
+          console.log(chalk.gray('   (FREE - no gas fee required)'));
+          console.log();
+          console.log(chalk.cyan('3. After signing, return here and run:'));
+          console.log(chalk.bold.blue(`   biofs access grant ${bioSampleOrIpId} ${agentWalletAddress}`));
+          console.log();
+        }
+
+        process.exit(1);
+      }
+
+      // Step 3: Grant consent (patient signature required)
       spinner.text = 'Obtaining patient signature for Sequentia consent...';
 
-      // Get patient wallet from stored credentials or ask user
       let patientWallet: string | null = null;
       let patientSignature: string | null = null;
 
-      // Try to get from stored credentials
+      // Get patient wallet from stored credentials
       const credPath = `${os.homedir()}/.biofs/credentials.json`;
       if (fs.existsSync(credPath)) {
         try {
@@ -64,8 +164,6 @@ export async function accessGrantCommand(
         )
       );
 
-      // In production, this would open a MetaMask prompt
-      // For now, provide interactive prompt
       patientSignature = await promptForSignature();
 
       if (!patientSignature) {
@@ -86,7 +184,7 @@ export async function accessGrantCommand(
           patient_signature: patientSignature,
           agent_wallet: agentWalletAddress,
           s3_vault_path: `biowallet/${bioSampleOrIpId}/*`,
-          allowed_operations: ['read', 'download']
+          allowed_operations: ['read', 'download', 'process']
         })
       });
 
@@ -127,8 +225,10 @@ export async function accessGrantCommand(
       console.log(chalk.cyan('═'.repeat(70)));
       console.log();
 
-      console.log(chalk.green('✓ Agent can now access FASTQ files via BioNFT-gated SSHFS mount:'));
-      console.log(chalk.cyan(`  biofs mount biocid://${bioSampleOrIpId} /mnt/biofs`));
+      console.log(chalk.green('✓ Agent can now access files:'));
+      console.log(chalk.cyan(`  biofs mount /mnt/genomics --biosample ${bioSampleOrIpId}`));
+      console.log(chalk.cyan(`  biofs job submit-clara ${bioSampleOrIpId}`));
+      console.log();
 
     } else if (isStoryProtocolId) {
       // STORY PROTOCOL FLOW: Legacy support for BioIP assets
@@ -183,7 +283,7 @@ export async function accessGrantCommand(
     }
 
   } catch (error: any) {
-    spinner.fail(chalk.red('✗ Consent grant failed'));
+    spinner.fail(chalk.red('✗ Access grant failed'));
     Logger.error(`Error: ${error.message}`);
     process.exit(1);
   }
