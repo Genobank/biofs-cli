@@ -10,7 +10,7 @@ export interface BioFile {
   biocid: string;
   type: string;
   size?: number;
-  source: 'S3' | 'BioFS' | 'IPFS' | 'Sequentia' | 'Avalanche';  // BioFS = BioNFT-Gated S3 protocol
+  source: 'S3' | 'BioFS' | 'IPFS' | 'Story' | 'Avalanche';  // BioFS = BioNFT-Gated S3 protocol
   created_at?: string;
   ip_asset?: string;
   s3_path?: string;
@@ -22,7 +22,7 @@ export interface BioFile {
 }
 
 export interface FileLocation {
-  type: 'S3' | 'BioFS' | 'IPFS' | 'Sequentia' | 'Avalanche';  // BioFS = BioNFT-Gated S3 protocol
+  type: 'S3' | 'BioFS' | 'IPFS' | 'Story' | 'Avalanche';  // BioFS = BioNFT-Gated S3 protocol
   path?: string;
   bucket?: string;
   presigned_url?: string;

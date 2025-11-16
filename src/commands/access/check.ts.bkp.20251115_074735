@@ -48,7 +48,7 @@ export async function accessCheckCommand(biocidOrIpId: string): Promise<void> {
 
     // Display results
     console.log('\n' + chalk.cyan('═'.repeat(66)));
-    console.log(chalk.bold('  Access Check Results (BioPIL License Status)'));
+    console.log(chalk.bold('  Access Check Results (Story PIL License Status)'));
     console.log(chalk.cyan('═'.repeat(66)));
     console.log(chalk.gray('  IP Asset ID:'), ipId);
     console.log(chalk.gray('  Owner:'), accessInfo.owner);

@@ -15,7 +15,7 @@ import { getCollectionForCategory, getDefaultImageForCategory } from '../lib/bio
 import { getLicenseType } from '../lib/bioip/licenses';
 import { saveTokenizationRecord } from '../lib/storage/tokenizations';
 import { BioFilesCacheManager } from '../lib/storage/biofiles-cache';
-import { STORY_NETWORKS, API_CONFIG } from '../lib/config/constants';
+import { SEQUENTIA_NETWORK, API_CONFIG } from '../lib/config/constants';
 import { chunkedUpload } from '../lib/upload/chunked';
 
 export interface TokenizeOptions {
@@ -23,7 +23,6 @@ export interface TokenizeOptions {
   description?: string;
   license?: string;
   collection?: string;
-  network?: 'mainnet' | 'testnet';  // Add network option
   noAi?: boolean;
   quiet?: boolean;
   yes?: boolean;  // Auto-confirm without prompts
@@ -52,9 +51,8 @@ export async function tokenizeCommand(filePath: string, options: TokenizeOptions
     throw new Error('Not authenticated. Please run "biofs login" first.');
   }
 
-  // Select network (default to mainnet)
-  const networkName = options.network || 'mainnet';
-  const network = STORY_NETWORKS[networkName];
+  // Use Sequentia network
+  const network = SEQUENTIA_NETWORK;
 
   if (!options.quiet) {
     console.log(chalk.cyan('\n🧬 BioFS Tokenization'));
@@ -175,8 +173,8 @@ export async function tokenizeCommand(filePath: string, options: TokenizeOptions
       aiDescription = options.description;
     }
 
-    // Step 4: Smart contract collection selection on Story Protocol
-    spinner = ora(`Step ${currentStep}/${steps}: 📜 Selecting optimal Story Protocol NFT collection...`).start();
+    // Step 4: Smart contract collection selection on Sequentia
+    spinner = ora(`Step ${currentStep}/${steps}: 📜 Selecting optimal BioNFT collection on Sequentia...`).start();
 
     let collectionAddress = options.collection || getCollectionForCategory(detectedCategory);
     let collectionName = getCollectionName(collectionAddress);
@@ -343,7 +341,6 @@ export async function tokenizeCommand(filePath: string, options: TokenizeOptions
     formData.append('file_category', detectedCategory);
     formData.append('collection_address', collectionAddress);
     formData.append('image_url', getDefaultImageForCategory(detectedCategory));
-    formData.append('network', networkName);
 
     // Submit to API
     const response = await axios.post(`${API_BASE}/register_bioip`, formData, {
@@ -367,8 +364,8 @@ export async function tokenizeCommand(filePath: string, options: TokenizeOptions
     // Debug: Log the response structure
     Logger.debug(`API Response: ${JSON.stringify(response.data, null, 2)}`);
 
-    // Step 6: Mint IP Asset on Story Protocol blockchain
-    spinner = ora(`Step ${currentStep}/${steps}: ⛓️  Minting IP Asset NFT on Story Protocol ${network.name}...`).start();
+    // Step 6: Mint BioNFT on Sequentia blockchain
+    spinner = ora(`Step ${currentStep}/${steps}: ⛓️  Minting BioNFT on ${network.name}...`).start();
 
     // Extract response data - handle different response formats
     const responseData = response.data.status_details?.data ||
@@ -389,7 +386,7 @@ export async function tokenizeCommand(filePath: string, options: TokenizeOptions
       throw new Error('No IP ID returned from tokenization');
     }
 
-    spinner.succeed(`Step ${currentStep}/${steps}: ✓ Smart contract executed successfully - IP Asset minted on-chain!`);
+    spinner.succeed(`Step ${currentStep}/${steps}: ✓ Smart contract executed successfully - BioNFT minted on-chain!`);
 
     // Generate BioCID
     const bioCID = generateBioCID(credentials.wallet_address, detectedCategory, fileName);
@@ -436,7 +433,7 @@ export async function tokenizeCommand(filePath: string, options: TokenizeOptions
       txHash: txHash || '',
       timestamp: new Date().toISOString(),
       wallet: credentials.wallet_address,
-      network: networkName
+      network: 'sequentia'
     });
 
     console.log(`\n💾 Details saved to: ${chalk.gray(recordPath)}`);
@@ -475,11 +472,7 @@ export async function tokenizeCommand(filePath: string, options: TokenizeOptions
     // Check for duplicate error
     if (error.response?.data?.status_details?.description?.includes('already tokenized') ||
         error.response?.data?.status_details?.description?.includes('already been registered')) {
-      if (networkName === 'mainnet') {
-        throw new Error('This genomic profile has already been tokenized on mainnet (duplicate fingerprint detected)');
-      }
-      // For testnet, this shouldn't happen - pass through the original error
-      throw new Error(error.response.data.status_details.description);
+      throw new Error('This genomic profile has already been tokenized (duplicate fingerprint detected)');
     }
 
     // Check for API error

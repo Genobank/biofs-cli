@@ -114,7 +114,11 @@ export class FileUploader {
   }
 
   private getCollectionForType(fileType: string): string {
-    // On Sequentia, all BioFiles use the BioNFT contract
-    return CONFIG.CONTRACTS.BIONFT;
+    switch (fileType) {
+      case 'vcf':
+        return CONFIG.COLLECTIONS.VCF_COLLECTION;
+      default:
+        return CONFIG.COLLECTIONS.VCF_OWNERSHIP; // Default collection
+    }
   }
 }

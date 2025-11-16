@@ -111,7 +111,7 @@ export class BioCIDResolver {
 
     if (file.ip_id) {
       return {
-        type: 'Sequentia',
+        type: 'Story',
         ip_id: file.ip_id,
         metadata_uri: undefined // Would need separate API call
       };
@@ -123,11 +123,11 @@ export class BioCIDResolver {
   async discoverAllBioFiles(verbose: boolean = false): Promise<BioFile[]> {
     const bioFiles: BioFile[] = [];
 
-    // Data Source 1: Sequentia IP Assets (includes BioIP files registered on Sequentia)
+    // Data Source 1: Story Protocol IP Assets (includes BioIP files registered on Story)
     try {
-      if (verbose) console.log('🔍 Fetching Sequentia assets...');
+      if (verbose) console.log('🔍 Fetching Story Protocol assets...');
       const ipAssets = await this.api.getStoryIPAssets();
-      if (verbose) console.log(`✅ Found ${ipAssets.length} Sequentia assets`);
+      if (verbose) console.log(`✅ Found ${ipAssets.length} Story Protocol assets`);
 
       for (const asset of ipAssets) {
         // Extract meaningful filename from metadata
@@ -142,9 +142,9 @@ export class BioCIDResolver {
 
         bioFiles.push({
           filename,
-          biocid: `biocid://${asset.owner || asset.wallet_address || 'unknown'}/sequentia/${asset.ipId}`,
+          biocid: `biocid://${asset.owner || asset.wallet_address || 'unknown'}/story/${asset.ipId}`,
           type: fileType,
-          source: 'Sequentia',
+          source: 'Story',
           created_at: asset.created_at,
           ip_asset: asset.ipId,
           s3_path: asset.s3_path,
@@ -152,7 +152,7 @@ export class BioCIDResolver {
         });
       }
     } catch (error) {
-      if (verbose) console.error('❌ Error fetching Sequentia assets:', error);
+      if (verbose) console.error('❌ Error fetching Story Protocol assets:', error);
     }
 
     // Data Source 2: Avalanche Biosamples

@@ -45,8 +45,8 @@ export class FileDownloader {
         return await this.downloadFromS3(location, outputPath, showProgress);
       case 'IPFS':
         return await this.downloadFromIPFS(location, outputPath, showProgress);
-      case 'Sequentia':
-        throw new Error('Direct download from Sequentia not yet implemented (use S3 backend)');
+      case 'Story':
+        throw new Error('Direct download from Story Protocol not yet implemented');
       default:
         throw new Error(`Unknown location type: ${location.type}`);
     }

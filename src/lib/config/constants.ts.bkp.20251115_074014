@@ -31,25 +31,29 @@ export const CONFIG = {
   // Credentials
   CREDENTIAL_EXPIRY_DAYS: 30,
 
-  // Sequentia v4 Smart Contracts (Deployed Nov 15, 2025)
-  CONTRACTS: {
-    BIONFT: '0x1e7403430a367C83dF96d5492cCB114b3750B00A',
-    BIOPIL: '0x6474485F6fE3c19Ac0cD069D4cBc421656942DA9',
-    BIOAGENT_NFT: '0x04D716bb245b55c715872F00d80BfE1b1d03a121',
-    X402_ROUTER: '0xe95f101dcBe711Ba9252043943ba28f7D9aE8014',
-    VALIDATOR_MANAGER: '0x4E21d10CCd98D46CA7045C475C4B46bdC6244B3a',
-    SEQUSDC: '0x85f8B3F5A3f6EA2E02BeE85a1C96F5e7e08f30F9',
-    STAKING_VALIDATOR: '0xbe31AB4fb4631d89a3b2D69D1e0E496B3D2F5df3'
+  // Story Protocol Collections
+  COLLECTIONS: {
+    VCF_OWNERSHIP: '0x5021F7438ea502b0c346cB59F8E92B749Ecd74B5',
+    VCF_COLLECTION: '0x19A615224D03487AaDdC43e4520F9D83923d9512',
+    VCF_ANNOTATION: '0xB8d03f2E1C02e4cC5b5fe1613c575c01BDD12269',
+    ALPHAGENOME: '0x88Ed5b47ea8f609Ee14ac60968C3f76f9138a171'
   }
 };
 
-// Sequentia Blockchain Network Configuration (Cosmos SDK + EVM Module v0.5.0)
-export const SEQUENTIA_NETWORK = {
-  rpc: process.env.SEQUENTIA_RPC_URL || 'http://52.90.163.112:8545',
-  chainId: parseInt(process.env.SEQUENTIA_CHAIN_ID || '262144'),
-  cosmosChainId: process.env.SEQUENTIA_COSMOS_CHAIN_ID || 'sequentia-15132025',
-  explorer: process.env.SEQUENTIA_EXPLORER || 'http://52.90.163.112:26657',
-  name: 'Sequentia v4 Mainnet'
+// Story Protocol Network Configuration
+export const STORY_NETWORKS = {
+  mainnet: {
+    rpc: process.env.STORY_MAINNET_RPC || 'https://rpc.story.foundation',
+    chainId: parseInt(process.env.STORY_MAINNET_CHAIN_ID || '1516'),
+    explorer: process.env.STORY_MAINNET_EXPLORER || 'https://explorer.story.foundation',
+    name: 'Story Protocol Mainnet'
+  },
+  testnet: {
+    rpc: process.env.STORY_TESTNET_RPC || 'https://testnet.storyrpc.io',
+    chainId: parseInt(process.env.STORY_TESTNET_CHAIN_ID || '1315'),
+    explorer: process.env.STORY_TESTNET_EXPLORER || 'https://aeneid.explorer.story.foundation',
+    name: 'Story Protocol Testnet (Aeneid)'
+  }
 };
 
 // API Configuration
