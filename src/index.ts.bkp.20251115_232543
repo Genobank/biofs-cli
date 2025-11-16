@@ -10,7 +10,6 @@ import { downloadCommand, DownloadOptions } from './commands/download';
 import { downloadCommandWithConsent } from './commands/download-with-consent';
 import { uploadCommand, UploadOptions } from './commands/upload';
 import { mountCommand, MountOptions } from './commands/mount';
-import { mountRemoteCommand, MountRemoteOptions } from './commands/mount-remote';
 import { umountCommand, UmountOptions } from './commands/umount';
 import { tokenizeCommand, TokenizeOptions } from './commands/tokenize';
 import { tokenizeFastqsCommand, TokenizeFastqsOptions } from './commands/tokenize-fastqs';
@@ -26,7 +25,6 @@ import { jobResultsCommand, JobResultsOptions } from './commands/job/results';
 import { jobListCommand, JobListOptions } from './commands/job/list';
 import { pipelinesCommand, PipelinesOptions } from './commands/job/pipelines';
 import { submitClaraCommand, ClaraJobOptions } from './commands/job/submit-clara';
-import { agentHealthCommand, AgentHealthOptions } from './commands/agent/health';
 import { labNFTsCommand, LabNFTsOptions } from './commands/labs/list';
 import { shareCommand, ShareOptions } from './commands/share';
 import { sharesCommand, SharesOptions } from './commands/shares';
@@ -192,22 +190,6 @@ program
       await mountCommand(mountPoint, options);
     } catch (error) {
       Logger.error(`Mount failed: ${error}`);
-      process.exit(1);
-    }
-  });
-
-// Mount-remote command (mount biosample on Nebius GPU agent)
-program
-  .command('mount-remote <biosample_id>')
-  .alias('mount-agent')
-  .description('Mount biosample files on remote agent (Nebius GPU server)')
-  .option('--mount-point <path>', 'Remote mount point (default: /biofs)')
-  .option('--json', 'Output as JSON')
-  .action(async (biosampleId: string, options: MountRemoteOptions) => {
-    try {
-      await mountRemoteCommand(biosampleId, options);
-    } catch (error) {
-      Logger.error(`Remote mount failed: ${error}`);
       process.exit(1);
     }
   });
@@ -444,35 +426,19 @@ jobCmd
 
 // job submit-clara - Submit Clara Parabricks FASTQ→VCF job
 jobCmd
-  .command('submit-clara <biosample_id> [fastq_r1] [fastq_r2]')
-  .description('Submit Clara Parabricks GPU variant calling job (FASTQ → VCF)\nAuto-discovers FASTQ files from consent if not specified')
+  .command('submit-clara <biosample_id> <fastq_r1> <fastq_r2>')
+  .description('Submit Clara Parabricks GPU variant calling job (FASTQ → VCF)')
   .option('--job-id <id>', 'Custom job ID (default: auto-generated UUID)')
   .option('--reference <genome>', 'Reference genome (default: hg38)')
   .option('--capture-kit <kit>', 'Capture kit name (default: agilent_v8)')
   .option('--sequencing-type <type>', 'Sequencing type: WES or WGS (default: WES)')
   .option('--interval-file <path>', 'BED file path for targeted sequencing')
   .option('--json', 'Output as JSON')
-  .action(async (biosampleId: string, fastqR1: string | undefined, fastqR2: string | undefined, options: ClaraJobOptions) => {
+  .action(async (biosampleId: string, fastqR1: string, fastqR2: string, options: ClaraJobOptions) => {
     try {
       await submitClaraCommand(biosampleId, fastqR1, fastqR2, options);
     } catch (error) {
       Logger.error(`Clara job submission failed: ${error}`);
-      process.exit(1);
-    }
-  });
-
-// Agent Health - Check processing agent readiness
-program
-  .command('agent-health')
-  .alias('health')
-  .description('Check if processing agent (Nebius GPU server) is ready to receive jobs')
-  .option('--json', 'Output as JSON')
-  .option('--verbose', 'Show detailed server information')
-  .action(async (options: AgentHealthOptions) => {
-    try {
-      await agentHealthCommand(options);
-    } catch (error) {
-      Logger.error(`Health check failed: ${error}`);
       process.exit(1);
     }
   });
@@ -622,7 +588,6 @@ if (process.argv.length === 2) {
   console.log(`  ${chalk.green('biofiles')}    - List your BioFiles (all sources)`);
   console.log(`  ${chalk.green('download')}    - Download files (GDPR consent)`);
   console.log(`  ${chalk.green('mount')}       - Mount all files (GDPR consent)`);
-  console.log(`  ${chalk.green('mount-remote')} - Mount biosample on agent`);
   console.log(`  ${chalk.green('upload')}      - Upload files`);
   console.log(`  ${chalk.green('tokenize')}    - Tokenize genomic data as BioNFT`);
   console.log(`  ${chalk.green('labnfts')}     - List approved research labs`);
@@ -632,7 +597,6 @@ if (process.argv.length === 2) {
   console.log(`  ${chalk.green('dissect')}     - Extract phenotype SNPs (GDPR)`);
   console.log(`  ${chalk.green('access')}      - Manage BioNFT access control`);
   console.log(`  ${chalk.green('job')}         - Manage research jobs (BioOS)`);
-  console.log(`  ${chalk.green('agent-health')} - Check processing agent readiness`);
   console.log(`  ${chalk.green('help')}        - Show help\n`);
 
   console.log('Tokenization subcommands:');

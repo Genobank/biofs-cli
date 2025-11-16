@@ -14,7 +14,7 @@ import { calculateSnpFingerprint, calculateFileFingerprint } from '../../lib/bio
 import { getCollectionForCategory, getDefaultImageForCategory } from '../../lib/bioip/collections';
 import { getLicenseType } from '../../lib/bioip/licenses';
 import { saveTokenizationRecord } from '../../lib/storage/tokenizations';
-import { SEQUENTIA_NETWORK, API_CONFIG } from '../../lib/config/constants';
+import { STORY_NETWORKS, API_CONFIG } from '../../lib/config/constants';
 import { chunkedUpload } from '../../lib/upload/chunked';
 
 export interface TokenizeOptions {
@@ -22,6 +22,7 @@ export interface TokenizeOptions {
   description?: string;
   license?: string;
   collection?: string;
+  network?: 'mainnet' | 'testnet';  // Add network option
   noAi?: boolean;
   quiet?: boolean;
   yes?: boolean;  // Auto-confirm without prompts
@@ -50,8 +51,9 @@ export async function tokenizeCommand(filePath: string, options: TokenizeOptions
     throw new Error('Not authenticated. Please run "biofs login" first.');
   }
 
-  // Use Sequentia network
-  const network = SEQUENTIA_NETWORK;
+  // Select network (default to mainnet)
+  const networkName = options.network || 'mainnet';
+  const network = STORY_NETWORKS[networkName];
 
   if (!options.quiet) {
     console.log(chalk.cyan('\n🧬 BioFS Tokenization'));
@@ -340,7 +342,7 @@ export async function tokenizeCommand(filePath: string, options: TokenizeOptions
     formData.append('file_category', detectedCategory);
     formData.append('collection_address', collectionAddress);
     formData.append('image_url', getDefaultImageForCategory(detectedCategory));
-    formData.append('network', network.name);
+    formData.append('network', networkName);
 
     // Submit to API
     const response = await axios.post(`${API_BASE}/register_bioip`, formData, {
@@ -433,7 +435,7 @@ export async function tokenizeCommand(filePath: string, options: TokenizeOptions
       txHash: txHash || '',
       timestamp: new Date().toISOString(),
       wallet: credentials.wallet_address,
-      network: network.name
+      network: networkName
     });
 
     console.log(`\n💾 Details saved to: ${chalk.gray(recordPath)}`);
@@ -444,8 +446,8 @@ export async function tokenizeCommand(filePath: string, options: TokenizeOptions
     // Check for duplicate error
     if (error.response?.data?.status_details?.description?.includes('already tokenized') ||
         error.response?.data?.status_details?.description?.includes('already been registered')) {
-      if (network.name === 'Sequentia v4 Mainnet') {
-        throw new Error('This genomic profile has already been tokenized on Sequentia (duplicate fingerprint detected)');
+      if (networkName === 'mainnet') {
+        throw new Error('This genomic profile has already been tokenized on mainnet (duplicate fingerprint detected)');
       }
       // For testnet, this shouldn't happen - pass through the original error
       throw new Error(error.response.data.status_details.description);

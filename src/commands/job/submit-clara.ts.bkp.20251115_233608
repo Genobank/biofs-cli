@@ -4,7 +4,6 @@ import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
 import { Logger } from '../../lib/utils/logger';
 import { getCredentials } from '../../lib/auth/credentials';
-import { BioNFTClient } from '../../lib/api/bionft-client';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -48,38 +47,12 @@ export async function submitClaraCommand(
     const userWallet = credentials.wallet_address;
     const userSignature = credentials.user_signature;
 
-    // Step 1: Query consent record to get agent wallet and FASTQ files
-    spinner.text = 'Querying biosample consent record...';
-    const bionft = BioNFTClient.getInstance();
-
-    const { isTokenized, consent } = await bionft.checkBiosampleTokenization(biosampleId);
-
-    if (!isTokenized || !consent) {
-      spinner.fail('Biosample not tokenized');
-      throw new Error(
-        `Biosample ${biosampleId} is not tokenized.\n` +
-        `Please run: biofs access grant ${biosampleId} <agent_wallet>`
-      );
-    }
-
-    const agentWallet = consent.agent_wallet;
-
-    if (!agentWallet) {
-      spinner.fail('No agent wallet found in consent');
-      throw new Error(
-        `No agent wallet assigned to biosample ${biosampleId}.\n` +
-        `Please run: biofs access grant ${biosampleId} <agent_wallet>`
-      );
-    }
-
-    Logger.info(`✓ Found agent wallet: ${agentWallet}`);
-
-    // Step 2: Auto-discover FASTQ files if not provided
+    // Auto-discover FASTQ files if not provided
     let finalFastqR1 = fastqR1;
     let finalFastqR2 = fastqR2;
 
     if (!fastqR1 || !fastqR2) {
-      spinner.text = 'Discovering FASTQ files from biosample...';
+      spinner.text = 'Discovering FASTQ files from biosample consent...';
 
       try {
         // Query the API to discover files from consent record
@@ -87,8 +60,8 @@ export async function submitClaraCommand(
         const discoveryResponse = await axios.get(`${apiBase}/api_biofs_fuse/list`, {
           params: {
             biosample: biosampleId,
-            wallet: agentWallet,  // Use agent wallet (who will process the files)
-            signature: userSignature,  // Patient signs the request
+            wallet: userWallet,
+            signature: userSignature,
             rebuild_index: false
           }
         });
@@ -138,8 +111,7 @@ export async function submitClaraCommand(
       biosampleId,
       fastqR1: finalFastqR1,
       fastqR2: finalFastqR2,
-      agentWallet,  // Agent wallet (processing lab) from consent
-      patientWallet: userWallet,  // Patient wallet (data owner)
+      userWallet,
       sequencingType: options.sequencingType || claraConfig.defaultSequencingType || 'WES',
       reference: options.reference || claraConfig.defaultReference || 'hg38',
       captureKit: options.captureKit || claraConfig.defaultCaptureKit || 'agilent_v8',
@@ -179,10 +151,6 @@ export async function submitClaraCommand(
     console.log(`  ${chalk.cyan('Sequencing Type:')} ${jobData.sequencingType}`);
     console.log(`  ${chalk.cyan('Reference:')} ${jobData.reference}`);
     console.log(`  ${chalk.cyan('Capture Kit:')} ${jobData.captureKit}`);
-    console.log();
-    console.log(chalk.bold('Consent Details:'));
-    console.log(`  ${chalk.cyan('Patient Wallet:')} ${userWallet.substring(0, 10)}...`);
-    console.log(`  ${chalk.cyan('Processing Agent:')} ${agentWallet.substring(0, 10)}...`);
     console.log();
     console.log(chalk.bold('Input Files:'));
     console.log(`  ${chalk.cyan('R1:')} ${finalFastqR1}`);

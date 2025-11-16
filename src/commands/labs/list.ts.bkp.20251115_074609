@@ -84,7 +84,7 @@ function displayLabsTable(labs: Lab[], filter?: string, location?: string): void
 
   for (const lab of labs) {
     const verificationBadge = lab.story_protocol_verified
-      ? chalk.green('✅ Sequentia Verified')
+      ? chalk.green('✅ Story Protocol Verified')
       : chalk.yellow('⚠️  Pending Verification');
 
     const content = [

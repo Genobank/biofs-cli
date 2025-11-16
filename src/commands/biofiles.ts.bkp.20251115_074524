@@ -35,7 +35,7 @@ export async function filesCommand(options: FilesOptions): Promise<void> {
           filename: cbf.filename,
           biocid: cbf.locations.biocid || '',
           type: cbf.metadata.file_type || 'unknown',
-          source: cbf.locations.story_ip ? 'Sequentia' :
+          source: cbf.locations.story_ip ? 'Story' :
                   cbf.locations.avalanche_biosample ? 'Avalanche' :
                   cbf.locations.s3 ? 'S3' : 'BioFS',
           size: cbf.metadata.size,
@@ -199,7 +199,7 @@ function getSourceColor(source: string): string {
       return 'cyan';  // BioNFT-Gated S3 storage
     case 'IPFS':
       return 'magenta';
-    case 'Sequentia':
+    case 'Story':
       return 'green';
     default:
       return 'gray';
@@ -214,8 +214,8 @@ function getSourceBadge(source: string): string {
       return chalk.bgCyan.black(` BioFS 🧬 `);  // BioNFT-Gated S3 - our proprietary protocol
     case 'IPFS':
       return chalk.bgMagenta.white(` IPFS `);
-    case 'Sequentia':
-      return chalk.bgGreen.white(` Sequentia `);
+    case 'Story':
+      return chalk.bgGreen.white(` Story `);
     default:
       return chalk.bgGray.white(` ${source} `);
   }
