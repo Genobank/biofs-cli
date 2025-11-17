@@ -44,7 +44,7 @@ const program = new Command();
 program
   .name('biofs')
   .description('BioFS by GenoBank.io - BioNFT-Gated S3 CLI for genomic data')
-  .version('2.2.0')
+  .version('2.3.10')
   .option('--debug', 'Enable debug output')
   .hook('preAction', (thisCommand) => {
     // Set global debug flag if --debug is passed
@@ -203,6 +203,7 @@ program
   .description('Mount biosample files on remote agent (Nebius GPU server)')
   .option('--mount-point <path>', 'Remote mount point (default: /biofs)')
   .option('--json', 'Output as JSON')
+  .option('--verbose', 'Show detailed debug information')
   .action(async (biosampleId: string, options: MountRemoteOptions) => {
     try {
       await mountRemoteCommand(biosampleId, options);

@@ -13,13 +13,19 @@ export async function agentHealthCommand(options: AgentHealthOptions = {}): Prom
   const spinner = ora('Checking agent health...').start();
 
   try {
-    // Load config to get BioFS-Node URL
-    const configPath = path.join(process.cwd(), 'config.json');
-    if (!fs.existsSync(configPath)) {
-      throw new Error('config.json not found. Please run in biofs-cli directory.');
+    // Load config to get BioFS-Node URL (check multiple locations)
+    let config: any;
+    const localConfigPath = path.join(process.cwd(), 'config.json');
+    const homeConfigPath = path.join(process.env.HOME || '~', '.biofsrc');
+
+    if (fs.existsSync(localConfigPath)) {
+      config = JSON.parse(fs.readFileSync(localConfigPath, 'utf-8'));
+    } else if (fs.existsSync(homeConfigPath)) {
+      config = JSON.parse(fs.readFileSync(homeConfigPath, 'utf-8'));
+    } else {
+      throw new Error('Config not found. Create config.json or ~/.biofsrc with biofsNode.url');
     }
 
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
     const biofsNodeUrl = config.biofsNode?.url || process.env.BIOFS_NODE_URL;
 
     if (!biofsNodeUrl) {

@@ -183,7 +183,7 @@ export async function accessGrantCommand(
           patient_wallet: patientWallet,
           patient_signature: patientSignature,
           agent_wallet: agentWalletAddress,
-          s3_vault_path: `deprecated`,  // Backend uses BioFS index instead
+          s3_vault_path: `${bioSampleOrIpId}/*`,  // Path pattern for BioNFT checkPermission()
           allowed_operations: ['read', 'download', 'process']
         })
       });

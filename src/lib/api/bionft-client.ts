@@ -10,6 +10,8 @@
 import axios, { AxiosInstance } from 'axios';
 import { CredentialsManager } from '../auth/credentials';
 import { Logger } from '../utils/logger';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface BioNFTConsent {
   biosample_serial: string;
@@ -74,38 +76,63 @@ export class BioNFTClient {
   }
 
   /**
-   * Check if biosample is tokenized (has patient_wallet set)
-   * Queries MongoDB via Python backend
+   * Check if biosample is tokenized by attempting to mount it on biofs-node
+   * This validates consent via Sequentia blockchain
    */
   async checkBiosampleTokenization(biosampleSerial: string): Promise<{
     isTokenized: boolean;
     consent: BioNFTConsent | null;
   }> {
     try {
-      const signature = await this.getSignature();
+      const wallet = await this.getWallet();
 
-      // Query via /api_biofs_fuse/discover (returns biosamples accessible to wallet)
-      const response = await this.axios.get('/api_biofs_fuse/discover', {
-        params: {
-          wallet: await this.getWallet(),
-          signature
+      // Get biofs-node URL from config (check multiple locations)
+      let biofsNodeUrl = process.env.BIOFS_NODE_URL;
+
+      if (!biofsNodeUrl) {
+        const localConfigPath = path.join(process.cwd(), 'config.json');
+        const homeConfigPath = path.join(process.env.HOME || '~', '.biofsrc');
+
+        if (fs.existsSync(localConfigPath)) {
+          const config = JSON.parse(fs.readFileSync(localConfigPath, 'utf-8'));
+          biofsNodeUrl = config.biofsNode?.url;
+        } else if (fs.existsSync(homeConfigPath)) {
+          const config = JSON.parse(fs.readFileSync(homeConfigPath, 'utf-8'));
+          biofsNodeUrl = config.biofsNode?.url;
         }
-      });
+      }
 
-      const biosamples = response.data.biosamples || [];
-      const consent = biosamples.find((b: any) => b.biosample_serial === biosampleSerial);
+      if (!biofsNodeUrl) {
+        throw new Error('BioFS-Node URL not configured. Set biofsNode.url in config.json or ~/.biofsrc');
+      }
 
-      if (consent) {
+      // Try to mount biosample on biofs-node (validates consent)
+      const mountResponse = await axios.post(
+        `${biofsNodeUrl}/api/v1/clara/mount`,
+        {
+          biosampleId: biosampleSerial,
+          mountPoint: `/biofs/${biosampleSerial}`,
+          userWallet: wallet
+        },
+        {
+          timeout: 30000,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      if (mountResponse.data.success && mountResponse.data.consent) {
+        const consentData = mountResponse.data.consent;
+
         return {
           isTokenized: true,
           consent: {
-            biosample_serial: consent.biosample_serial,
-            patient_wallet: consent.patient_wallet || null,
-            agent_wallet: consent.agent_wallet,
-            tx_hash: consent.tx_hash,
-            block_number: consent.block_number,
-            s3_paths: consent.s3_paths || [],
-            status: consent.status || 'active'
+            biosample_serial: biosampleSerial,
+            patient_wallet: consentData.patient || wallet,
+            agent_wallet: consentData.agent,
+            tx_hash: consentData.tx_hash || '',
+            block_number: consentData.block || 0,
+            s3_paths: mountResponse.data.files || [],
+            status: 'active'
           }
         };
       }
@@ -125,6 +152,7 @@ export class BioNFTClient {
 
   /**
    * List files in biosample using /api_biofs_fuse/list
+   * Automatically fetches file sizes from S3 for each file
    */
   async listBiosampleFiles(biosampleSerial: string): Promise<BiosampleFile[]> {
     try {
@@ -141,12 +169,20 @@ export class BioNFTClient {
       });
 
       if (response.data.files) {
-        return response.data.files.map((filename: string) => ({
-          filename,
-          size: 0,  // Will be populated by info call if needed
-          lastModified: '',
-          sizeReadable: ''
-        }));
+        // Get file sizes for each file
+        const filesWithSizes = await Promise.all(
+          response.data.files.map(async (filename: string) => {
+            const fileInfo = await this.getFileInfo(biosampleSerial, filename);
+            return fileInfo || {
+              filename,
+              size: 0,
+              lastModified: '',
+              sizeReadable: ''
+            };
+          })
+        );
+
+        return filesWithSizes;
       }
 
       return [];
