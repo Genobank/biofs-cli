@@ -1,58 +1,241 @@
 [
   {
+    "inputs": [],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
     "inputs": [
-      {"internalType": "string", "name": "biocid", "type": "string"},
-      {"internalType": "address", "name": "subject", "type": "address"},
-      {"internalType": "address[]", "name": "grantors", "type": "address[]"},
-      {"internalType": "uint8[]", "name": "consentTypes", "type": "uint8[]"},
-      {"internalType": "uint256", "name": "birthDate", "type": "uint256"},
-      {"internalType": "uint256", "name": "expiresAt", "type": "uint256"},
-      {"internalType": "string", "name": "purpose", "type": "string"},
-      {"internalType": "bool", "name": "requiresAllGrantors", "type": "bool"}
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "accessor",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "action",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
     ],
-    "name": "createConsent",
-    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-    "stateMutability": "nonpayable",
-    "type": "function"
+    "name": "AccessLogged",
+    "type": "event"
   },
   {
-    "inputs": [{"internalType": "string", "name": "biocid", "type": "string"}],
-    "name": "approveConsent",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "grantor",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "ConsentApproved",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "subject",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address[]",
+        "name": "grantors",
+        "type": "address[]"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum ConsentManager.ConsentType[]",
+        "name": "consentTypes",
+        "type": "uint8[]"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "expiresAt",
+        "type": "uint256"
+      }
+    ],
+    "name": "ConsentCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "ConsentExpired",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "revoker",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "reason",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "ConsentRevoked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "ConsentTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "deceased",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address[]",
+        "name": "heirs",
+        "type": "address[]"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256[]",
+        "name": "shares",
+        "type": "uint256[]"
+      }
+    ],
+    "name": "FamilyInheritanceDeclared",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
   },
   {
     "inputs": [
-      {"internalType": "string", "name": "biocid", "type": "string"},
-      {"internalType": "string", "name": "reason", "type": "string"}
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    "name": "revokeConsent",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "string", "name": "biocid", "type": "string"}],
-    "name": "getConsent",
+    "name": "allBiocids",
     "outputs": [
       {
-        "components": [
-          {"internalType": "string", "name": "biocid", "type": "string"},
-          {"internalType": "address", "name": "subject", "type": "address"},
-          {"internalType": "address[]", "name": "grantors", "type": "address[]"},
-          {"internalType": "bool[]", "name": "grantorApproved", "type": "bool[]"},
-          {"internalType": "uint8[]", "name": "consentTypes", "type": "uint8[]"},
-          {"internalType": "uint8", "name": "status", "type": "uint8"},
-          {"internalType": "uint256", "name": "grantedAt", "type": "uint256"},
-          {"internalType": "uint256", "name": "expiresAt", "type": "uint256"},
-          {"internalType": "uint256", "name": "ageOfMajority", "type": "uint256"},
-          {"internalType": "string", "name": "purpose", "type": "string"},
-          {"internalType": "bool", "name": "requiresAllGrantors", "type": "bool"}
-        ],
-        "internalType": "struct ConsentManager.ConsentRecord",
+        "internalType": "string",
         "name": "",
-        "type": "tuple"
+        "type": "string"
       }
     ],
     "stateMutability": "view",
@@ -60,26 +243,144 @@
   },
   {
     "inputs": [
-      {"internalType": "string", "name": "biocid", "type": "string"},
-      {"internalType": "address", "name": "accessor", "type": "address"},
-      {"internalType": "string", "name": "action", "type": "string"},
-      {"internalType": "uint256", "name": "timestamp", "type": "uint256"}
+      {
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      }
     ],
-    "name": "logAccess",
+    "name": "approveConsent",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "string", "name": "biocid", "type": "string"}],
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "name": "consentExists",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      },
+      {
+        "internalType": "address",
+        "name": "subject",
+        "type": "address"
+      },
+      {
+        "internalType": "address[]",
+        "name": "grantors",
+        "type": "address[]"
+      },
+      {
+        "internalType": "enum ConsentManager.ConsentType[]",
+        "name": "consentTypes",
+        "type": "uint8[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "birthDate",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "expiresAt",
+        "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "purpose",
+        "type": "string"
+      },
+      {
+        "internalType": "bool",
+        "name": "requiresAllGrantors",
+        "type": "bool"
+      }
+    ],
+    "name": "createConsent",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "deceased",
+        "type": "address"
+      },
+      {
+        "internalType": "address[]",
+        "name": "heirs",
+        "type": "address[]"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "heirShares",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "string[]",
+        "name": "biocids",
+        "type": "string[]"
+      }
+    ],
+    "name": "declareFamilyInheritance",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      }
+    ],
     "name": "getAccessLogs",
     "outputs": [
       {
         "components": [
-          {"internalType": "string", "name": "biocid", "type": "string"},
-          {"internalType": "address", "name": "accessor", "type": "address"},
-          {"internalType": "string", "name": "action", "type": "string"},
-          {"internalType": "uint256", "name": "timestamp", "type": "uint256"}
+          {
+            "internalType": "address",
+            "name": "accessor",
+            "type": "address"
+          },
+          {
+            "internalType": "string",
+            "name": "action",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "timestamp",
+            "type": "uint256"
+          },
+          {
+            "internalType": "string",
+            "name": "ipAddress",
+            "type": "string"
+          }
         ],
         "internalType": "struct ConsentManager.AccessLog[]",
         "name": "",
@@ -90,20 +391,229 @@
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "string", "name": "biocid", "type": "string"}],
-    "name": "isConsentValid",
-    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      }
+    ],
+    "name": "getConsent",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "subject",
+        "type": "address"
+      },
+      {
+        "internalType": "address[]",
+        "name": "grantors",
+        "type": "address[]"
+      },
+      {
+        "internalType": "enum ConsentManager.ConsentType[]",
+        "name": "consentTypes",
+        "type": "uint8[]"
+      },
+      {
+        "internalType": "enum ConsentManager.ConsentStatus",
+        "name": "status",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint256",
+        "name": "grantedAt",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "expiresAt",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "ageOfMajority",
+        "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "purpose",
+        "type": "string"
+      },
+      {
+        "internalType": "bool",
+        "name": "requiresAllGrantors",
+        "type": "bool"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
-    "anonymous": false,
     "inputs": [
-      {"indexed": true, "internalType": "string", "name": "biocid", "type": "string"},
-      {"indexed": false, "internalType": "string", "name": "reason", "type": "string"},
-      {"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"}
+      {
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      }
     ],
-    "name": "ConsentRevoked",
-    "type": "event"
+    "name": "getConsentStatus",
+    "outputs": [
+      {
+        "internalType": "enum ConsentManager.ConsentStatus",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getTotalConsents",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      },
+      {
+        "internalType": "address",
+        "name": "grantor",
+        "type": "address"
+      }
+    ],
+    "name": "hasGrantorApproved",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      }
+    ],
+    "name": "isConsentValid",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      },
+      {
+        "internalType": "address",
+        "name": "accessor",
+        "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "action",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "logAccess",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "reason",
+        "type": "string"
+      }
+    ],
+    "name": "revokeConsent",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      }
+    ],
+    "name": "transferConsentToSubject",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   }
 ]

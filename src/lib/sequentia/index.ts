@@ -29,8 +29,16 @@ export { BloomFilterFingerprint, calculateFingerprint, extractPhenotypeSubset, t
 export const SEQUENTIA_CONFIG = {
     rpcUrl: 'http://52.90.163.112:8545',
     chainId: 15132025,
-    usdcToken: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
-    biodataRouter: '0x2ff3FB85c71D6cD7F1217A08Ac9a2d68C02219cd'
+    usdcToken: '0xD837B344e931cc265ec54879A0B388DE6F0015c9',          // SeqUSDC
+    treasury: '0x5C9d00f5BC59037A038A2936F0F614b770f947A7',            // Sequentia Treasury
+    consentManager: '0x2ff3FB85c71D6cD7F1217A08Ac9a2d68C02219cd',      // GDPR Article 17
+    openCravatJobs: '0xB384A7531d59cFd45f98f71833aF736b921a5FCB',      // Byzantine-FT Jobs
+    paymentRouter: '0x4b46D8A0533bc17503349F86a909C2FEcFD04489',       // x402 Atomic Payments
+    x402Router: '0xe95f101dcBe711Ba9252043943ba28f7D9aE8014',          // Legacy x402
+    bioPIL: '0x6474485F6fE3c19Ac0cD069D4cBc421656942DA9',              // Genomic Licensing
+    bioNFT: '0x1e7403430a367C83dF96d5492cCB114b3750B00A',              // BioNFT Consent
+    bioAgentNFT: '0x04D716bb245b55c715872F00d80BfE1b1d03a121',         // AI Agent NFT
+    bioCIDRegistry: '0x6Fb51DB12AE422F8360a31a27B3E960f4DC0004b'       // File Registry
 };
 
 // Import classes for initialization
