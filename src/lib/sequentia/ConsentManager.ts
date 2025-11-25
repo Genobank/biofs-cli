@@ -19,7 +19,7 @@ import { Logger } from '../utils/logger';
 
 // Sequentia Network Configuration
 const SEQUENTIA_RPC_URL = 'http://52.90.163.112:8545';
-const CONSENT_MANAGER_ADDRESS = '0x0000000000000000000000000000000000000000'; // TODO: Deploy (optional for basic operations)
+const CONSENT_MANAGER_ADDRESS = '0x2ff3FB85c71D6cD7F1217A08Ac9a2d68C02219cd'; // Deployed Nov 24, 2025
 
 export enum ConsentStatus {
     NotProvided = 0,
@@ -69,14 +69,7 @@ export class ConsentManager {
         
 
         try {
-            // ConsentManager is optional for basic operations
-            if (CONSENT_MANAGER_ADDRESS === '0x0000000000000000000000000000000000000000') {
-                Logger.warn('ConsentManager not deployed - GDPR features disabled');
-                this.contract = null as any;
-                this.signer = null as any;
-                return;
-            }
-
+            // ConsentManager deployed - GDPR features enabled
             const provider = new ethers.JsonRpcProvider(SEQUENTIA_RPC_URL);
             this.signer = new ethers.Wallet(privateKey, provider);
 

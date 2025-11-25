@@ -1,44 +1,545 @@
 [
   {
     "inputs": [
-      {"internalType": "string", "name": "biocid", "type": "string"},
-      {"internalType": "string", "name": "analysisType", "type": "string"},
-      {"internalType": "uint256", "name": "escrowAmount", "type": "uint256"},
       {
-        "components": [
-          {"internalType": "address", "name": "recipient", "type": "address"},
-          {"internalType": "uint256", "name": "amount", "type": "uint256"},
-          {"internalType": "string", "name": "description", "type": "string"}
-        ],
-        "internalType": "struct PaymentRouter.PaymentRecipient[]",
-        "name": "paymentRoute",
-        "type": "tuple[]"
-      },
-      {"internalType": "uint256", "name": "deadline", "type": "uint256"}
+        "internalType": "address",
+        "name": "_usdcToken",
+        "type": "address"
+      }
     ],
-    "name": "createJob",
-    "outputs": [{"internalType": "string", "name": "jobId", "type": "string"}],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "jobId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "lab",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "JobAssigned",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "jobId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "creator",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "refundAmount",
+        "type": "uint256"
+      }
+    ],
+    "name": "JobCancelled",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "jobId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "lab",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "resultBioCID",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "processingTime",
+        "type": "uint256"
+      }
+    ],
+    "name": "JobCompleted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "jobId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "creator",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "analysisType",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "escrowAmount",
+        "type": "uint256"
+      }
+    ],
+    "name": "JobCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "jobId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "lab",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "reason",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "int256",
+        "name": "reputationPenalty",
+        "type": "int256"
+      }
+    ],
+    "name": "JobFailed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "jobId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "progress",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "JobProgressUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "lab",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "LabRegistered",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "lab",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "int256",
+        "name": "oldReputation",
+        "type": "int256"
+      },
+      {
+        "indexed": false,
+        "internalType": "int256",
+        "name": "newReputation",
+        "type": "int256"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "reason",
+        "type": "string"
+      }
+    ],
+    "name": "LabReputationUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "oldRouter",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newRouter",
+        "type": "address"
+      }
+    ],
+    "name": "PaymentRouterUpdated",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "MIN_REPUTATION_FOR_JOBS",
+    "outputs": [
+      {
+        "internalType": "int256",
+        "name": "",
+        "type": "int256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "REPUTATION_FAILURE",
+    "outputs": [
+      {
+        "internalType": "int256",
+        "name": "",
+        "type": "int256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "REPUTATION_SUCCESS",
+    "outputs": [
+      {
+        "internalType": "int256",
+        "name": "",
+        "type": "int256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "allJobIds",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "jobId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "lab",
+        "type": "address"
+      }
+    ],
+    "name": "assignJob",
+    "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "string", "name": "jobId", "type": "string"}],
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "jobId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "cancelJob",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "jobId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "string",
+        "name": "resultBioCID",
+        "type": "string"
+      }
+    ],
+    "name": "completeJob",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "analysisType",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "escrowAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "deadline",
+        "type": "uint256"
+      }
+    ],
+    "name": "createJob",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "emergencyWithdraw",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "jobId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "string",
+        "name": "reason",
+        "type": "string"
+      }
+    ],
+    "name": "failJob",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getApprovedLabs",
+    "outputs": [
+      {
+        "internalType": "address[]",
+        "name": "",
+        "type": "address[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "jobId",
+        "type": "bytes32"
+      }
+    ],
     "name": "getJob",
     "outputs": [
       {
         "components": [
-          {"internalType": "string", "name": "id", "type": "string"},
-          {"internalType": "string", "name": "biocid", "type": "string"},
-          {"internalType": "address", "name": "creator", "type": "address"},
-          {"internalType": "string", "name": "analysisType", "type": "string"},
-          {"internalType": "uint256", "name": "escrowAmount", "type": "uint256"},
-          {"internalType": "address", "name": "assignedLab", "type": "address"},
-          {"internalType": "int256", "name": "labReputation", "type": "int256"},
-          {"internalType": "uint8", "name": "status", "type": "uint8"},
-          {"internalType": "uint8", "name": "progress", "type": "uint8"},
-          {"internalType": "string", "name": "resultBioCID", "type": "string"},
-          {"internalType": "uint256", "name": "createdAt", "type": "uint256"},
-          {"internalType": "uint256", "name": "deadline", "type": "uint256"}
+          {
+            "internalType": "bytes32",
+            "name": "id",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "string",
+            "name": "biocid",
+            "type": "string"
+          },
+          {
+            "internalType": "address",
+            "name": "creator",
+            "type": "address"
+          },
+          {
+            "internalType": "string",
+            "name": "analysisType",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "escrowAmount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "assignedLab",
+            "type": "address"
+          },
+          {
+            "internalType": "enum OpenCravatJobs.JobStatus",
+            "name": "status",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint8",
+            "name": "progress",
+            "type": "uint8"
+          },
+          {
+            "internalType": "string",
+            "name": "resultBioCID",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "createdAt",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "deadline",
+            "type": "uint256"
+          },
+          {
+            "internalType": "string",
+            "name": "failureReason",
+            "type": "string"
+          }
         ],
         "internalType": "struct OpenCravatJobs.Job",
         "name": "",
@@ -49,55 +550,57 @@
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "address", "name": "wallet", "type": "address"}],
-    "name": "getUserJobs",
-    "outputs": [{"internalType": "string[]", "name": "", "type": "string[]"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
-      {"internalType": "string", "name": "jobId", "type": "string"},
-      {"internalType": "string", "name": "resultBioCID", "type": "string"}
+      {
+        "internalType": "address",
+        "name": "lab",
+        "type": "address"
+      }
     ],
-    "name": "completeJob",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {"internalType": "string", "name": "jobId", "type": "string"},
-      {"internalType": "string", "name": "reason", "type": "string"}
-    ],
-    "name": "failJob",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {"internalType": "string", "name": "jobId", "type": "string"},
-      {"internalType": "uint8", "name": "progress", "type": "uint8"}
-    ],
-    "name": "updateProgress",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "address", "name": "labWallet", "type": "address"}],
     "name": "getLabProfile",
     "outputs": [
       {
         "components": [
-          {"internalType": "address", "name": "wallet", "type": "address"},
-          {"internalType": "string", "name": "name", "type": "string"},
-          {"internalType": "int256", "name": "reputation", "type": "int256"},
-          {"internalType": "uint256", "name": "completedJobs", "type": "uint256"},
-          {"internalType": "uint256", "name": "failedJobs", "type": "uint256"},
-          {"internalType": "uint256", "name": "averageTime", "type": "uint256"},
-          {"internalType": "bool", "name": "kyLabVerified", "type": "bool"}
+          {
+            "internalType": "address",
+            "name": "wallet",
+            "type": "address"
+          },
+          {
+            "internalType": "string",
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "internalType": "int256",
+            "name": "reputation",
+            "type": "int256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "completedJobs",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "failedJobs",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "totalProcessingTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "isVerified",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "isActive",
+            "type": "bool"
+          }
         ],
         "internalType": "struct OpenCravatJobs.LabProfile",
         "name": "",
@@ -109,34 +612,376 @@
   },
   {
     "inputs": [],
-    "name": "getApprovedLabs",
+    "name": "getTotalJobs",
     "outputs": [
       {
-        "components": [
-          {"internalType": "address", "name": "wallet", "type": "address"},
-          {"internalType": "string", "name": "name", "type": "string"},
-          {"internalType": "int256", "name": "reputation", "type": "int256"},
-          {"internalType": "uint256", "name": "completedJobs", "type": "uint256"},
-          {"internalType": "uint256", "name": "failedJobs", "type": "uint256"},
-          {"internalType": "uint256", "name": "averageTime", "type": "uint256"},
-          {"internalType": "bool", "name": "kyLabVerified", "type": "bool"}
-        ],
-        "internalType": "struct OpenCravatJobs.LabProfile[]",
+        "internalType": "uint256",
         "name": "",
-        "type": "tuple[]"
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
     "type": "function"
   },
   {
-    "anonymous": false,
-    "inputs": [
-      {"indexed": true, "internalType": "string", "name": "jobId", "type": "string"},
-      {"indexed": true, "internalType": "address", "name": "creator", "type": "address"},
-      {"indexed": false, "internalType": "uint256", "name": "escrowAmount", "type": "uint256"}
+    "inputs": [],
+    "name": "getTotalLabs",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    "name": "JobCreated",
-    "type": "event"
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      }
+    ],
+    "name": "getUserJobs",
+    "outputs": [
+      {
+        "internalType": "bytes32[]",
+        "name": "",
+        "type": "bytes32[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "jobCounter",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "jobs",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "id",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "string",
+        "name": "biocid",
+        "type": "string"
+      },
+      {
+        "internalType": "address",
+        "name": "creator",
+        "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "analysisType",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "escrowAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "assignedLab",
+        "type": "address"
+      },
+      {
+        "internalType": "enum OpenCravatJobs.JobStatus",
+        "name": "status",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint8",
+        "name": "progress",
+        "type": "uint8"
+      },
+      {
+        "internalType": "string",
+        "name": "resultBioCID",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "createdAt",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "deadline",
+        "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "failureReason",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "labJobs",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "labProfiles",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "wallet",
+        "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "internalType": "int256",
+        "name": "reputation",
+        "type": "int256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "completedJobs",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "failedJobs",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalProcessingTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "isVerified",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "isActive",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "paymentRouter",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      }
+    ],
+    "name": "registerLab",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "registeredLabs",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_paymentRouter",
+        "type": "address"
+      }
+    ],
+    "name": "setPaymentRouter",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "jobId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint8",
+        "name": "progress",
+        "type": "uint8"
+      }
+    ],
+    "name": "updateProgress",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "usdcToken",
+    "outputs": [
+      {
+        "internalType": "contract IERC20",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "userJobs",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "lab",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "verified",
+        "type": "bool"
+      }
+    ],
+    "name": "verifyLab",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   }
 ]

@@ -36,6 +36,7 @@ import { dissectCommandSequentia } from './commands/dissect-sequentia';
 import { viewCommand, ViewOptions } from './commands/view';
 import { reportCommand, ReportOptions } from './commands/report';
 import { createAdminCommand } from './commands/admin';
+import { fuseListCommand, fuseMountCommand, fuseStreamCommand, fuseSampleCommand, FuseOptions } from './commands/fuse';
 import { Logger } from './lib/utils/logger';
 
 const program = new Command();
@@ -44,7 +45,7 @@ const program = new Command();
 program
   .name('biofs')
   .description('BioFS by GenoBank.io - BioNFT-Gated S3 CLI for genomic data')
-  .version('2.3.10')
+  .version('2.3.11')
   .option('--debug', 'Enable debug output')
   .hook('preAction', (thisCommand) => {
     // Set global debug flag if --debug is passed
@@ -209,6 +210,80 @@ program
       await mountRemoteCommand(biosampleId, options);
     } catch (error) {
       Logger.error(`Remote mount failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// FUSE command group - Remote BioNFT-gated file access
+const fuseCmd = program
+  .command('fuse')
+  .description('Remote BioNFT-gated file access via BioFS-Node server');
+
+// fuse mount - Verify consent
+fuseCmd
+  .command('mount <biosample_id>')
+  .description('Verify BioNFT consent for a biosample')
+  .option('--server <url>', 'BioFS-Node server URL', 'http://localhost:8081')
+  .option('--json', 'Output as JSON')
+  .option('--verbose', 'Show detailed output')
+  .action(async (biosampleId: string, options: FuseOptions) => {
+    try {
+      await fuseMountCommand(biosampleId, options);
+    } catch (error) {
+      Logger.error(`Consent verification failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// fuse list - List files
+fuseCmd
+  .command('list <biosample_id>')
+  .alias('ls')
+  .description('List files available in a biosample')
+  .option('--server <url>', 'BioFS-Node server URL', 'http://localhost:8081')
+  .option('--json', 'Output as JSON')
+  .option('--verbose', 'Show detailed output')
+  .action(async (biosampleId: string, options: FuseOptions) => {
+    try {
+      await fuseListCommand(biosampleId, options);
+    } catch (error) {
+      Logger.error(`File listing failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// fuse stream - Download full file
+fuseCmd
+  .command('stream <biosample_id> <filename>')
+  .alias('download')
+  .description('Stream/download a file from a biosample')
+  .option('--server <url>', 'BioFS-Node server URL', 'http://localhost:8081')
+  .option('--output <path>', 'Output file path')
+  .option('--json', 'Output as JSON')
+  .option('--verbose', 'Show detailed output')
+  .action(async (biosampleId: string, filename: string, options: FuseOptions) => {
+    try {
+      await fuseStreamCommand(biosampleId, filename, options);
+    } catch (error) {
+      Logger.error(`File streaming failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// fuse sample - Download sample for FastQC
+fuseCmd
+  .command('sample <biosample_id> <filename>')
+  .description('Download a sample of a file (for FastQC preview)')
+  .option('--server <url>', 'BioFS-Node server URL', 'http://localhost:8081')
+  .option('--size <size>', 'Sample size (e.g., 100MB, 1GB)', '100MB')
+  .option('--output <path>', 'Output file path')
+  .option('--json', 'Output as JSON')
+  .option('--verbose', 'Show detailed output')
+  .action(async (biosampleId: string, filename: string, options: FuseOptions & { size?: string }) => {
+    try {
+      await fuseSampleCommand(biosampleId, filename, options);
+    } catch (error) {
+      Logger.error(`Sample download failed: ${error}`);
       process.exit(1);
     }
   });

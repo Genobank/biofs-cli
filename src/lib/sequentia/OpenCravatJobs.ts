@@ -19,8 +19,8 @@ import { Logger } from '../utils/logger';
 
 // Sequentia Network Configuration
 const SEQUENTIA_RPC_URL = 'http://52.90.163.112:8545';
-const OPENCRAVAT_JOBS_ADDRESS = '0x...'; // TODO: Deploy OpenCravatJobs.sol
-const USDC_TOKEN_ADDRESS = '0x036CbD53842c5426634e7929541eC2318f3dCF7e';
+const OPENCRAVAT_JOBS_ADDRESS = '0xB384A7531d59cFd45f98f71833aF736b921a5FCB'; // Deployed Nov 24, 2025
+const USDC_TOKEN_ADDRESS = '0xD837B344e931cc265ec54879A0B388DE6F0015c9'; // SeqUSDC
 
 export enum JobStatus {
     Pending = 0,
