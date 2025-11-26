@@ -27,13 +27,17 @@ dotenv.config({ path: envPath });
 
 // GenoBank API Configuration
 const GENOBANK_API = process.env.GENOBANK_API_URL || 'https://genobank.app';
-const ADMIN_SIGNATURE = process.env.ADMIN_SIGNATURE;
 
-if (!ADMIN_SIGNATURE) {
-  console.error(chalk.red('\n❌ Error: ADMIN_SIGNATURE environment variable not set'));
-  console.error(chalk.gray('   This command requires admin privileges'));
-  console.error(chalk.gray('   Set ADMIN_SIGNATURE environment variable or BIOFS_ENV_PATH'));
-  process.exit(1);
+// Helper to get admin signature (checked inside command action, not at module load)
+function getAdminSignature(): string {
+  const sig = process.env.ADMIN_SIGNATURE;
+  if (!sig) {
+    console.error(chalk.red('\n❌ Error: ADMIN_SIGNATURE environment variable not set'));
+    console.error(chalk.gray('   This command requires admin privileges'));
+    console.error(chalk.gray('   Set ADMIN_SIGNATURE environment variable or BIOFS_ENV_PATH'));
+    process.exit(1);
+  }
+  return sig;
 }
 
 // Sequentia Network Configuration (for display)
@@ -63,7 +67,7 @@ async function extractWebsiteBranding(websiteUrl: string): Promise<any> {
       `${GENOBANK_API}/api_lab_customization/extract_website_branding`,
       {
         website_url: websiteUrl,
-        user_signature: ADMIN_SIGNATURE,
+        user_signature: getAdminSignature(),
         laboratory_id: 'CLI_REGISTRATION'
       }
     );
