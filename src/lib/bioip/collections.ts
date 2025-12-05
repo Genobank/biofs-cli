@@ -1,30 +1,39 @@
 /**
  * BioIP Collection mappings for Story Protocol
+ * SYNCED WITH: api_bioip.py BIOIP_COLLECTIONS_MAINNET (source of truth)
+ * Last sync: 2025-12-05
  */
 
 // Collection addresses mapped by category
 export const BIOIP_COLLECTIONS: Record<string, string> = {
-  'genomic': '0x5021F7438ea502b0c346cB59F8E92B749Ecd74B5',
-  'variant': '0x19A615224D03487AaDdC43e4520F9D83923d9512',
-  'vcf': '0x19A615224D03487AaDdC43e4520F9D83923d9512',
-  'alignment': '0xB8d03f2E1C02e4cC5b5fe1613c575c01BDD12269',
-  'bam': '0xB8d03f2E1C02e4cC5b5fe1613c575c01BDD12269',
-  'sam': '0xB8d03f2E1C02e4cC5b5fe1613c575c01BDD12269',
-  'sequence': '0x88Ed5b47ea8f609Ee14ac60968C3f76f9138a171',
-  'fastq': '0x88Ed5b47ea8f609Ee14ac60968C3f76f9138a171',
-  'fasta': '0x88Ed5b47ea8f609Ee14ac60968C3f76f9138a171',
-  'annotation': '0x88Ed5b47ea8f609Ee14ac60968C3f76f9138a171',
-  'bed': '0x88Ed5b47ea8f609Ee14ac60968C3f76f9138a171',
-  'gff': '0x88Ed5b47ea8f609Ee14ac60968C3f76f9138a171',
-  'microarray': '0x29853ed299B8FBBe16568840F3Bb2A8E40dc7401',
-  'snp': '0x29853ed299B8FBBe16568840F3Bb2A8E40dc7401',
-  'gwas': '0x29853ed299B8FBBe16568840F3Bb2A8E40dc7401',
-  'dtc': '0x29853ed299B8FBBe16568840F3Bb2A8E40dc7401',
-  '23andme': '0x29853ed299B8FBBe16568840F3Bb2A8E40dc7401',
-  'ancestry': '0x29853ed299B8FBBe16568840F3Bb2A8E40dc7401',
-  'medical_imaging': '0x5021F7438ea502b0c346cB59F8E92B749Ecd74B5',
-  'medical': '0x5021F7438ea502b0c346cB59F8E92B749Ecd74B5',
-  'dicom': '0x5021F7438ea502b0c346cB59F8E92B749Ecd74B5'
+  // Primary categories from api_bioip.py
+  'genomic': '0x5021F7438ea502b0c346cB59F8E92B749Ecd74B5',           // Genomic data (FASTQ, BAM, etc)
+  'variant': '0x19A615224D03487AaDdC43e4520F9D83923d9512',           // Variant data
+  'vcf': '0x19A615224D03487AaDdC43e4520F9D83923d9512',               // VCF files (alias for variant)
+  'alignment': '0xB8d03f2E1C02e4cC5b5fe1613c575c01BDD12269',         // BAM/SAM alignment files
+  'bam': '0xB8d03f2E1C02e4cC5b5fe1613c575c01BDD12269',               // BAM (alias for alignment)
+  'sam': '0xB8d03f2E1C02e4cC5b5fe1613c575c01BDD12269',               // SAM (alias for alignment)
+  'sequence': '0x88Ed5b47ea8f609Ee14ac60968C3f76f9138a171',          // Sequence data (FASTQ, FASTA)
+  'fastq': '0x88Ed5b47ea8f609Ee14ac60968C3f76f9138a171',             // FASTQ (alias for sequence)
+  'fasta': '0x88Ed5b47ea8f609Ee14ac60968C3f76f9138a171',             // FASTA (alias for sequence)
+  'annotation': '0x88Ed5b47ea8f609Ee14ac60968C3f76f9138a171',        // Annotation files (BED, GFF)
+  'bed': '0x88Ed5b47ea8f609Ee14ac60968C3f76f9138a171',               // BED (alias for annotation)
+  'gff': '0x88Ed5b47ea8f609Ee14ac60968C3f76f9138a171',               // GFF (alias for annotation)
+  // MicroArray/GWAS/SNP/DTC collection - for consumer genomics data
+  'microarray': '0x29853ed299B8FBBe16568840F3Bb2A8E40dc7401',        // MicroArray/GWAS/SNPs
+  'snp': '0x29853ed299B8FBBe16568840F3Bb2A8E40dc7401',               // SNP data
+  'gwas': '0x29853ed299B8FBBe16568840F3Bb2A8E40dc7401',              // GWAS data
+  'dtc': '0x29853ed299B8FBBe16568840F3Bb2A8E40dc7401',               // Direct-to-Consumer (23andMe, Ancestry)
+  '23andme': '0x29853ed299B8FBBe16568840F3Bb2A8E40dc7401',           // 23andMe (alias for dtc)
+  'ancestry': '0x29853ed299B8FBBe16568840F3Bb2A8E40dc7401',          // Ancestry (alias for dtc)
+  // Medical imaging
+  'medical_imaging': '0x5021F7438ea502b0c346cB59F8E92B749Ecd74B5',   // DICOM medical imaging
+  'medical': '0x5021F7438ea502b0c346cB59F8E92B749Ecd74B5',           // Medical data general
+  'dicom': '0x5021F7438ea502b0c346cB59F8E92B749Ecd74B5',             // DICOM (alias for medical)
+  // Special collections (not in api_bioip.py but used by other services)
+  'alphagenome': '0x88Ed5b47ea8f609Ee14ac60968C3f76f9138a171',       // AlphaGenome AI predictions
+  'newborn': '0xdaB93b0D7f01C9D7ffe33afcDc3518E8d6DE7Be1',           // Newborn screening / Trio
+  'llm': '0x495B1E8C54b572d78B16982BFb97908823C9358A'                // LLM/AI analysis
 };
 
 // IPFS images for each category - synchronized with bioip.js and api_bioip.py
@@ -107,6 +116,8 @@ export function getDefaultImageForCategory(category: string): string {
 
 /**
  * Get collection metadata
+ * SYNCED WITH: api_bioip.py BIOIP_COLLECTIONS_MAINNET (source of truth)
+ * Last sync: 2025-12-05
  */
 export function getCollectionMetadata(address: string): {
   name: string;
@@ -115,34 +126,39 @@ export function getCollectionMetadata(address: string): {
 } {
   const collectionInfo: Record<string, { name: string; symbol: string; category: string }> = {
     '0x5021F7438ea502b0c346cB59F8E92B749Ecd74B5': {
-      name: 'BioNFT Ownership IP Assets',
-      symbol: 'OWNERSHIP',
+      name: 'Genomic Data IP Assets',
+      symbol: 'GENOMIC',
       category: 'genomic'
     },
     '0x19A615224D03487AaDdC43e4520F9D83923d9512': {
-      name: 'VCF IP Assets',
+      name: 'VCF/Variant IP Assets',
       symbol: 'VCF',
       category: 'vcf'
     },
     '0xB8d03f2E1C02e4cC5b5fe1613c575c01BDD12269': {
-      name: 'VCF Annotation IP Assets',
-      symbol: 'VCFANNOTATION',
+      name: 'Alignment IP Assets',
+      symbol: 'ALIGN',
       category: 'alignment'
     },
     '0x88Ed5b47ea8f609Ee14ac60968C3f76f9138a171': {
-      name: 'AlphaGenome AI IP Assets',
-      symbol: 'AGENOME',
+      name: 'Sequence/AlphaGenome IP Assets',
+      symbol: 'SEQ',
       category: 'sequence'
     },
     '0x29853ed299B8FBBe16568840F3Bb2A8E40dc7401': {
-      name: 'SNP/Microarray IP Assets',
-      symbol: 'SNP',
+      name: 'MicroArray/GWAS/SNP IP Assets',
+      symbol: 'GWAS',
       category: 'microarray'
     },
     '0x495B1E8C54b572d78B16982BFb97908823C9358A': {
-      name: 'VCF Analyst IP Assets',
-      symbol: 'VCFANALYST',
-      category: 'analysis'
+      name: 'AI/LLM Analysis IP Assets',
+      symbol: 'LLM',
+      category: 'llm'
+    },
+    '0xdaB93b0D7f01C9D7ffe33afcDc3518E8d6DE7Be1': {
+      name: 'Newborn/Trio IP Assets',
+      symbol: 'NEWBORN',
+      category: 'newborn'
     }
   };
 
