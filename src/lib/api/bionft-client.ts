@@ -227,28 +227,59 @@ export class BioNFTClient {
 
   /**
    * Tokenize biosample (claim ownership)
-   * This should call a backend endpoint that:
-   * 1. Queries /api_biofs_fuse/list for files
-   * 2. Creates MongoDB record in sequentia_bionfts
-   * 3. Mints BioNFT on Sequentia blockchain
+   * Calls /api_biofs_fuse/tokenize_biosample which:
+   * 1. Discovers files from S3 index
+   * 2. Mints BioNFT consent on Sequentia blockchain
+   * 3. Creates MongoDB record in sequentia_bionfts
    */
-  async tokenizeBiosample(biosampleSerial: string): Promise<{
+  async tokenizeBiosample(biosampleSerial: string, files?: string[]): Promise<{
     success: boolean;
     tx_hash?: string;
+    block_number?: number;
+    consent?: {
+      patient_wallet: string;
+      agent_wallet: string;
+      operations: string[];
+      expires_at: number;
+      status: string;
+    };
     error?: string;
   }> {
     try {
       const signature = await this.getSignature();
       const wallet = await this.getWallet();
 
-      // TODO: Create backend endpoint /api_biofs/tokenize_biosample
-      // For now, return error with instructions
-      return {
-        success: false,
-        error: 'Biosample tokenization endpoint not yet implemented. Please use GenoBank.io web interface to tokenize.'
-      };
+      const response = await this.axios.get('/api_biofs_fuse/tokenize_biosample', {
+        params: {
+          biosample: biosampleSerial,
+          wallet,
+          signature,
+          files: files ? JSON.stringify(files) : undefined
+        }
+      });
+
+      if (response.data.success) {
+        return {
+          success: true,
+          tx_hash: response.data.tx_hash,
+          block_number: response.data.block_number,
+          consent: response.data.consent
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data.error || 'Tokenization failed'
+        };
+      }
 
     } catch (error: any) {
+      // Handle specific error responses
+      if (error.response?.data?.error) {
+        return {
+          success: false,
+          error: error.response.data.error
+        };
+      }
       return {
         success: false,
         error: error.message
@@ -258,28 +289,113 @@ export class BioNFTClient {
 
   /**
    * Grant access to biosample for an agent wallet
-   * Updates MongoDB and blockchain
+   * Calls /api_biofs_fuse/grant_access which:
+   * 1. Verifies owner signature
+   * 2. Mints permission on Sequentia blockchain
+   * 3. Creates MongoDB access record
    */
   async grantAccess(
     biosampleSerial: string,
     agentWallet: string,
-    operations: string[] = ['read', 'download', 'process']
+    operations: string[] = ['read', 'download', 'process'],
+    expiresDays: number = 365
   ): Promise<{
     success: boolean;
     tx_hash?: string;
+    block_number?: number;
+    access_record?: {
+      patient_wallet: string;
+      agent_wallet: string;
+      operations: string[];
+      expires_at: number;
+      expires_days: number;
+      status: string;
+    };
     error?: string;
   }> {
     try {
       const signature = await this.getSignature();
+      const wallet = await this.getWallet();
 
-      // TODO: Create backend endpoint /api_biofs/grant_access
-      // For now, return error with instructions
-      return {
-        success: false,
-        error: 'Access grant endpoint not yet implemented. Please use GenoBank.io web interface to grant access.'
-      };
+      const response = await this.axios.get('/api_biofs_fuse/grant_access', {
+        params: {
+          biosample: biosampleSerial,
+          owner_wallet: wallet,
+          owner_signature: signature,
+          agent_wallet: agentWallet,
+          operations: JSON.stringify(operations),
+          expires_days: expiresDays
+        }
+      });
+
+      if (response.data.success) {
+        return {
+          success: true,
+          tx_hash: response.data.tx_hash,
+          block_number: response.data.block_number,
+          access_record: response.data.access_record
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data.error || 'Access grant failed'
+        };
+      }
 
     } catch (error: any) {
+      if (error.response?.data?.error) {
+        return {
+          success: false,
+          error: error.response.data.error
+        };
+      }
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Revoke access from an agent wallet
+   * Calls /api_biofs_fuse/revoke_access
+   */
+  async revokeAccess(
+    biosampleSerial: string,
+    agentWallet: string
+  ): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      const signature = await this.getSignature();
+      const wallet = await this.getWallet();
+
+      const response = await this.axios.get('/api_biofs_fuse/revoke_access', {
+        params: {
+          biosample: biosampleSerial,
+          owner_wallet: wallet,
+          owner_signature: signature,
+          agent_wallet: agentWallet
+        }
+      });
+
+      if (response.data.success) {
+        return { success: true };
+      } else {
+        return {
+          success: false,
+          error: response.data.error || 'Access revoke failed'
+        };
+      }
+
+    } catch (error: any) {
+      if (error.response?.data?.error) {
+        return {
+          success: false,
+          error: error.response.data.error
+        };
+      }
       return {
         success: false,
         error: error.message
