@@ -1,5 +1,5 @@
 /**
- * Remote Mount Command - Mount biosample files on Nebius agent
+ * Remote Mount Command - Mount biosample files on GPU processing agent
  * Calls BioFS-Node mount endpoint to orchestrate remote filesystem mounting
  */
 

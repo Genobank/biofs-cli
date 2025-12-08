@@ -258,7 +258,7 @@ Creates a BioNFT consent record for existing FASTQ files in S3.
 
 **Example:**
 ```bash
-biofs tokenize fastqs 55052008714000 --recipient 0xNebiusLab
+biofs tokenize fastqs 55052008714000 --recipient 0xLabWallet
 ```
 
 ---
