@@ -6,7 +6,7 @@ import { Logger } from '../lib/utils/logger';
 import { SEQUENTIA_NETWORK, API_CONFIG } from '../lib/config/constants';
 
 export interface TokenizeFastqsOptions {
-  recipient?: string;  // Wallet address to grant access to (e.g., Nebius Lab)
+  recipient?: string;  // Wallet address to grant access to (e.g., approved lab)
   license?: string;    // License type (default: non-commercial)
   quiet?: boolean;
   yes?: boolean;

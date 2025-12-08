@@ -14,6 +14,9 @@ import { mountRemoteCommand, MountRemoteOptions } from './commands/mount-remote'
 import { umountCommand, UmountOptions } from './commands/umount';
 import { tokenizeCommand, TokenizeOptions } from './commands/tokenize';
 import { tokenizeFastqsCommand, TokenizeFastqsOptions } from './commands/tokenize-fastqs';
+import { tokenizeBiosampleCommand, TokenizeBiosampleOptions } from './commands/tokenize-biosample';
+import { linkClaraCommand, LinkClaraOptions } from './commands/link-clara';
+import { familyStatusCommand, FamilyStatusOptions } from './commands/family-status';
 import { accessRequestCommand, AccessRequestOptions } from './commands/access/request';
 import { accessGrantCommand, AccessGrantOptions } from './commands/access/grant';
 import { accessRevokeCommand, AccessRevokeOptions } from './commands/access/revoke';
@@ -197,11 +200,11 @@ program
     }
   });
 
-// Mount-remote command (mount biosample on Nebius GPU agent)
+// Mount-remote command (mount biosample on GPU processing agent)
 program
   .command('mount-remote <biosample_id>')
   .alias('mount-agent')
-  .description('Mount biosample files on remote agent (Nebius GPU server)')
+  .description('Mount biosample files on remote GPU processing agent')
   .option('--mount-point <path>', 'Remote mount point (default: /biofs)')
   .option('--json', 'Output as JSON')
   .option('--verbose', 'Show detailed debug information')
@@ -333,7 +336,7 @@ tokenizeCmd
 tokenizeCmd
   .command('fastqs <biosample_serial>')
   .description('Mint BioNFT consent for biosample FASTQ files in S3')
-  .option('--recipient <wallet>', 'Grant access to wallet address (e.g., Nebius Lab)')
+  .option('--recipient <wallet>', 'Grant access to wallet address (e.g., approved lab)')
   .option('--license <type>', 'License type (default: non-commercial)', 'non-commercial')
   .option('--quiet', 'Suppress progress output')
   .option('--yes', 'Auto-confirm all prompts')
@@ -342,6 +345,63 @@ tokenizeCmd
       await tokenizeFastqsCommand(biosampleSerial, options);
     } catch (error) {
       Logger.error(`FASTQ tokenization failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// tokenize biosample - Mint BioNFT from deployed contract on Sequentia
+tokenizeCmd
+  .command('biosample <biosample_serial>')
+  .description('Mint BioNFT from deployed contract on Sequentia')
+  .option('--owner-name <name>', 'Name of biosample owner')
+  .option('--role <role>', 'Role (patient, mother, father, child, proband, sibling)', 'patient')
+  .option('--sample-type <type>', 'Sample type (exome, genome, panel, array)', 'exome')
+  .option('--capture-kit <kit>', 'Capture kit used', 'agilent_v8')
+  .option('--quiet', 'Suppress progress output')
+  .option('--yes', 'Auto-confirm all prompts')
+  .action(async (biosampleSerial: string, options: TokenizeBiosampleOptions) => {
+    try {
+      await tokenizeBiosampleCommand(biosampleSerial, options);
+    } catch (error) {
+      Logger.error(`Biosample tokenization failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Link command group - Link derivative NFTs to BioNFTs
+const linkCmd = program
+  .command('link')
+  .description('Link derivative NFTs to parent BioNFT');
+
+// link clara - Link ClaraJobNFT for VCF output
+linkCmd
+  .command('clara <biosample_serial>')
+  .description('Mint ClaraJobNFT and link as derivative to BioNFT')
+  .option('--vcf-path <path>', 'Manual VCF path override')
+  .option('--quiet', 'Suppress progress output')
+  .option('--yes', 'Auto-confirm all prompts')
+  .action(async (biosampleSerial: string, options: LinkClaraOptions) => {
+    try {
+      await linkClaraCommand(biosampleSerial, options);
+    } catch (error) {
+      Logger.error(`Clara linking failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Family status command - Show family pipeline status
+program
+  .command('family-status')
+  .alias('family')
+  .description('Show family genomic pipeline status (BioNFT → ClaraJobNFT → etc.)')
+  .argument('<biosample_serials...>', 'Biosample serial numbers')
+  .option('--json', 'Output as JSON')
+  .option('--verbose', 'Show detailed information')
+  .action(async (biosampleSerials: string[], options: FamilyStatusOptions) => {
+    try {
+      await familyStatusCommand(biosampleSerials, options);
+    } catch (error) {
+      Logger.error(`Family status check failed: ${error}`);
       process.exit(1);
     }
   });
@@ -541,7 +601,7 @@ jobCmd
 program
   .command('agent-health')
   .alias('health')
-  .description('Check if processing agent (Nebius GPU server) is ready to receive jobs')
+  .description('Check if GPU processing agent is ready to receive jobs')
   .option('--json', 'Output as JSON')
   .option('--verbose', 'Show detailed server information')
   .action(async (options: AgentHealthOptions) => {
@@ -713,7 +773,12 @@ if (process.argv.length === 2) {
 
   console.log('Tokenization subcommands:');
   console.log(`  ${chalk.cyan('tokenize file')} <file>                - Tokenize local genomic file`);
-  console.log(`  ${chalk.cyan('tokenize fastqs')} <biosample_serial>  - Mint BioNFT consent for biosample FASTQs\n`);
+  console.log(`  ${chalk.cyan('tokenize fastqs')} <biosample_serial>  - Mint BioNFT consent for biosample FASTQs`);
+  console.log(`  ${chalk.cyan('tokenize biosample')} <serial>         - Mint BioNFT from deployed contract\n`);
+
+  console.log('Derivative linking subcommands:');
+  console.log(`  ${chalk.cyan('link clara')} <biosample_serial>       - Mint ClaraJobNFT and link to BioNFT`);
+  console.log(`  ${chalk.cyan('family-status')} <serials...>          - Show family pipeline status\n`);
 
   console.log('Access control subcommands:');
   console.log(`  ${chalk.cyan('access request')} <biocid>            - Request access to asset`);
