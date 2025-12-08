@@ -1,12 +1,14 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import Table from 'cli-table3';
+import axios from 'axios';
 import { GenoBankAPIClient } from '../../lib/api/client';
 import { Logger } from '../../lib/utils/logger';
 
 export interface JobStatusOptions {
   json?: boolean;    // JSON output format
   watch?: boolean;   // Watch mode (refresh every 5 seconds)
+  labNode?: string;  // Query a specific lab node URL for Clara jobs
 }
 
 export async function jobStatusCommand(

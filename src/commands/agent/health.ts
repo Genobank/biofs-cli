@@ -144,7 +144,7 @@ export async function agentHealthCommand(options: AgentHealthOptions = {}): Prom
       console.log(chalk.gray(`   URL: ${error.config?.url || 'unknown'}`));
       console.log();
       console.log(chalk.yellow('Troubleshooting:'));
-      console.log(chalk.gray('  1. Verify BioFS-Node is running on Nebius server'));
+      console.log(chalk.gray('  1. Verify BioFS-Node is running on GPU server'));
       console.log(chalk.gray('  2. Check network connectivity'));
       console.log(chalk.gray('  3. Verify config.json has correct biofsNode.url'));
       console.log();

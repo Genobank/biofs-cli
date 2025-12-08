@@ -22,7 +22,7 @@ import { BioNFTClient } from '../lib/api/bionft-client';
 import { Logger } from '../lib/utils/logger';
 
 export interface AccessGrantBioNFTOptions {
-  agent: string;  // Agent wallet address (e.g., Nebius Lab)
+  agent: string;  // Agent wallet address (e.g., approved lab)
   verbose?: boolean;
   debug?: boolean;
 }

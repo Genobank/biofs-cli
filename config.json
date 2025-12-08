@@ -1,6 +1,6 @@
 {
   "biofsNode": {
-    "url": "http://89.169.108.206:8081",
+    "url": "http://localhost:8081",
     "timeout": 30000
   },
   "wallet": {
