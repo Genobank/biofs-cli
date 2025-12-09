@@ -11,6 +11,9 @@ node_modules/
 test/
 *.test.ts
 *.spec.ts
+test.vcf
+test_*.txt
+test-*.sh
 
 # Backups
 *.bkp.*
