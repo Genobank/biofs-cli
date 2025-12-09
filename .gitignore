@@ -8,3 +8,30 @@ dist/
 ~/.genobank/credentials.json
 coverage/
 .nyc_output/
+
+# Build artifacts
+*.tgz
+artifacts/
+cache/
+
+# Backup files
+*.bkp*
+*.bak
+*.backup
+
+# Temp test scripts
+check_clara*.js
+test_v2_mint.js
+mint_and_link_all.js
+debug_credentials.js
+
+# Config files (local only)
+config.json
+hardhat.config.js
+jest.config.js
+
+# Large reference files
+opencravat_annotators_dictionary.json
+
+# macOS
+._*
