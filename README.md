@@ -5,7 +5,7 @@
 ## Features
 
 - 🔐 **Web3 Authentication**: Secure wallet-based authentication
-- 📁 **File Discovery**: List all your BioFiles from S3, IPFS, and Story Protocol
+- 📁 **File Discovery**: List all your BioFiles from S3 and Story Protocol
 - 📥 **Download Files**: Download by BioCID or filename with progress bars
 - 📤 **Upload Files**: Upload genomic data with optional NFT tokenization
 - 🗂️ **NFS Mount Support**: Mount BioNFT-gated files as true filesystem (NEW in v2.0!)
@@ -42,7 +42,7 @@ biofs login
 ```bash
 biofs files
 # 📁 Your BioFiles (12 files)
-# Shows all files from S3, IPFS, and Story Protocol
+# Shows all files from S3 and Story Protocol
 ```
 
 ### 3. Download a File
@@ -197,5 +197,5 @@ npm link
 
 ## License
 
-MIT © GenoBank.io
+AGPL-3.0 © GenoBank.io
 
