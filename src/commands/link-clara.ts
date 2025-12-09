@@ -36,8 +36,14 @@ const CHAIN_ID = 15132025;
 // S3 bucket for VCF files
 const S3_BUCKET = 'deepvariant-fastq-to-vcf-genobank.app';
 
-// Minter key (validator account with gas)
-const MINTER_KEY = process.env.SEQUENTIA_MINTER_KEY || '***REMOVED***';
+// Minter key (validator account with gas) - REQUIRED via environment variable
+function getMinterKey(): string {
+  const key = process.env.SEQUENTIA_MINTER_KEY;
+  if (!key) {
+    throw new Error('SEQUENTIA_MINTER_KEY environment variable is required');
+  }
+  return key;
+}
 
 // ABIs
 const BIONFT_ABI = [
@@ -191,7 +197,7 @@ export async function linkClaraCommand(
     // Step 5: Mint ClaraJobNFT
     spinner.start('Step 5/6: Minting ClaraJobNFT...');
 
-    const minterWallet = new ethers.Wallet(MINTER_KEY, provider);
+    const minterWallet = new ethers.Wallet(getMinterKey(), provider);
     const claraJobNft = new ethers.Contract(CLARA_JOB_NFT_CONTRACT, CLARA_JOB_NFT_ABI, provider);
     const claraJobNftWithSigner = claraJobNft.connect(minterWallet);
 

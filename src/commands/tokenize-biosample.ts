@@ -31,8 +31,14 @@ const BIONFT_CONTRACT = '0xA2cD489d7c2eB3FF5e51F13f0641351a33cA32cd';
 const SEQUENTIA_RPC = 'http://54.226.180.9:8545';
 const CHAIN_ID = 15132025;
 
-// Minter key (validator account with gas)
-const MINTER_KEY = process.env.SEQUENTIA_MINTER_KEY || '***REMOVED***';
+// Minter key (validator account with gas) - REQUIRED via environment variable
+function getMinterKey(): string {
+  const key = process.env.SEQUENTIA_MINTER_KEY;
+  if (!key) {
+    throw new Error('SEQUENTIA_MINTER_KEY environment variable is required');
+  }
+  return key;
+}
 
 // BioNFT ABI (minimal for minting)
 const BIONFT_ABI = [
@@ -202,7 +208,7 @@ export async function tokenizeBiosampleCommand(
     // Step 5: Mint BioNFT
     spinner.start('Step 5/5: Minting BioNFT on Sequentia...');
 
-    const minterWallet = new ethers.Wallet(MINTER_KEY, provider);
+    const minterWallet = new ethers.Wallet(getMinterKey(), provider);
     const bionftWithSigner = bionft.connect(minterWallet);
 
     // Generate metadata URI
