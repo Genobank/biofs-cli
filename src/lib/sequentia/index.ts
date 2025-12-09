@@ -65,3 +65,4 @@ export function initializeSequentia(privateKey: string) {
         labNFT: new LabNFTClass(privateKey)
     };
 }
+

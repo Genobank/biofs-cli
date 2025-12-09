@@ -91,3 +91,4 @@ export async function accessRequestCommand(
     process.exit(1);
   }
 }
+

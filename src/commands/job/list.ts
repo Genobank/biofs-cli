@@ -157,3 +157,4 @@ export async function jobListCommand(
     process.exit(1);
   }
 }
+

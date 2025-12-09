@@ -106,3 +106,4 @@ export async function paymentFaucetCommand(options: PaymentFaucetOptions = {}): 
     throw error;
   }
 }
+

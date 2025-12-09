@@ -168,3 +168,4 @@ export async function paymentHistoryCommand(options: PaymentHistoryOptions = {})
     throw error;
   }
 }
+

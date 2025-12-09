@@ -425,3 +425,4 @@ export class OpenCravatJobs {
         return output;
     }
 }
+

@@ -383,3 +383,4 @@ function handleError(error: any, serverUrl: string): void {
     Logger.error(`Error: ${error.message}`);
   }
 }
+

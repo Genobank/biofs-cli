@@ -160,3 +160,4 @@ export async function submitClaraCommand(
     process.exit(1);
   }
 }
+

@@ -125,3 +125,4 @@ export async function paymentBalanceCommand(options: PaymentBalanceOptions = {})
     throw error;
   }
 }
+

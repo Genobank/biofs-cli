@@ -170,3 +170,4 @@ export const FACILITATOR_URLS = {
   public: 'https://x402.org/facilitator/',
   docker: 'http://localhost:8080'
 };
+

@@ -119,3 +119,4 @@ export async function accessRevokeCommand(
     process.exit(1);
   }
 }
+

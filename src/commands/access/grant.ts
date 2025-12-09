@@ -305,3 +305,4 @@ async function promptForSignature(): Promise<string> {
     );
   });
 }
+

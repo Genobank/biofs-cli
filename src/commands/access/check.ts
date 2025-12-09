@@ -142,3 +142,4 @@ export async function accessCheckCommand(biocidOrIpId: string): Promise<void> {
     process.exit(1);
   }
 }
+

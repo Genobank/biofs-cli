@@ -135,3 +135,4 @@ export function createVerifyLabCommand(): Command {
       await verifyLab(wallet);
     });
 }
+

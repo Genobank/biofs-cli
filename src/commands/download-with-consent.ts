@@ -127,3 +127,4 @@ export async function downloadCommandWithConsent(
     process.exit(1);
   }
 }
+

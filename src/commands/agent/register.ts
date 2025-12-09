@@ -147,3 +147,4 @@ export async function agentRegisterCommand(options: AgentRegisterOptions = {}): 
     throw error;
   }
 }
+

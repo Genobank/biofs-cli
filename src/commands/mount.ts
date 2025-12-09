@@ -391,3 +391,4 @@ async function mountViaCopy(
     process.exit(1);
   }
 }
+
