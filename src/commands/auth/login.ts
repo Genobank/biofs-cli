@@ -76,3 +76,4 @@ export async function loginCommand(options: LoginOptions): Promise<void> {
     process.exit(1);
   }
 }
+

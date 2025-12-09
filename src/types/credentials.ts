@@ -15,3 +15,4 @@ export interface UserConfig {
   show_progress?: boolean;
   cache_duration_ms?: number;
 }
+

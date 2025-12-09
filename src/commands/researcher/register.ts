@@ -188,3 +188,4 @@ export function createRegisterCommand(): Command {
       await registerResearcher(options);
     });
 }
+

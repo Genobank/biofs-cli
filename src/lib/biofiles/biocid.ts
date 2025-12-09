@@ -56,3 +56,4 @@ export class BioCIDParser {
     return this.parse(biocid) !== null;
   }
 }
+

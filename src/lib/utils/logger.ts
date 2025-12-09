@@ -93,3 +93,4 @@ export class Logger {
     return `${seconds} second${seconds !== 1 ? 's' : ''}`;
   }
 }
+

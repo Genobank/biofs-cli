@@ -305,3 +305,4 @@ export async function checkFingerprintExists(fingerprint: string): Promise<boole
   // For now, return false (no duplicate)
   return false;
 }
+

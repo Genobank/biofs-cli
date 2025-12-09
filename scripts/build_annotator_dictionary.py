@@ -350,3 +350,4 @@ def create_markdown_reference(dictionary, categories):
 
 if __name__ == "__main__":
     main()
+

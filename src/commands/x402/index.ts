@@ -12,3 +12,4 @@ export function createX402Command(): Command {
 }
 
 export default createX402Command;
+

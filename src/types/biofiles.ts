@@ -37,3 +37,4 @@ export interface FileLocation {
   license_type?: string;       // License type (non-commercial, commercial, etc.)
   license_token_id?: number;   // License token ID
 }
+

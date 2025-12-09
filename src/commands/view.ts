@@ -126,3 +126,4 @@ function displayPrettyContent(content: string, fileType: string): void {
   });
 }
 
+

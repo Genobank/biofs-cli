@@ -178,3 +178,4 @@ function validateCategory(category: string | undefined): string | null {
   const normalized = category.toLowerCase().trim();
   return validCategories.includes(normalized) ? normalized : null;
 }
+

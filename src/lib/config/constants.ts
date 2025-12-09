@@ -73,3 +73,4 @@ export const FILE_TYPES = {
   json: { ext: ['.json'], desc: 'JSON files' },
   txt: { ext: ['.txt'], desc: 'Text files' }
 };
+

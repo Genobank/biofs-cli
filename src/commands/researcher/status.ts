@@ -270,3 +270,4 @@ export function createStatusCommand(): Command {
       await researcherStatus(options);
     });
 }
+

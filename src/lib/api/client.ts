@@ -1034,3 +1034,4 @@ export class GenoBankAPIClient {
     throw new Error(response.data.status_details?.message || 'Contract generation failed');
   }
 }
+

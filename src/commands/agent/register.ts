@@ -148,3 +148,4 @@ export async function agentRegisterCommand(options: AgentRegisterOptions = {}): 
   }
 }
 
+

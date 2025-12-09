@@ -62,3 +62,4 @@ export interface Biosample {
   status?: string;
   metadata?: any;
 }
+

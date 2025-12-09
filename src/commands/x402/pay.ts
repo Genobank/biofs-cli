@@ -213,3 +213,4 @@ export function createPayCommand(): Command {
 
 // Export for use in main CLI
 export default createPayCommand;
+
