@@ -26,6 +26,11 @@ test_v2_mint.js
 mint_and_link_all.js
 debug_credentials.js
 
+# Test data files
+test.vcf
+test_*.txt
+test-*.sh
+
 # Config files (local only)
 config.json
 hardhat.config.js
