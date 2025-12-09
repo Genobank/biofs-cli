@@ -18,6 +18,7 @@ cache/
 *.bkp*
 *.bak
 *.backup
+*.working.*
 
 # Temp test scripts
 check_clara*.js
