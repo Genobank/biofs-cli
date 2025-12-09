@@ -30,6 +30,10 @@ import { jobListCommand, JobListOptions } from './commands/job/list';
 import { pipelinesCommand, PipelinesOptions } from './commands/job/pipelines';
 import { submitClaraCommand, ClaraJobOptions } from './commands/job/submit-clara';
 import { agentHealthCommand, AgentHealthOptions } from './commands/agent/health';
+import { agentRegisterCommand, AgentRegisterOptions } from './commands/agent/register';
+import { agentListCommand, AgentListOptions } from './commands/agent/list';
+import { agentStatusCommand, AgentStatusOptions } from './commands/agent/status';
+import { KiteNetwork } from './types/kite';
 import { labNFTsCommand, LabNFTsOptions } from './commands/labs/list';
 import { shareCommand, ShareOptions } from './commands/share';
 import { sharesCommand, SharesOptions } from './commands/shares';
@@ -40,6 +44,14 @@ import { viewCommand, ViewOptions } from './commands/view';
 import { reportCommand, ReportOptions } from './commands/report';
 import { createAdminCommand } from './commands/admin';
 import { fuseListCommand, fuseMountCommand, fuseStreamCommand, fuseSampleCommand, FuseOptions } from './commands/fuse';
+import { annotateSubmitCommand, AnnotateSubmitOptions } from './commands/annotate/submit';
+import { annotateStatusCommand, AnnotateStatusOptions } from './commands/annotate/status';
+import { paymentBalanceCommand, PaymentBalanceOptions } from './commands/payment/balance';
+import { paymentPricingCommand, PaymentPricingOptions } from './commands/payment/pricing';
+import { paymentSetupCommand, PaymentSetupOptions } from './commands/payment/setup';
+import { paymentFaucetCommand, PaymentFaucetOptions } from './commands/payment/faucet';
+import { paymentHistoryCommand, PaymentHistoryOptions } from './commands/payment/history';
+import { X402Network } from './types/x402';
 import { Logger } from './lib/utils/logger';
 
 const program = new Command();
@@ -48,7 +60,7 @@ const program = new Command();
 program
   .name('biofs')
   .description('BioFS by GenoBank.io - BioNFT-Gated S3 CLI for genomic data')
-  .version('2.3.12')
+  .version('2.4.0')
   .option('--debug', 'Enable debug output')
   .hook('preAction', (thisCommand) => {
     // Set global debug flag if --debug is passed
@@ -406,6 +418,193 @@ program
     }
   });
 
+// Annotate command group - OpenCRAVAT VCF annotation
+const annotateCmd = program
+  .command('annotate')
+  .description('Annotate VCF files with OpenCRAVAT (146 annotators)');
+
+// annotate submit - Submit VCF for annotation
+annotateCmd
+  .command('submit <biosample_serial>')
+  .description('Submit VCF to OpenCRAVAT for annotation with all 146 annotators')
+  .option('--vcf-path <path>', 'Manual VCF path override')
+  .option('--annotators <list>', 'Custom annotators (comma-separated), defaults to all 146')
+  .option('--package <package>', 'Analysis package (rare_coding, hereditary_cancer, splicing, drug_interaction, pathogenic)', 'rare_coding')
+  .option('--phenotype <text>', 'Clinical phenotype description for AI analysis')
+  .option('--assembly <genome>', 'Reference genome (hg38, hg19)', 'hg38')
+  .option('--wait', 'Wait for job to complete')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Output as JSON')
+  .action(async (biosampleSerial: string, options: AnnotateSubmitOptions) => {
+    try {
+      await annotateSubmitCommand(biosampleSerial, options);
+    } catch (error) {
+      Logger.error(`Annotation submission failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// annotate status - Check annotation job status
+annotateCmd
+  .command('status <job_id>')
+  .description('Check OpenCRAVAT annotation job status')
+  .option('--watch', 'Watch mode (refresh every 5 seconds)')
+  .option('--json', 'Output as JSON')
+  .action(async (jobId: string, options: AnnotateStatusOptions) => {
+    try {
+      await annotateStatusCommand(jobId, options);
+    } catch (error) {
+      Logger.error(`Status check failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Payment commands (x402 Protocol - Avalanche C-Chain)
+const paymentCmd = program
+  .command('payment')
+  .alias('pay')
+  .description('Manage x402 payments on Avalanche C-Chain (USDC)');
+
+// payment balance - Check USDC balance
+paymentCmd
+  .command('balance')
+  .description('Check USDC balance on Avalanche for x402 payments')
+  .option('--network <network>', 'Network: avalanche-fuji or avalanche', 'avalanche-fuji')
+  .option('--json', 'Output as JSON')
+  .action(async (options: PaymentBalanceOptions) => {
+    try {
+      await paymentBalanceCommand(options);
+    } catch (error) {
+      Logger.error(`Balance check failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// payment pricing - Show service pricing
+paymentCmd
+  .command('pricing')
+  .alias('prices')
+  .description('Show x402 pricing for BioFS services')
+  .option('--network <network>', 'Network: avalanche-fuji or avalanche', 'avalanche-fuji')
+  .option('--json', 'Output as JSON')
+  .action(async (options: PaymentPricingOptions) => {
+    try {
+      await paymentPricingCommand(options);
+    } catch (error) {
+      Logger.error(`Pricing lookup failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// payment setup - Configure payment wallet
+paymentCmd
+  .command('setup')
+  .description('Configure wallet for x402 payments on Avalanche')
+  .option('--network <network>', 'Network: avalanche-fuji or avalanche', 'avalanche-fuji')
+  .option('--max-auto-approve <amount>', 'Maximum auto-approve amount (e.g., $10.00)', '$10.00')
+  .option('--json', 'Output as JSON')
+  .action(async (options: PaymentSetupOptions) => {
+    try {
+      await paymentSetupCommand(options);
+    } catch (error) {
+      Logger.error(`Setup failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// payment faucet - Get testnet tokens
+paymentCmd
+  .command('faucet')
+  .description('Get testnet USDC and AVAX on Avalanche Fuji')
+  .option('--no-browser', "Don't auto-open browser")
+  .option('--json', 'Output as JSON')
+  .action(async (options: PaymentFaucetOptions) => {
+    try {
+      await paymentFaucetCommand(options);
+    } catch (error) {
+      Logger.error(`Faucet command failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// payment history - View transaction history
+paymentCmd
+  .command('history')
+  .alias('transactions')
+  .description('View payment transaction history')
+  .option('--network <network>', 'Network: avalanche-fuji or avalanche', 'avalanche-fuji')
+  .option('--limit <number>', 'Number of transactions to show', parseInt)
+  .option('--json', 'Output as JSON')
+  .action(async (options: PaymentHistoryOptions) => {
+    try {
+      await paymentHistoryCommand(options);
+    } catch (error) {
+      Logger.error(`History lookup failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Agent commands (Kite AI Network)
+const agentCmd = program
+  .command('agent')
+  .description('Manage BioFS agents on Kite AI Network');
+
+// agent register - Register agents on Kite
+agentCmd
+  .command('register')
+  .description('Register BioFS agents on Kite network')
+  .option('--name <name>', 'Agent name (e.g., augenomics-clara)')
+  .option('--type <type>', 'Service type: orchestrator, gpu-compute, vcf-annotator, ai-analysis, storage, tokenization')
+  .option('--endpoint <url>', 'Agent API endpoint URL')
+  .option('--price <price>', 'Base price per request (e.g., $0.25)')
+  .option('--network <network>', 'Kite network: kite-testnet or kite-mainnet', 'kite-testnet')
+  .option('--namespace <namespace>', 'Agent namespace (e.g., genobank.eth)', 'genobank.eth')
+  .option('--all', 'Register all pre-defined BioFS agents')
+  .option('--json', 'Output as JSON')
+  .action(async (options: AgentRegisterOptions) => {
+    try {
+      await agentRegisterCommand(options);
+    } catch (error) {
+      Logger.error(`Agent registration failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// agent list - List registered agents
+agentCmd
+  .command('list')
+  .alias('ls')
+  .description('List registered BioFS agents')
+  .option('--network <network>', 'Kite network: kite-testnet or kite-mainnet', 'kite-testnet')
+  .option('--namespace <namespace>', 'Agent namespace', 'genobank.eth')
+  .option('--type <type>', 'Filter by service type')
+  .option('--json', 'Output as JSON')
+  .action(async (options: AgentListOptions) => {
+    try {
+      await agentListCommand(options);
+    } catch (error) {
+      Logger.error(`Agent list failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// agent status - Check agent health and SLA compliance
+agentCmd
+  .command('status')
+  .description('Check agent status, health, and SLA compliance')
+  .option('--did <did>', 'Specific agent DID or name')
+  .option('--network <network>', 'Kite network: kite-testnet or kite-mainnet', 'kite-testnet')
+  .option('--namespace <namespace>', 'Agent namespace', 'genobank.eth')
+  .option('--json', 'Output as JSON')
+  .action(async (options: AgentStatusOptions) => {
+    try {
+      await agentStatusCommand(options);
+    } catch (error) {
+      Logger.error(`Agent status check failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
 // Access control commands (v1.2.0)
 const accessCmd = program
   .command('access')
@@ -744,10 +943,10 @@ program
 
 // Show welcome message if no command
 if (process.argv.length === 2) {
-  console.log(chalk.cyan('\n╔════════════════════════════════════╗'));
-  console.log(chalk.cyan('║     BioFS CLI v2.0.7               ║'));
-  console.log(chalk.cyan('║     BioNFT-Gated S3 CLI            ║'));
-  console.log(chalk.cyan('╚════════════════════════════════════╝\n'));
+  console.log(chalk.cyan('\n╔═════════════════════════════════════════════╗'));
+  console.log(chalk.cyan('║  BioFS CLI v2.4.0                           ║'));
+  console.log(chalk.cyan('║  BioNFT-Gated S3 + x402 Pay + Kite AI       ║'));
+  console.log(chalk.cyan('╚═════════════════════════════════════════════╝\n'));
 
   console.log('Available commands:');
   console.log(`  ${chalk.green('login')}       - Authenticate with Web3 wallet`);
@@ -768,7 +967,8 @@ if (process.argv.length === 2) {
   console.log(`  ${chalk.green('dissect')}     - Extract phenotype SNPs (GDPR)`);
   console.log(`  ${chalk.green('access')}      - Manage BioNFT access control`);
   console.log(`  ${chalk.green('job')}         - Manage research jobs (BioOS)`);
-  console.log(`  ${chalk.green('agent-health')} - Check processing agent readiness`);
+  console.log(`  ${chalk.green('payment')}     - x402 payments (Avalanche USDC)`);
+  console.log(`  ${chalk.green('agent')}       - Kite AI agent management`);
   console.log(`  ${chalk.green('help')}        - Show help\n`);
 
   console.log('Tokenization subcommands:');
@@ -779,6 +979,18 @@ if (process.argv.length === 2) {
   console.log('Derivative linking subcommands:');
   console.log(`  ${chalk.cyan('link clara')} <biosample_serial>       - Mint ClaraJobNFT and link to BioNFT`);
   console.log(`  ${chalk.cyan('family-status')} <serials...>          - Show family pipeline status\n`);
+
+  console.log('x402 Payment subcommands (Avalanche C-Chain):');
+  console.log(`  ${chalk.cyan('payment balance')}   - Check USDC balance`);
+  console.log(`  ${chalk.cyan('payment pricing')}   - View service pricing`);
+  console.log(`  ${chalk.cyan('payment setup')}     - Configure payment wallet`);
+  console.log(`  ${chalk.cyan('payment faucet')}    - Get testnet tokens`);
+  console.log(`  ${chalk.cyan('payment history')}   - View transaction history\n`);
+
+  console.log('Kite AI Agent subcommands:');
+  console.log(`  ${chalk.cyan('agent register')} --all     - Register BioFS agents on Kite`);
+  console.log(`  ${chalk.cyan('agent list')}               - List registered agents`);
+  console.log(`  ${chalk.cyan('agent status')}             - Check agent health & SLA\n`);
 
   console.log('Access control subcommands:');
   console.log(`  ${chalk.cyan('access request')} <biocid>            - Request access to asset`);
