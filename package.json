@@ -4,7 +4,7 @@
   "description": "BioFS - GenoBank.io BioNFT-Gated Filesystem CLI with Sequentia Protocol (BioCIDRegistry, ConsentManager, BioPIL) - 97% cost savings vs Story Protocol",
   "main": "dist/index.js",
   "bin": {
-    "biofs": "./bin/biofs.js"
+    "biofs": "bin/biofs.js"
   },
   "scripts": {
     "build": "tsc",
