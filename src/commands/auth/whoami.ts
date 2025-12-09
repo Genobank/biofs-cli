@@ -40,3 +40,4 @@ export async function whoamiCommand(options: WhoamiOptions): Promise<void> {
     }
   }
 }
+

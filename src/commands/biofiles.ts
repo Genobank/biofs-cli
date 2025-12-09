@@ -220,3 +220,4 @@ function getSourceBadge(source: string): string {
       return chalk.bgGray.white(` ${source} `);
   }
 }
+

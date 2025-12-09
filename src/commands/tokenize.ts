@@ -640,3 +640,4 @@ function wrapText(text: string, maxLength: number): string[] {
   if (currentLine) lines.push(currentLine);
   return lines;
 }
+

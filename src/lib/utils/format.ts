@@ -96,3 +96,4 @@ export function formatDuration(ms: number): string {
 export function formatNumber(num: number): string {
   return num.toLocaleString();
 }
+

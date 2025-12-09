@@ -118,3 +118,4 @@ export class FileUploader {
     return CONFIG.CONTRACTS.BIONFT;
   }
 }
+

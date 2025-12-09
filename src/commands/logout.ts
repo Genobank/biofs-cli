@@ -14,3 +14,4 @@ export async function logoutCommand(): Promise<void> {
     Logger.info('No credentials to clear');
   }
 }
+

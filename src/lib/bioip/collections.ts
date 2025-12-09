@@ -176,3 +176,4 @@ export function isValidCollection(address: string): boolean {
   const knownCollections = new Set(Object.values(BIOIP_COLLECTIONS));
   return knownCollections.has(address);
 }
+

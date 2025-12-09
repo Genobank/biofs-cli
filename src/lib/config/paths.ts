@@ -60,3 +60,4 @@ export class ConfigPaths {
     return path.join(this.logsDir, filename);
   }
 }
+

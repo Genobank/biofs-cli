@@ -196,3 +196,4 @@ export function createVerifyCommand(): Command {
       await verifyResearcher(options);
     });
 }
+

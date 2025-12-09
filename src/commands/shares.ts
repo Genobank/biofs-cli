@@ -277,3 +277,4 @@ function displayGraphQL(graph: PermissionGraph, yourWallet: string): void {
   console.log();
 }
 
+

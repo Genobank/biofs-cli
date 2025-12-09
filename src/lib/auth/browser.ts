@@ -25,3 +25,4 @@ export class BrowserLauncher {
     return `${authBaseUrl}?${params.toString()}`;
   }
 }
+

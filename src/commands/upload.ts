@@ -56,3 +56,4 @@ export async function uploadCommand(
     process.exit(1);
   }
 }
+

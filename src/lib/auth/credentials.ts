@@ -134,3 +134,4 @@ export class CredentialsManager {
 export async function getCredentials(): Promise<Credentials | null> {
   return CredentialsManager.getInstance().loadCredentials();
 }
+
