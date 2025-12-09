@@ -213,3 +213,4 @@ export async function accessListCommand(
     process.exit(1);
   }
 }
+

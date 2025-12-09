@@ -362,3 +362,4 @@ export async function reportCommand(options: ReportOptions = {}): Promise<void> 
     process.exit(1);
   }
 }
+

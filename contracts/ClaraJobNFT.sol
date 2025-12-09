@@ -97,3 +97,4 @@ contract ClaraJobNFT is ERC721URIStorage, Ownable {
         return jobData[tokenId];
     }
 }
+

@@ -259,3 +259,4 @@ export function createRegisterLabCommand(): Command {
       await registerLab(websiteUrl, options);
     });
 }
+

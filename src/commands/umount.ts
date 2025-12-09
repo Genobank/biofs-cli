@@ -189,3 +189,4 @@ async function cleanupCopyMount(mountPoint: string, options: UmountOptions): Pro
     await fs.remove(path.join(mountPoint, '.bionfs-cache'));
   }
 }
+

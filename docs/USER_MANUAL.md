@@ -599,3 +599,4 @@ biofs access request <biocid>
 ---
 
 *BioFS CLI is part of the GenoBank.io ecosystem for decentralized genomic data management.*
+

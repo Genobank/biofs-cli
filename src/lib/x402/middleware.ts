@@ -281,3 +281,4 @@ export function downloadPricing(pricePerGB: string, receiver: string): RequestHa
     };
   });
 }
+

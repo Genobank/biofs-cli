@@ -276,3 +276,4 @@ function displayGraphQL(graph: PermissionGraph, yourWallet: string): void {
   console.log(chalk.gray('   • GraphQL endpoint: Coming soon!'));
   console.log();
 }
+

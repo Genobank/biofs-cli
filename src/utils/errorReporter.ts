@@ -172,3 +172,4 @@ export class ErrorReporter {
         this.enabled = true;
     }
 }
+

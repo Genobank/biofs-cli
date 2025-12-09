@@ -361,3 +361,4 @@ export async function getPaymentClient(): Promise<X402Client> {
   }
   return _clientInstance;
 }
+

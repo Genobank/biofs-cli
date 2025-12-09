@@ -199,3 +199,4 @@ describe('JobStatus enum', () => {
         expect(JobStatus.Disputed).toBe(5);
     });
 });
+

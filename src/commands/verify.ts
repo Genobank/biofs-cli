@@ -120,3 +120,4 @@ export async function verifyCommand(
     throw error;
   }
 }
+

@@ -154,3 +154,4 @@ export async function paymentSetupCommand(options: PaymentSetupOptions = {}): Pr
 export async function getPaymentConfig(): Promise<PaymentConfig> {
   return loadPaymentConfig();
 }
+

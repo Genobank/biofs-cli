@@ -162,3 +162,4 @@ export async function agentHealthCommand(options: AgentHealthOptions = {}): Prom
     process.exit(1);
   }
 }
+

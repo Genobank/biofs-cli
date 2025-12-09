@@ -118,3 +118,4 @@ export async function jobResultsCommand(
     process.exit(1);
   }
 }
+

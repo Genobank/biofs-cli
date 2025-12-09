@@ -273,3 +273,4 @@ async function headlessLogin(): Promise<void> {
     process.exit(1);
   }
 }
+

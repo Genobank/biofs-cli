@@ -162,3 +162,4 @@ export async function jobStatusCommand(
     process.exit(1);
   }
 }
+

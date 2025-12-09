@@ -340,3 +340,4 @@ function formatWallet(wallet: string): string {
   }
   return wallet;
 }
+
