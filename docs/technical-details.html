@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioFS x402 + Kite AI - Technical Details</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #10b981;
+            --accent: #f59e0b;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            padding: 3rem 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.2rem;
+        }
+
+        .badge-row {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .badge-primary { border-color: var(--primary); }
+        .badge-secondary { border-color: var(--secondary); }
+        .badge-accent { border-color: var(--accent); }
+
+        section {
+            margin-bottom: 3rem;
+        }
+
+        h2 {
+            font-size: 1.75rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        h2::before {
+            content: '';
+            width: 4px;
+            height: 1.5rem;
+            background: var(--primary);
+            border-radius: 2px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card h3 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+        }
+
+        .tech-stack {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+
+        .tech-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .tech-item .layer {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .tech-item .tech {
+            font-weight: 600;
+        }
+
+        pre {
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        code {
+            color: #e6edf3;
+        }
+
+        .comment { color: #8b949e; }
+        .keyword { color: #ff7b72; }
+        .string { color: #a5d6ff; }
+        .function { color: #d2a8ff; }
+        .number { color: #79c0ff; }
+        .type { color: #7ee787; }
+
+        .architecture {
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            white-space: pre;
+            overflow-x: auto;
+            line-height: 1.4;
+        }
+
+        .flow-diagram {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .flow-box {
+            background: var(--bg-card);
+            border: 2px solid var(--primary);
+            border-radius: 12px;
+            padding: 1rem 2rem;
+            text-align: center;
+            min-width: 300px;
+        }
+
+        .flow-arrow {
+            color: var(--primary);
+            font-size: 1.5rem;
+        }
+
+        .integration-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--bg-card);
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        td code {
+            background: #0d1117;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(16, 185, 129, 0.1));
+            border: 1px solid var(--primary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .highlight-box h4 {
+            color: var(--secondary);
+            margin-bottom: 0.75rem;
+        }
+
+        .npm-install {
+            background: linear-gradient(135deg, var(--bg-card), #1a1a2e);
+            border: 2px solid var(--secondary);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            margin: 2rem 0;
+        }
+
+        .npm-install code {
+            background: #0d1117;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            display: inline-block;
+        }
+
+        .innovation-list {
+            list-style: none;
+        }
+
+        .innovation-list li {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: var(--bg-card);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+        }
+
+        .innovation-list li strong {
+            color: var(--accent);
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            border-top: 1px solid var(--border);
+            margin-top: 3rem;
+            color: var(--text-muted);
+        }
+
+        footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .container { padding: 1rem; }
+            h1 { font-size: 1.75rem; }
+            .architecture { font-size: 0.65rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>BioFS x402 + Kite AI</h1>
+            <p class="subtitle">Autonomous AI Agents for Genomic Data with HTTP 402 Micropayments</p>
+            <div class="badge-row">
+                <span class="badge badge-primary">x402 Protocol</span>
+                <span class="badge badge-secondary">Kite AI Passports</span>
+                <span class="badge badge-accent">Sequentia Protocol</span>
+                <span class="badge">Hack2Build 2025</span>
+            </div>
+        </header>
+
+        <section>
+            <h2>Tech Stack</h2>
+            <div class="tech-stack">
+                <div class="tech-item">
+                    <div class="layer">CLI Framework</div>
+                    <div class="tech">TypeScript + Commander.js</div>
+                </div>
+                <div class="tech-item">
+                    <div class="layer">Blockchain</div>
+                    <div class="tech">ethers.js v6, Sequentia L1, Avalanche</div>
+                </div>
+                <div class="tech-item">
+                    <div class="layer">Smart Contracts</div>
+                    <div class="tech">Solidity 0.8.19, OpenZeppelin, Hardhat</div>
+                </div>
+                <div class="tech-item">
+                    <div class="layer">Storage</div>
+                    <div class="tech">AWS S3, IPFS, MongoDB</div>
+                </div>
+                <div class="tech-item">
+                    <div class="layer">AI Integration</div>
+                    <div class="tech">Google Generative AI (Gemini)</div>
+                </div>
+                <div class="tech-item">
+                    <div class="layer">Payment Protocol</div>
+                    <div class="tech">x402 HTTP 402, EIP-712 Signatures</div>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Architecture</h2>
+            <div class="architecture">
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         BioFS CLI (Orchestrator)                        │
+│              npm i -g @genobank/biofs@2.5.0 • biofs --help              │
+└───────────────────────────────────┬─────────────────────────────────────┘
+                                    │
+        ┌───────────────────────────┼───────────────────────────┐
+        │                           │                           │
+        ▼                           ▼                           ▼
+┌──────────────────┐    ┌──────────────────────┐    ┌──────────────────────┐
+│  Kite AI Agent   │    │   x402 PaymentRouter │    │  Sequentia Protocol  │
+│    Passports     │    │   (Atomic USDC)      │    │  (BioCID + Consent)  │
+│                  │    │                      │    │                      │
+│ • DID identity   │    │ • HTTP 402 flow      │    │ • BioCIDRegistry     │
+│ • BIP-32 wallets │    │ • Multi-recipient    │    │ • ConsentManager     │
+│ • SLA contracts  │    │ • Revenue sharing    │    │ • PaymentRouter      │
+│ • Delegation     │    │ • Escrow + refund    │    │ • ClaraJobNFT        │
+└──────────────────┘    └──────────────────────┘    └──────────────────────┘
+            </div>
+        </section>
+
+        <section>
+            <h2>Key Integrations</h2>
+            <div class="integration-grid">
+                <div class="card">
+                    <h3>1. x402 Protocol (HTTP 402 Payment Required)</h3>
+                    <pre><code><span class="comment">// Client requests service</span>
+<span class="keyword">const</span> response = <span class="keyword">await</span> axios.<span class="function">post</span>(url, data);
+
+<span class="comment">// Server returns 402 with payment requirements</span>
+<span class="keyword">if</span> (response.status === <span class="number">402</span>) {
+  <span class="keyword">const</span> { amount, receiver, network } = response.data;
+
+  <span class="comment">// Client signs EIP-712 payment</span>
+  <span class="keyword">const</span> signature = <span class="keyword">await</span> wallet.<span class="function">signTypedData</span>(
+    domain, types, paymentData
+  );
+
+  <span class="comment">// Retry with X-PAYMENT header</span>
+  <span class="keyword">await</span> axios.<span class="function">post</span>(url, data, {
+    headers: { <span class="string">'X-PAYMENT'</span>: paymentHeader }
+  });
+}</code></pre>
+                </div>
+
+                <div class="card">
+                    <h3>2. Kite AI Agent Passports</h3>
+                    <pre><code><span class="keyword">interface</span> <span class="type">KitePassport</span> {
+  <span class="comment">// DID format: did:kite:namespace/agent-version</span>
+  did: <span class="string">"did:kite:genobank.eth/augenomics-clara-v1"</span>;
+
+  <span class="comment">// BIP-32 derived wallet</span>
+  walletAddress: <span class="string">"0x..."</span>;
+  derivationPath: <span class="string">"m/44'/60'/0'/0/1"</span>;
+
+  <span class="comment">// Capabilities & spending limits</span>
+  capabilities: [<span class="string">'fastq-to-vcf'</span>, <span class="string">'variant-calling'</span>];
+  spendingCaps: {
+    maxPerTransaction: <span class="string">'$100'</span>,
+    maxDaily: <span class="string">'$1000'</span>
+  };
+}</code></pre>
+                </div>
+
+                <div class="card">
+                    <h3>3. BioCID Universal Identifier</h3>
+                    <pre><code><span class="comment">// Format: biocid://wallet/type/identifier</span>
+<span class="keyword">static</span> <span class="function">generate</span>(wallet: <span class="type">string</span>, filename: <span class="type">string</span>) {
+  <span class="keyword">const</span> type = <span class="keyword">this</span>.<span class="function">detectFileType</span>(filename);
+  <span class="keyword">return</span> <span class="string">`biocid://</span>${wallet}<span class="string">/</span>${type}<span class="string">/</span>${filename}<span class="string">`</span>;
+}
+
+<span class="comment">// Examples:</span>
+<span class="comment">// biocid://0x5f5a.../vcf/sample.vcf.gz</span>
+<span class="comment">// biocid://0x5f5a.../fastq/reads_R1.fastq.gz</span>
+<span class="comment">// biocid://0x5f5a.../bam/aligned.bam</span></code></pre>
+                </div>
+
+                <div class="card">
+                    <h3>4. Atomic Multi-Recipient Payments</h3>
+                    <pre><code><span class="comment">// $1000 genomic analysis payment split</span>
+<span class="keyword">const</span> recipients = [
+  { recipient: labWallet,   amount: <span class="string">"700"</span> },  <span class="comment">// 70%</span>
+  { recipient: cravatWallet, amount: <span class="string">"200"</span> }, <span class="comment">// 20%</span>
+  { recipient: platformWallet, amount: <span class="string">"100"</span> } <span class="comment">// 10%</span>
+];
+
+<span class="comment">// ATOMIC: All succeed or all fail</span>
+<span class="keyword">await</span> router.<span class="function">createRoute</span>(jobId, <span class="number">1000</span>, recipients);
+<span class="keyword">await</span> router.<span class="function">executeRoute</span>(jobId);</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Innovative Solutions</h2>
+            <ul class="innovation-list">
+                <li>
+                    <strong>BIP-32 Agent Derivation Hierarchy</strong>
+                    Single master seed derives all agent wallets deterministically. One backup secures entire agent fleet. Path convention: <code>m/44'/60'/0'/0/{agent_index}</code>
+                </li>
+                <li>
+                    <strong>HTTP 402 → Blockchain Atomic Bridge</strong>
+                    Extended standard x402 single-recipient to multi-recipient via on-chain PaymentRouter. Payments execute atomically (all-or-nothing) with automatic refund on failure.
+                </li>
+                <li>
+                    <strong>Data Minimization Pattern</strong>
+                    Raw FASTQ files (100GB+) processed in secure enclave, only VCF derivatives returned. Original deleted, hash remains on-chain for provenance. GDPR Article 17 compliant.
+                </li>
+                <li>
+                    <strong>Standing Intent + Delegation Tokens</strong>
+                    User signs once (30-day Standing Intent with spending caps). Agents create short-lived Delegation Tokens (60s TTL) per operation. Zero user interaction for micropayments within approved caps.
+                </li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Pre-configured AI Agents</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Agent</th>
+                        <th>Service</th>
+                        <th>Price</th>
+                        <th>SLA</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>biofs-orchestrator</code></td>
+                        <td>CLI Orchestration</td>
+                        <td>Free</td>
+                        <td>5s response, 99.9% uptime</td>
+                    </tr>
+                    <tr>
+                        <td><code>augenomics-clara</code></td>
+                        <td>GPU Variant Calling</td>
+                        <td>$0.25</td>
+                        <td>2hr max, 50% penalty on timeout</td>
+                    </tr>
+                    <tr>
+                        <td><code>opencravat-annotator</code></td>
+                        <td>VCF Annotation</td>
+                        <td>$0.05</td>
+                        <td>30min max, 25% penalty on timeout</td>
+                    </tr>
+                    <tr>
+                        <td><code>claude-ai</code></td>
+                        <td>Genomic Analysis</td>
+                        <td>$0.01</td>
+                        <td>60s response, 99.9% accuracy</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>Deployed Infrastructure</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Component</th>
+                        <th>Network</th>
+                        <th>Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>ClaraJobNFT V2</td>
+                        <td>Sequentia L1</td>
+                        <td><code>0x8B0a66A840364c7D5956E72f9c6fB363E0341AEF</code></td>
+                    </tr>
+                    <tr>
+                        <td>PaymentRouter</td>
+                        <td>Sequentia L1</td>
+                        <td><code>0x4b46D8A0533bc17503349F86a909C2FEcFD04489</code></td>
+                    </tr>
+                    <tr>
+                        <td>SeqUSDC</td>
+                        <td>Sequentia L1</td>
+                        <td><code>0xD837B344e931cc265ec54879A0B388DE6F0015c9</code></td>
+                    </tr>
+                    <tr>
+                        <td>BioFS Node</td>
+                        <td>P2P Network</td>
+                        <td>NFS + QUIC protocol</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <div class="npm-install">
+            <h3 style="margin-bottom: 1rem; color: var(--secondary);">Get Started</h3>
+            <code>npm install -g @genobank/biofs@2.5.0 && biofs --help</code>
+        </div>
+
+        <footer>
+            <p>
+                Built by <a href="https://genobank.io">GenoBank.io</a> |
+                <a href="https://github.com/Genobank/biofs-cli">GitHub</a> |
+                <a href="https://www.npmjs.com/package/@genobank/biofs">npm</a>
+            </p>
+            <p style="margin-top: 0.5rem;">Hack2Build 2025</p>
+        </footer>
+    </div>
+</body>
+</html>
