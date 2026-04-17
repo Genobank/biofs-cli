@@ -1,3 +1,22 @@
+# v2.7.1 - Security: 0 vulnerabilities (was 46)
+
+**Published**: April 17, 2026
+
+## Changes
+- `npm audit fix --force` run to clear **1 critical + 11 high + 18 moderate + 16 low vulnerabilities** (total 46 → 0).
+- `hardhat` bumped 2.x → 3.4.0 (SemVer major; dev-only, used by `scripts/deploy-clara-nft.js` for smart-contract deploy — not by the CLI runtime).
+- `@nomicfoundation/hardhat-toolbox` 6.x → 7.0.0.
+- Auto-fixable patches applied to axios, express, handlebars, minimatch, mocha, path-to-regexp, picomatch, serialize-javascript, undici, etc.
+
+## Runtime impact
+- **Zero.** The CLI's runtime dependencies and build (`tsc`) are unaffected.
+- The `scripts/deploy-clara-nft.js` smart-contract deploy script may need minor adjustments for hardhat 3.x API changes — out of scope for this release since it's a one-off deploy tool, not a CLI code path.
+
+## How to upgrade
+```bash
+npm install -g @genobank/biofs@2.7.1
+```
+
 # v2.7.0 - htsget + smart streaming + aliases
 
 **Published**: April 17, 2026
