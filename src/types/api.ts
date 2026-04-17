@@ -10,7 +10,10 @@ export interface ApiResponse<T = any> {
 export interface FileInfo {
   filename: string;
   file_path?: string;
+  /** Legacy storage path. Populated by older backends and for files still on AWS S3. */
   s3_path?: string;
+  /** Preferred storage path since the v2.6.2 GCS migration (April 2026). */
+  gcs_path?: string;
   ipfs_hash?: string;
   ip_id?: string;
   size?: number;
@@ -50,6 +53,7 @@ export interface IPAsset {
   file_type?: string;
   type?: string;
   s3_path?: string;
+  gcs_path?: string;
   ipfs_hash?: string;
   source?: string;
   chain?: string;

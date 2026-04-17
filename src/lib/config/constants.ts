@@ -61,8 +61,8 @@ export const API_CONFIG = {
   timeout: 300000 // 5 minutes for large file uploads
 };
 
-// Gemini AI Configuration
-export const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+// Anthropic Claude AI Configuration
+export const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 export const FILE_TYPES = {
   vcf: { ext: ['.vcf', '.vcf.gz'], desc: 'Variant Call Format' },

@@ -30,19 +30,28 @@ export class BioCIDResolver {
 
         Logger.debug(`Access granted! Filename: ${downloadInfo.filename}`);
 
+        // GCS migration (v2.6.2): prefer gcs_path when backend returns it,
+        // fall back to legacy s3_path. Backend's stream endpoint name
+        // (`stream_s3_file`) is a stable URL contract — it now streams from GCS
+        // server-side even though the name is legacy.
+        const storagePath: string | undefined =
+          downloadInfo.gcs_path || downloadInfo.s3_path;
+        const storageType: 'GCS' | 'S3' =
+          downloadInfo.gcs_path ? 'GCS' : 'S3';
+
         // Use stream endpoint with IP Asset validation
         let streamUrl = downloadInfo.presigned_url;
         if (!streamUrl || streamUrl.includes('/get_presigned_link')) {
           const signature = await this.api.getSignature();
           // Include ip_asset_id for mainnet validation
-          streamUrl = `${CONFIG.API_BASE_URL}/api_vcf_annotator/stream_s3_file?user_signature=${encodeURIComponent(signature)}&file_path=${encodeURIComponent(downloadInfo.s3_path)}&ip_asset_id=${encodeURIComponent(biocidOrFilename)}`;
+          streamUrl = `${CONFIG.API_BASE_URL}/api_vcf_annotator/stream_s3_file?user_signature=${encodeURIComponent(signature)}&file_path=${encodeURIComponent(storagePath || '')}&ip_asset_id=${encodeURIComponent(biocidOrFilename)}`;
           Logger.debug(`Using stream URL with IP validation: ${streamUrl}`);
         }
 
         return {
-          type: 'S3',
-          path: downloadInfo.s3_path,
-          bucket: 'test.vault.genoverse.io',
+          type: storageType,
+          path: storagePath,
+          bucket: downloadInfo.bucket || (storageType === 'GCS' ? 'genobank-biorouter' : 'test.vault.genoverse.io'),
           presigned_url: streamUrl,
           filename: downloadInfo.filename,
           // GDPR consent metadata
@@ -82,21 +91,23 @@ export class BioCIDResolver {
       throw new Error(`File not found: ${biocidOrFilename}`);
     }
 
-    // Resolve to storage location
-    if (file.s3_path) {
-      // Use the working stream endpoint instead of broken presigned link
+    // Resolve to storage location — GCS preferred, S3 legacy-compat.
+    const storagePath: string | undefined = file.gcs_path || file.s3_path;
+    if (storagePath) {
+      const storageType: 'GCS' | 'S3' = file.gcs_path ? 'GCS' : 'S3';
+      // Use the working stream endpoint instead of broken presigned link.
+      // `stream_s3_file` name is legacy URL contract; backend now streams from GCS.
       let streamUrl = file.presigned_url;
       if (!streamUrl) {
         const signature = await this.api.getSignature();
-        // Construct stream URL like OpenCRAVAT does
-        streamUrl = `${CONFIG.API_BASE_URL}/api_vcf_annotator/stream_s3_file?user_signature=${encodeURIComponent(signature)}&file_path=${encodeURIComponent(file.s3_path)}`;
+        streamUrl = `${CONFIG.API_BASE_URL}/api_vcf_annotator/stream_s3_file?user_signature=${encodeURIComponent(signature)}&file_path=${encodeURIComponent(storagePath)}`;
         Logger.debug(`Using stream URL: ${streamUrl}`);
       }
 
       return {
-        type: 'S3',
-        path: file.s3_path,
-        bucket: file.bucket || 'vault.genobank.io',
+        type: storageType,
+        path: storagePath,
+        bucket: file.bucket || (storageType === 'GCS' ? 'genobank-biorouter' : 'vault.genobank.io'),
         presigned_url: streamUrl
       };
     }
@@ -176,28 +187,33 @@ export class BioCIDResolver {
       if (verbose) console.error('❌ Error fetching Avalanche biosamples:', error);
     }
 
-    // Data Source 3: S3 Uploaded Files (non-Story Protocol files)
+    // Data Source 3: Uploaded Files (GCS since April 2026; S3 before).
+    // Backend field name is still `s3_path` (legacy API contract); we also
+    // honor `gcs_path` if the backend has been updated to emit it.
     try {
-      if (verbose) console.log('🔍 Fetching S3 uploaded files...');
-      const s3Files = await this.api.getMyUploadedFilesUrls();
-      if (verbose) console.log(`✅ Found ${s3Files.length} S3 files`);
+      if (verbose) console.log('🔍 Fetching uploaded files...');
+      const uploadedFiles = await this.api.getMyUploadedFilesUrls();
+      if (verbose) console.log(`✅ Found ${uploadedFiles.length} uploaded files`);
 
-      for (const file of s3Files) {
+      for (const file of uploadedFiles) {
         const filename = file.original_name || file.filename || 'unknown';
         const type = BioCIDParser.detectFileType(filename);
+        const gcsPath = (file as any).gcs_path;
+        const s3Path = file.s3_path;
         bioFiles.push({
           filename,
           biocid: file.biocid || BioCIDParser.generate('unknown', filename),
           type,
           size: file.size,
-          source: 'S3',
+          source: gcsPath ? 'GCS' : 'S3',
           created_at: file.created_at,
-          s3_path: file.s3_path || file.path,
+          gcs_path: gcsPath,
+          s3_path: s3Path || file.path,
           presigned_url: file.presigned_url
         });
       }
     } catch (error) {
-      if (verbose) console.error('❌ Error fetching S3 files:', error);
+      if (verbose) console.error('❌ Error fetching uploaded files:', error);
     }
 
     // Data Source 4: Granted BioIP files (via license tokens)
@@ -207,13 +223,14 @@ export class BioCIDResolver {
       if (verbose) console.log(`✅ Found ${grantedBioips.length} granted BioIP files`);
 
       for (const bioip of grantedBioips) {
-        if (bioip.s3_path || bioip.ipfs_hash) {
+        if (bioip.s3_path || bioip.gcs_path || bioip.ipfs_hash) {
           bioFiles.push({
             filename: (bioip.filename || 'Granted BioIP') + ' 🔑',
             biocid: `biocid://${bioip.owner}/bioip/${bioip.ip_id}`,
             type: bioip.file_category || bioip.type || 'bioip',
-            source: 'BioFS',  // BioNFT-Gated S3
+            source: 'BioFS',  // BioNFT-Gated storage (GCS since April 2026)
             created_at: bioip.granted_at,
+            gcs_path: bioip.gcs_path,
             s3_path: bioip.s3_path,
             ipfs_hash: bioip.ipfs_hash,
             ip_asset: bioip.ip_id,

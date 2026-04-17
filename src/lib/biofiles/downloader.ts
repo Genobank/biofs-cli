@@ -39,20 +39,29 @@ export class FileDownloader {
       outputPath = path.join(downloadDir, originalFilename);
     }
 
-    // Download based on location type
+    // Download based on location type.
+    // S3, GCS, and BioFS all present the same client-side interface — a
+    // presigned URL to stream from. The storage backend is a server-side detail.
     switch (location.type) {
       case 'S3':
-        return await this.downloadFromS3(location, outputPath, showProgress);
+      case 'GCS':
+      case 'BioFS':
+        return await this.downloadFromPresignedUrl(location, outputPath, showProgress);
       case 'IPFS':
         return await this.downloadFromIPFS(location, outputPath, showProgress);
       case 'Sequentia':
-        throw new Error('Direct download from Sequentia not yet implemented (use S3 backend)');
+        throw new Error('Direct download from Sequentia not yet implemented (use GCS/S3 backend)');
       default:
         throw new Error(`Unknown location type: ${location.type}`);
     }
   }
 
-  private async downloadFromS3(
+  /**
+   * Stream a file from a presigned URL. Works transparently for S3 and GCS
+   * since both use HTTPS + Range-capable responses.
+   * Previously named `downloadFromS3`; renamed in 2.6.2 after GCS migration.
+   */
+  private async downloadFromPresignedUrl(
     location: FileLocation,
     outputPath: string,
     showProgress: boolean

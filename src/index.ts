@@ -28,7 +28,16 @@ import { jobStatusCommand, JobStatusOptions } from './commands/job/status';
 import { jobResultsCommand, JobResultsOptions } from './commands/job/results';
 import { jobListCommand, JobListOptions } from './commands/job/list';
 import { pipelinesCommand, PipelinesOptions } from './commands/job/pipelines';
+// v2.7.0: htsget + smart streaming + aliases
+import { streamCommand, StreamOptions } from './commands/stream';
+import { pipeCommand, PipeOptions } from './commands/pipe';
+import { aliasCommand, AliasOptions } from './commands/alias';
+import { htsgetServiceInfoCommand, htsgetTicketCommand } from './commands/htsget';
 import { submitClaraCommand, ClaraJobOptions } from './commands/job/submit-clara';
+import { contextCreateCommand, ContextCreateOptions } from './commands/context/create';
+import { contextPublishCommand, ContextPublishOptions } from './commands/context/publish';
+import { contextVerifyCommand } from './commands/context/verify';
+import { contextRevokeCommand, ContextRevokeOptions } from './commands/context/revoke';
 import { agentHealthCommand, AgentHealthOptions } from './commands/agent/health';
 import { agentRegisterCommand, AgentRegisterOptions } from './commands/agent/register';
 import { agentListCommand, AgentListOptions } from './commands/agent/list';
@@ -60,7 +69,7 @@ const program = new Command();
 program
   .name('biofs')
   .description('BioFS by GenoBank.io - BioNFT-Gated S3 CLI for genomic data')
-  .version('2.5.2')
+  .version('2.7.0')
   .option('--debug', 'Enable debug output')
   .hook('preAction', (thisCommand) => {
     // Set global debug flag if --debug is passed
@@ -107,7 +116,7 @@ program
   .description('Show current authenticated wallet')
   .option('--json', 'Output as JSON')
   .option('--verify', 'Verify signature validity')
-  .option('--check <wallet>', 'Check against specific wallet address (e.g., Dra. Claudia: 0xb3c3a584491b8ca4df45116a1e250098a0d6192d)')
+  .option('--check <wallet>', 'Check against specific wallet address (e.g., 0x0000000000000000000000000000000000000000)')
   .action(async (options: WhoamiOptions) => {
     try {
       await whoamiCommand(options);
@@ -318,6 +327,103 @@ program
       process.exit(1);
     }
   });
+
+// ========================================================================
+// v2.7.0 — htsget + smart streaming + aliases (Sprint 6)
+// ========================================================================
+// Mac researchers stream BioNFT-gated VCFs/BAMs through the tools they
+// already use (bcftools, samtools, pysam, IGV) with zero FUSE, zero kext.
+// `stream` / `view` are the day-to-day commands; `htsget` is for debugging.
+
+// stream - htsget stream to stdout (pipes into any bioinformatics tool)
+program
+  .command('stream <id>')
+  .description('Stream a BioNFT-gated VCF/BAM to stdout via htsget (pipe into bcftools/samtools/pysam)')
+  .option('--kind <variants|reads>', 'force datatype (default: auto-detect from filename)')
+  .option('--htsget-url <url>', 'override htsget endpoint (default: https://htsget.genobank.app)')
+  .option('-q, --quiet', 'suppress info messages')
+  .action(async (id: string, options: StreamOptions) => {
+    try {
+      await streamCommand(id, options);
+    } catch (error: any) {
+      Logger.error(`stream failed: ${error?.message || error}`);
+      process.exit(6);
+    }
+  });
+
+// pipe - auto-pipe htsget stream into bcftools/samtools view
+// (distinct from the existing `view` command, which prints file content)
+program
+  .command('pipe <id>')
+  .description('Pipe a BioIP stream into bcftools view (VCF) or samtools view (BAM) automatically')
+  .option('--tool <bcftools|samtools>', 'force tool (default: auto-detect from filename)')
+  .option('--htsget-url <url>', 'override htsget endpoint')
+  .option('-q, --quiet', 'suppress info messages')
+  .allowUnknownOption(true)
+  .action(async (id: string, options: PipeOptions, cmd: any) => {
+    try {
+      // Everything after `--` is passed through to bcftools/samtools view
+      const extra = cmd.args.slice(cmd.args.indexOf(id) + 1);
+      await pipeCommand(id, { ...options, extra });
+    } catch (error: any) {
+      Logger.error(`pipe failed: ${error?.message || error}`);
+      process.exit(6);
+    }
+  });
+
+// alias - manage local shortcuts for ip_ids / BioCIDs
+program
+  .command('alias [name] [target]')
+  .description('Manage local aliases for ip_ids (e.g. `biofs alias my-wes 0xCCe14315…`)')
+  .option('--list', 'list all aliases (default when no args)')
+  .option('--remove <name>', 'remove alias by name')
+  .option('--json', 'emit JSON')
+  .action(async (name: string | undefined, target: string | undefined, options: AliasOptions) => {
+    try {
+      await aliasCommand({ ...options, name, target });
+    } catch (error: any) {
+      Logger.error(`alias failed: ${error?.message || error}`);
+      process.exit(1);
+    }
+  });
+
+// htsget - low-level GA4GH htsget operations (service-info, ticket)
+const htsgetCmd = program
+  .command('htsget')
+  .description('Low-level GA4GH htsget operations (see `biofs stream`/`view` for day-to-day use)');
+
+htsgetCmd
+  .command('service-info')
+  .description('Show htsget endpoint metadata (GA4GH service-info)')
+  .option('--json', 'emit JSON')
+  .action(async (options: { json?: boolean }) => {
+    try {
+      await htsgetServiceInfoCommand(options);
+    } catch (error: any) {
+      Logger.error(`service-info failed: ${error?.message || error}`);
+      process.exit(6);
+    }
+  });
+
+htsgetCmd
+  .command('ticket <kind> <id>')
+  .description('Fetch a raw htsget ticket for debugging (kind = variants | reads)')
+  .action(async (kind: string, id: string) => {
+    try {
+      if (kind !== 'variants' && kind !== 'reads') {
+        Logger.error(`kind must be 'variants' or 'reads' (got '${kind}')`);
+        process.exit(2);
+      }
+      await htsgetTicketCommand(kind as 'variants' | 'reads', id);
+    } catch (error: any) {
+      Logger.error(`ticket failed: ${error?.message || error}`);
+      process.exit(6);
+    }
+  });
+
+// ========================================================================
+// (end v2.7.0 block)
+// ========================================================================
 
 // Tokenize command group - BioNFT minting on Sequentia
 const tokenizeCmd = program
@@ -692,6 +798,75 @@ accessCmd
       await revokeConsentCommand(ipId, options);
     } catch (error) {
       Logger.error(`Consent revocation failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// BioContext manifest commands (v2.6.0)
+const contextCmd = program
+  .command('context')
+  .description('Create, publish, verify, revoke .bionft BioContext manifests (EIP-712 signed)');
+
+contextCmd
+  .command('create <caseId>')
+  .description('Build + EIP-712 sign a .bionft manifest for a caseId (e.g. TN25-336147)')
+  .option('--kind <string>', 'Manifest kind', 'CancerDigitalTwin')
+  .option('--pil <n>', 'BioPIL license id (1-9)', '5')
+  .option('--commercial', 'Commercial use permitted')
+  .option('--deny-purpose <csv>', 'Denied purposes, comma-separated')
+  .option('--allow-skill <csv>', 'Allowed skills, comma-separated')
+  .option('--deny-skill <csv>', 'Denied skills, comma-separated')
+  .option('--deadline <dur>', 'Manifest TTL (e.g. 30d)', '30d')
+  .option('--expires <dur>', 'Consent TTL (e.g. 365d)', '365d')
+  .option('--narrative <path>', 'Path to .bio.md file')
+  .option('--output <path>', 'Output .bionft path')
+  .option('--include-files <csv>', 'BioCIDs to include non-interactively')
+  .option('--private-key <key>', 'Signing key (or BIOFS_SIGNING_KEY env)')
+  .option('--yes', 'No prompts; include all files')
+  .action(async (caseId: string, options: ContextCreateOptions) => {
+    try {
+      await contextCreateCommand(caseId, options);
+    } catch (error) {
+      Logger.error(`context create failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+contextCmd
+  .command('publish <bionft_file>')
+  .description('Upload a signed .bionft to biorouter.genobank.app')
+  .option('--force', 'Publish even if local verification fails')
+  .action(async (file: string, options: ContextPublishOptions) => {
+    try {
+      await contextPublishCommand(file, options);
+    } catch (error) {
+      Logger.error(`context publish failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+contextCmd
+  .command('verify <bionft_file>')
+  .description('Local verification: EIP-712 sig, hashes, Merkle proofs, deadline')
+  .action(async (file: string) => {
+    try {
+      await contextVerifyCommand(file);
+    } catch (error) {
+      Logger.error(`context verify failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+contextCmd
+  .command('revoke <caseId_or_file>')
+  .description('Revoke every BioCID in the manifest (GDPR Article 17)')
+  .option('--yes', 'Skip confirmation')
+  .option('--reason <string>', 'Revocation reason')
+  .action(async (key: string, options: ContextRevokeOptions) => {
+    try {
+      await contextRevokeCommand(key, options);
+    } catch (error) {
+      Logger.error(`context revoke failed: ${error}`);
       process.exit(1);
     }
   });

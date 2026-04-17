@@ -5,15 +5,32 @@ export interface BioCID {
   fullCID: string;
 }
 
+/**
+ * Storage backend the asset lives on.
+ * BioFS = BioNFT-Gated storage protocol (S3 or GCS).
+ * GCS added v2.6.2 (April 2026 AWS→GCS migration).
+ * S3 retained for backwards-compat during the transition; new writes go to GCS.
+ */
+export type StorageSource =
+  | 'S3'
+  | 'GCS'
+  | 'BioFS'
+  | 'IPFS'
+  | 'Sequentia'
+  | 'Avalanche';
+
 export interface BioFile {
   filename: string;
   biocid: string;
   type: string;
   size?: number;
-  source: 'S3' | 'BioFS' | 'IPFS' | 'Sequentia' | 'Avalanche';  // BioFS = BioNFT-Gated S3 protocol
+  source: StorageSource;
   created_at?: string;
   ip_asset?: string;
+  /** Legacy path field. Populated by older backends and for files still on AWS S3. */
   s3_path?: string;
+  /** Preferred path field since the April 2026 GCS migration. */
+  gcs_path?: string;
   ipfs_hash?: string;
   presigned_url?: string;
   granted?: boolean;       // True if access granted via license token
@@ -22,7 +39,7 @@ export interface BioFile {
 }
 
 export interface FileLocation {
-  type: 'S3' | 'BioFS' | 'IPFS' | 'Sequentia' | 'Avalanche';  // BioFS = BioNFT-Gated S3 protocol
+  type: StorageSource;
   path?: string;
   bucket?: string;
   presigned_url?: string;
@@ -37,4 +54,3 @@ export interface FileLocation {
   license_type?: string;       // License type (non-commercial, commercial, etc.)
   license_token_id?: number;   // License token ID
 }
-

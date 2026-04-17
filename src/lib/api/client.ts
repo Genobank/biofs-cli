@@ -88,9 +88,18 @@ export class GenoBankAPIClient {
     }
   }
 
+  /**
+   * Get a streaming URL for an asset by its storage path.
+   *
+   * GCS migration note (v2.6.2):
+   *  - The parameter is named `s3Path` for backwards compatibility, but it
+   *    accepts GCS object paths too — the backend treats the input as an
+   *    opaque object key regardless of the underlying store.
+   *  - Endpoint `stream_s3_file` is a stable URL contract even though the
+   *    backend now serves bytes from Google Cloud Storage (migrated from AWS S3
+   *    in April 2026).
+   */
   async getPresignedLink(s3Path: string): Promise<string> {
-    // Use the working endpoint from cravat.genobank.app (stream_s3_file)
-    // This endpoint is proven to work with genobank-biofiles-stream.js
     const signature = await this.getSignature();
     const streamUrl = `/api_vcf_annotator/stream_s3_file?user_signature=${encodeURIComponent(signature)}&file_path=${encodeURIComponent(s3Path)}`;
     return streamUrl;
@@ -201,7 +210,11 @@ export class GenoBankAPIClient {
 
   async mintVariantsStoryNFT(metadata: {
     filename: string;
+    /** Legacy storage path field. Since v2.6.2 (GCS migration) this accepts
+     *  GCS object paths too. Backend treats it as an opaque object key. */
     s3_path?: string;
+    /** Preferred since v2.6.2. If both set, backend uses gcs_path. */
+    gcs_path?: string;
     ipfs_hash?: string;
     collection_address?: string;
   }): Promise<{ ipId: string; txHash: string }> {
@@ -311,12 +324,18 @@ export class GenoBankAPIClient {
         throw new Error(details.reason || 'Access denied to this BioIP asset');
       }
 
-      // Return in expected format
+      // Return in expected format. Prefer gcs_path when backend emits it
+      // (v2.6.2+). s3_path retained for backwards compatibility.
       return {
         access_granted: true,
         presigned_url: details.presigned_url,
+        gcs_path: details.gcs_path,
         s3_path: details.s3_path,
-        filename: details.filename || details.file_name
+        bucket: details.bucket,
+        filename: details.filename || details.file_name,
+        owner: details.owner,
+        license_type: details.license_type,
+        license_token_id: details.license_token_id
       };
     }
     throw new Error(response.data.status_details?.message || 'Failed to check access');
@@ -661,6 +680,8 @@ export class GenoBankAPIClient {
   async mintSequentiasBioCID(params: {
     filename: string;
     file_type: string;
+    /** Storage object path. Named `s3_path` for legacy API contract;
+     *  since v2.6.2 this is a GCS object key. */
     s3_path: string;
     dna_fingerprint?: string;
     file_hash?: string;
@@ -946,8 +967,14 @@ export class GenoBankAPIClient {
   }
 
   /**
-   * Upload file to S3
-   * Sequentia Protocol: Returns S3 path for BioCIDRegistry
+   * Upload file to the BioFS storage backend (GCS since April 2026; S3 before).
+   *
+   * Returns an opaque object path that can be fed to other endpoints
+   * (e.g. getPresignedLink). For legacy API-contract reasons the field is
+   * still called `s3_path` in the backend response; we also honor `gcs_path`
+   * if the backend has been updated to emit it.
+   *
+   * Sequentia Protocol: this path is what BioCIDRegistry stores on-chain.
    */
   async uploadFile(filePath: string): Promise<string> {
     const signature = await this.getSignature();
@@ -965,15 +992,17 @@ export class GenoBankAPIClient {
     });
 
     if (response.data.status === 'Success') {
-      return response.data.status_details?.s3_path || response.data.s3_path;
+      const d = response.data.status_details || {};
+      // Prefer new gcs_path, fall back to legacy s3_path.
+      return d.gcs_path || d.s3_path || response.data.gcs_path || response.data.s3_path;
     }
 
     throw new Error('Upload failed');
   }
 
   /**
-   * Download file from S3
-   * Sequentia Protocol: With GDPR consent verification
+   * Download file from the BioFS storage backend (GCS since April 2026).
+   * Sequentia Protocol: with GDPR consent verification.
    */
   async downloadFile(biocidOrFilename: string, destination: string): Promise<void> {
     const signature = await this.getSignature();

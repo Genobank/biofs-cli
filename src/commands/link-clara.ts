@@ -5,7 +5,7 @@
  *
  * Prerequisites:
  * - Biosample must have a BioNFT minted
- * - VCF file must exist in S3 (Clara job completed)
+ * - VCF file must exist in GCS (Clara job completed)
  *
  * Contracts:
  * - BioNFT: 0xA2cD489d7c2eB3FF5e51F13f0641351a33cA32cd
@@ -33,8 +33,12 @@ const CLARA_JOB_NFT_CONTRACT = '0x9B70040299efd49C0BBC607395F92a9492DCcc20'; // 
 const SEQUENTIA_RPC = 'http://54.226.180.9:8545';
 const CHAIN_ID = 15132025;
 
-// S3 bucket for VCF files
-const S3_BUCKET = 'deepvariant-fastq-to-vcf-genobank.app';
+// GCS bucket for VCF files (migrated from AWS S3 April 2026).
+// Bucket name uses hyphens (GCS rule) where the legacy S3 bucket used dots.
+// Override via env for dev / future migrations.
+const GCS_BUCKET = process.env.GENOBANK_VCF_BUCKET
+  || 'deepvariant-fastq-to-vcf-genobank-app';
+const GCS_PUBLIC_BASE = `https://storage.googleapis.com/${GCS_BUCKET}`;
 
 // Minter key (validator account with gas) - REQUIRED via environment variable
 function getMinterKey(): string {
@@ -67,6 +71,14 @@ export async function linkClaraCommand(
   biosampleSerial: string,
   options: LinkClaraOptions = {}
 ): Promise<void> {
+  // Security: biosample serials are numeric. Reject anything else before it
+  // reaches any shell / GCS / HTTP context. See audit H1 (CVE-avoidance).
+  if (!/^\d{6,20}$/.test(biosampleSerial)) {
+    throw new Error(
+      `Invalid biosample serial "${biosampleSerial}" — must be 6–20 digits`
+    );
+  }
+
   const spinner = ora('Initializing Clara job linking...').start();
 
   try {
@@ -137,8 +149,8 @@ export async function linkClaraCommand(
 
     spinner.succeed('Step 3/6: No existing Clara derivative found');
 
-    // Step 4: Check VCF file exists in S3
-    spinner.start('Step 4/6: Locating VCF file in S3...');
+    // Step 4: Check VCF file exists in Google Cloud Storage
+    spinner.start('Step 4/6: Locating VCF file in GCS...');
 
     let vcfPath = options.vcfPath;
     let vcfSize = 0;
@@ -151,13 +163,14 @@ export async function linkClaraCommand(
         `output/${biosampleSerial}/${biosampleSerial}.deepvariant.agilent_v8.vcf`
       ];
 
-      for (const path of possiblePaths) {
+      for (const filePath of possiblePaths) {
         try {
-          const response = await axios.head(`https://${S3_BUCKET}.s3.amazonaws.com/${path}`, {
+          // GCS public JSON API — HEAD on storage.googleapis.com/<bucket>/<object>
+          const response = await axios.head(`${GCS_PUBLIC_BASE}/${filePath}`, {
             timeout: 5000
           });
           if (response.status === 200) {
-            vcfPath = `s3://${S3_BUCKET}/${path}`;
+            vcfPath = `gs://${GCS_BUCKET}/${filePath}`;
             vcfSize = parseInt(response.headers['content-length'] || '0');
             break;
           }
@@ -167,22 +180,54 @@ export async function linkClaraCommand(
       }
 
       if (!vcfPath) {
-        // Check via AWS CLI
+        // Fall back to `gcloud storage ls` via execFileSync (argv array — no shell
+        // interpolation). Serial is regex-validated above; defense-in-depth: never
+        // pass user input through a shell string.
         try {
-          const { execSync } = require('child_process');
-          const result = execSync(
-            `aws s3 ls s3://${S3_BUCKET}/output/${biosampleSerial}/ 2>/dev/null | grep -E '\\.vcf$|\\.g\\.vcf$' | head -1`,
-            { encoding: 'utf-8' }
-          ).trim();
+          const { execFileSync } = require('child_process');
+          const raw = execFileSync(
+            'gcloud',
+            ['storage', 'ls', `gs://${GCS_BUCKET}/output/${biosampleSerial}/`],
+            { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }
+          ) as string;
 
-          if (result) {
-            const parts = result.split(/\s+/);
-            const filename = parts[parts.length - 1];
-            vcfPath = `s3://${S3_BUCKET}/output/${biosampleSerial}/${filename}`;
-            vcfSize = parseInt(parts[2] || '0');
+          // gcloud storage ls emits one gs:// URI per line. Pick the first VCF.
+          const firstLine = raw
+            .split(/\r?\n/)
+            .find(l => /\.(?:g\.)?vcf(?:\.gz)?$/.test(l));
+
+          if (firstLine) {
+            const gsUri = firstLine.trim();
+            // Validate URI shape: gs://<bucket>/<object-path> with safe chars
+            if (/^gs:\/\/[A-Za-z0-9._-]+\/[A-Za-z0-9._/-]+$/.test(gsUri)) {
+              vcfPath = gsUri;
+              // Size is unavailable from `gcloud storage ls` without --long.
+              // Caller treats vcfSize===0 as "unknown but present."
+              vcfSize = 0;
+            }
           }
         } catch {
-          // AWS CLI not available or error
+          // gcloud CLI not available or error — try "gcloud storage ls -l" last-ditch
+          try {
+            const { execFileSync } = require('child_process');
+            const raw = execFileSync(
+              'gcloud',
+              ['storage', 'ls', '-l', `gs://${GCS_BUCKET}/output/${biosampleSerial}/`],
+              { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }
+            ) as string;
+            const line = raw.split(/\r?\n/).find(l => /\.(?:g\.)?vcf(?:\.gz)?$/.test(l));
+            if (line) {
+              // -l output: "<size>  <date>  gs://bucket/path"
+              const parts = line.trim().split(/\s+/);
+              const uri = parts[parts.length - 1];
+              if (/^gs:\/\/[A-Za-z0-9._-]+\/[A-Za-z0-9._/-]+$/.test(uri)) {
+                vcfPath = uri;
+                vcfSize = parseInt(parts[0] || '0', 10);
+              }
+            }
+          } catch {
+            // gcloud not available or final failure — let outer check handle
+          }
         }
       }
     }
