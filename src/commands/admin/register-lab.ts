@@ -20,6 +20,9 @@ import ora from 'ora';
 import inquirer from 'inquirer';
 import axios from 'axios';
 import * as dotenv from 'dotenv';
+import * as fs from 'fs-extra';
+import * as os from 'os';
+import * as path from 'path';
 
 // Load environment variables (try production API path, then local)
 const envPath = process.env.BIOFS_ENV_PATH || '/home/ubuntu/Genobank_APIs/production_api/.env';
@@ -194,9 +197,41 @@ export async function registerLab(
     // Display wallet credentials for custodial wallets
     if (result.wallet_type === 'custodial_generated') {
       console.log(chalk.yellow('\n🔑 Custodial Wallet Credentials:'));
-      console.log(chalk.gray('  Private Key:'), chalk.white(result.private_key || '(stored in MongoDB)'));
-      console.log(chalk.gray('  Mnemonic:'), chalk.white(result.mnemonic || '(stored in MongoDB)'));
-      console.log(chalk.yellow('  ⚠️  Keep these credentials secure!'));
+
+      // Security (audit H2): never write private keys / mnemonics to stdout —
+      // they leak into shell history, tmux scrollback, terminal recordings
+      // and sometimes CI logs. Persist to a mode-0600 file instead and only
+      // tell the operator the path.
+      if (result.private_key || result.mnemonic) {
+        const credDir = path.join(os.homedir(), '.biofs', 'labs');
+        await fs.ensureDir(credDir);
+        const credFile = path.join(
+          credDir,
+          `${result.wallet_address || result.lab_id || 'lab'}.json`
+        );
+        const payload: Record<string, string> = {
+          wallet_address: result.wallet_address || '',
+          created_at: new Date().toISOString(),
+        };
+        if (result.private_key) payload.private_key = result.private_key;
+        if (result.mnemonic) payload.mnemonic = result.mnemonic;
+        await fs.writeJson(credFile, payload, { spaces: 2 });
+        await fs.chmod(credFile, 0o600);
+
+        console.log(
+          chalk.gray('  Credentials file:'),
+          chalk.white(credFile),
+          chalk.gray('(mode 0600)')
+        );
+        console.log(
+          chalk.yellow('  ⚠️  Back this file up securely — if lost, the wallet is unrecoverable.')
+        );
+      } else {
+        console.log(
+          chalk.gray('  Credentials:'),
+          chalk.white('(stored in MongoDB — backend did not return them)')
+        );
+      }
       console.log(chalk.gray('  Lab can claim this wallet via email verification'));
     }
 

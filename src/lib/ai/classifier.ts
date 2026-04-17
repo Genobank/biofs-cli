@@ -1,13 +1,17 @@
 import { readFile } from 'fs/promises';
 import { basename, extname } from 'path';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { GEMINI_API_KEY } from '../config/constants';
+import Anthropic from '@anthropic-ai/sdk';
+import { ANTHROPIC_API_KEY } from '../config/constants';
 
 // Use environment variable only - no fallback key for security
-if (!GEMINI_API_KEY) {
-  throw new Error('GEMINI_API_KEY environment variable is not set. AI classification is disabled.');
+if (!ANTHROPIC_API_KEY) {
+  throw new Error('ANTHROPIC_API_KEY environment variable is not set. AI classification is disabled.');
 }
-const API_KEY = GEMINI_API_KEY;
+
+// Initialize Anthropic client
+const anthropic = new Anthropic({
+  apiKey: ANTHROPIC_API_KEY
+});
 
 export interface ClassificationResult {
   description: string;
@@ -16,14 +20,10 @@ export interface ClassificationResult {
 }
 
 /**
- * Classify a genomic dataset using Gemini AI
+ * Classify a genomic dataset using Claude Opus 4.5
  */
 export async function classifyDataset(filePath: string): Promise<ClassificationResult> {
   try {
-    // Initialize Gemini
-    const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-
     // Read file sample (first 100 lines or 10KB, whichever is smaller)
     const fileContent = await readFile(filePath, { encoding: 'utf-8' });
     const lines = fileContent.split('\n');
@@ -52,10 +52,21 @@ IMPORTANT: Respond ONLY in valid JSON format with no additional text or markdown
   "suggestedTitle": "..."
 }`;
 
-    // Get AI response
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    // Get Claude response
+    const message = await anthropic.messages.create({
+      model: 'claude-opus-4-5-20251101',
+      max_tokens: 1024,
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ]
+    });
+
+    // Extract text from response
+    const textBlock = message.content.find(block => block.type === 'text');
+    const text = textBlock?.type === 'text' ? textBlock.text : '';
 
     // Parse JSON response
     // Clean the response (remove markdown if present)
@@ -178,4 +189,3 @@ function validateCategory(category: string | undefined): string | null {
   const normalized = category.toLowerCase().trim();
   return validCategories.includes(normalized) ? normalized : null;
 }
-

@@ -1,3 +1,89 @@
+# v2.7.0 - htsget + smart streaming + aliases
+
+**Published**: April 17, 2026
+
+## What you get
+
+Three new commands that make BioNFT-gated genomic data feel native to the
+bioinformatics toolchain (bcftools, samtools, pysam, IGV) — zero FUSE, zero
+kext, zero install friction on macOS.
+
+- `biofs stream <id>` — stream a BioNFT-gated VCF/BAM to stdout via htsget.
+  Pipes cleanly into any bioinformatics CLI:
+
+      biofs stream my-wes | bcftools stats -
+      biofs stream my-wes | bcftools view -H -
+
+- `biofs pipe <id> -- [tool-args]` — auto-pipe into bcftools (VCF) or
+  samtools (BAM). Format detected from registered filename:
+
+      biofs pipe my-wes -- -H -r chr17:1M-2M      # bcftools view
+      biofs pipe my-bam -- -b                      # samtools view
+
+- `biofs alias <name> <target>` — local shortcuts for ip_ids. Stored at
+  ~/.biofs/aliases.json. Works across every command (stream, pipe, info,
+  download, mount).
+
+      biofs alias my-wes 0xCCe14315eE3D6a41596EeB4a2839eE50A8ec59f7
+      biofs stream my-wes | bcftools view -H -
+
+## Low-level htsget (for debugging)
+
+- `biofs htsget service-info` — GA4GH service-info JSON
+- `biofs htsget ticket variants|reads <id>` — raw ticket
+
+## Endpoints
+
+- Dedicated subdomain: `https://htsget.genobank.app`
+- Legacy path still works: `https://bioip.genobank.app/api_bioip/htsget/*`
+- Override with `BIOFS_HTSGET_URL` env var.
+
+## Auth
+
+Uses the same `~/.biofs/credentials.json` from `biofs login`. Bearer-token
+auth against the htsget endpoint; server verifies the EIP-191 signature of
+"I want to proceed" on every request.
+
+## Compatibility
+
+- All existing commands unchanged
+- `view` command retained (prints file content); `pipe` is the new
+  bioinformatics-tool wrapper
+- No breaking changes to config files or credentials
+
+## Dependencies
+
+No new npm dependencies. Uses Node 18+ built-in `fetch` for htsget calls.
+
+# v2.6.2 - GCS Migration
+
+**Published**: April 16, 2026
+
+## Breaking change (avoided!)
+None. Public API and on-disk formats unchanged. Legacy 'S3' source still works.
+
+## Why
+AWS S3 buckets backing BioFS were decommissioned on April 11, 2026. All
+biodata now lives on Google Cloud Storage (project: genobank-biowalletization).
+Until 2.6.1 the CLI still constructed AWS URLs in 'biofs link clara' — this
+release fixes that concrete breakage and teaches the rest of the CLI to
+prefer GCS paths when the backend emits them.
+
+## Changes
+- 'biofs link clara <serial>' — now probes 'gs://deepvariant-fastq-to-vcf-genobank-app/...',
+  uses 'gcloud storage ls' (was 'aws s3 ls'), emits 'gs://' URIs (was 's3://').
+  New env var 'GENOBANK_VCF_BUCKET' overrides the default bucket.
+- 'StorageSource' type expanded to include 'GCS'. Existing 'S3' values
+  remain valid.
+- 'gcs_path' field added alongside 's3_path' on 'BioFile', 'FileLocation',
+  and all relevant API response types. Resolver prefers 'gcs_path'.
+- Downloader: 'downloadFromS3' → 'downloadFromPresignedUrl' (works for S3 and GCS).
+
+## Compatibility
+- Old backends returning only 's3_path' continue to work.
+- CLI users who had 'biofs link clara' failing (404 against dead S3 buckets)
+  should see it succeed against the live GCS bucket.
+
 # v2.1.3 - Critical Bug Fix
 
 **Published**: November 7, 2025
