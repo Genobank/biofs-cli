@@ -1,3 +1,31 @@
+# v3.2.0 — Annotated-variant queries + Cosic-RRM Fourier scoring + family-status fix
+
+**Published**: 2026-05-20 (pending)
+
+## New verbs
+
+- **`biofs variants <biosample_serial>`** — query the latest OpenCRAVAT sqlite for a biosample via biorouter route-check resolution. Filters on `--gene` (HUGO symbols), `--region` (chrN:start-end, hg38), `--so` (sequence-ontology terms or `all`), `--max-af` (population frequency cap across gnomAD3/4 + AllOfUs), `--clinvar` (patho/likely/vus/benign/all). Surfaces full-trio zygosity automatically when the underlying sqlite is from a joint-call: samples not in the per-variant sample-table are filled as `ref` so compound-het patterns are visible at a glance. `--sqlite-uri` and `--job-id` overrides bypass bioroutes resolution for runs not yet in inventory. Output: pretty table, TSV, or JSON; optional `--output` file.
+
+- **`biofs fourier-score <variants>`** — Cosic Resonant Recognition Model scoring of missense variants. Takes HGVS protein descriptors (e.g. `ITGA2B:p.Val779Ala`), fetches and caches the canonical UniProt sequence, extracts an EIIP-encoded window centered on the residue (N=31 default, N=51 for known transmembrane regions on ITGA2B / ITGB3), runs an rfft via numpy, and returns the |ΔF| spectrum between wildtype and mutant: Σ|ΔF| (with and without DC), max |ΔF| non-DC bin, spectral-energy change, and the full vectorized spectrum (raw and detrended). `--plot <path.png>` renders a one-panel-per-variant figure. Useful as a biophysical complement when REVEL / AlphaMissense / PrimateAI-3D return ambiguous calls.
+
+## Fixed
+
+- **`biofs family-status`** was broken since the Sequentia chain migrated off AWS in March 2026. Root cause: hardcoded `http://54.226.180.9:8545` (dead AWS IP) and a `.env` override pointing at `http://52.90.163.112:8545` with chain id `262144` (wrong). Replaced with the canonical `SEQUENTIA_NETWORK.rpc` constant (`https://seqrpc.genobank.app`, chain `15132025`). Added bioroutes.inventory enrichment so the verb is informative even for legacy (pre-Phase-G) samples that aren't on-chain yet; surfaces file-type count, lab hints (AUGenomics / Neochromosome / Color / Ultima), and total bytes.
+- **`biofs annotate status`** previously failed for both GenoBank API-issued job IDs (server-side `KeyError 'job_status'`) and OpenCRAVAT native IDs (session-auth mismatch on `/submit/jobstatus/<id>`). Added a three-step fallback: if the job ID matches OC's native `YYMMDD-HHMMSS` format, read `<wallet>/<jobid>/*.status.json` directly via gcloud IAP; otherwise try OC HTTP; otherwise try the GenoBank API. Status emoji recognizer now handles the verbose `Running CADD (cadd): line N` style strings.
+
+## Configuration
+
+- `.env` Sequentia block updated to canonical GCE-hosted endpoints:
+  - `SEQUENTIA_RPC_URL=https://seqrpc.genobank.app`
+  - `SEQUENTIA_CHAIN_ID=15132025`
+  - `SEQUENTIA_EXPLORER=https://explorer.sequentias-test.genobank.io`
+
+## How to upgrade
+
+```bash
+npm install -g @genobank/biofs@3.2.0
+```
+
 # v2.7.1 - Security: 0 vulnerabilities (was 46)
 
 **Published**: April 17, 2026

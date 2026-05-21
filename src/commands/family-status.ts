@@ -7,20 +7,28 @@
 
 import chalk from 'chalk';
 import ora from 'ora';
+import { spawnSync } from 'child_process';
 import { ethers } from 'ethers';
 import { Logger } from '../lib/utils/logger';
-import { SEQUENTIA_NETWORK } from '../lib/config/constants';
+import { SEQUENTIA_NETWORK, CONFIG } from '../lib/config/constants';
 
 export interface FamilyStatusOptions {
   json?: boolean;
   verbose?: boolean;
+  noInventory?: boolean;       // skip bioroutes.inventory enrichment (chain-only)
+  bionftAddress?: string;      // override BioNFT contract (legacy deployments)
+  claraAddress?: string;       // override ClaraJobNFT contract
 }
 
-// Contract addresses on Sequentia
-const BIONFT_CONTRACT = '0xA2cD489d7c2eB3FF5e51F13f0641351a33cA32cd';
-const CLARA_JOB_NFT_CONTRACT = '0x9B70040299efd49C0BBC607395F92a9492DCcc20'; // V2 deployed Dec 7, 2025
-const SEQUENTIA_RPC = 'http://54.226.180.9:8545';
-const CHAIN_ID = 15132025;
+// Canonical Sequentia v4 contracts (env-overridable via constants.ts).
+// Legacy deployments can be queried by passing --bionft-address / --clara-address.
+const SEQUENTIA_RPC = SEQUENTIA_NETWORK.rpc;
+const CHAIN_ID = SEQUENTIA_NETWORK.chainId;
+const DEFAULT_BIONFT_CONTRACT = CONFIG.CONTRACTS.BIONFT;
+// ClaraJobNFT has no canonical entry in constants yet — current deployment
+// is at 0x1D19e75A... per project_clara_parabricks_agent memory (April 2026).
+// Earlier V2 from Dec 2025 was 0x9B70040299efd49C0BBC607395F92a9492DCcc20.
+const DEFAULT_CLARA_JOB_NFT_CONTRACT = '0x9B70040299efd49C0BBC607395F92a9492DCcc20';
 
 // ABIs
 const BIONFT_ABI = [
@@ -52,6 +60,79 @@ interface FamilyMember {
     description: string;
     timestamp: bigint;
   }>;
+  inventory?: {
+    fileTypes: number;
+    totalBytes: number;
+    labs: string[];
+    summary: Record<string, number>;
+    sourceLabHints: string[];
+  };
+}
+
+/**
+ * Pull file inventory for a biosample by shelling out to the same route_mount.py
+ * the `biofs route check` command uses. Falls back gracefully if IAP/SSH or the
+ * resolver is unreachable.
+ */
+function fetchInventorySummary(serial: string, debug: boolean): FamilyMember['inventory'] | undefined {
+  const res = spawnSync(
+    'gcloud',
+    [
+      'compute', 'ssh', 'genobank-production',
+      '--zone=us-central1-a', '--tunnel-through-iap',
+      '--command',
+      `/home/ubuntu/Genobank_APIs/production_api/plugins/genoclaw/.venv/bin/python3 /home/ubuntu/bioroutes_dryrun/route_mount.py check ${serial} 2>&1`,
+    ],
+    { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024, timeout: 30000 }
+  );
+  if (res.status !== 0 || !res.stdout) {
+    if (debug) Logger.debug(`inventory fetch failed for ${serial}: ${res.stderr || 'no output'}`);
+    return undefined;
+  }
+  const lines = res.stdout.split('\n');
+  const summary: Record<string, number> = {};
+  let totalBytes = 0;
+  const labHints = new Set<string>();
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^\s*\[(\w+(?:_\w+)*)\s*\]/);
+    if (!m) continue;
+    const ftype = m[1];
+    summary[ftype] = (summary[ftype] || 0) + 1;
+    // Bytes are on the following gs:// line: "    gs://... NNNNN bytes"
+    for (let j = i + 1; j < Math.min(i + 3, lines.length); j++) {
+      const bm = lines[j].match(/(\d+)\s+bytes\s*$/);
+      if (bm) {
+        totalBytes += parseInt(bm[1], 10);
+        break;
+      }
+    }
+    // Lab hint from path (augenomics, deepvariant, neochrom, etc.)
+    const pathMatch = lines[i + 1] && lines[i + 1].match(/gs:\/\/([^/\s]+)/);
+    if (pathMatch) {
+      const bucket = pathMatch[1].toLowerCase();
+      if (bucket.includes('augenomics')) labHints.add('AUGenomics');
+      if (bucket.includes('neochrom')) labHints.add('Neochromosome');
+      if (bucket.includes('color')) labHints.add('Color');
+      if (bucket.includes('ultima')) labHints.add('Ultima');
+      if (bucket.includes('deepvariant')) labHints.add('DeepVariant-pipeline');
+    }
+  }
+  if (Object.keys(summary).length === 0) return undefined;
+  return {
+    fileTypes: Object.keys(summary).length,
+    totalBytes,
+    labs: Array.from(labHints),
+    summary,
+    sourceLabHints: Array.from(labHints),
+  };
+}
+
+function formatBytes(n: number): string {
+  if (n > 1e12) return `${(n / 1e12).toFixed(2)} TB`;
+  if (n > 1e9) return `${(n / 1e9).toFixed(2)} GB`;
+  if (n > 1e6) return `${(n / 1e6).toFixed(1)} MB`;
+  if (n > 1e3) return `${(n / 1e3).toFixed(1)} KB`;
+  return `${n} B`;
 }
 
 export async function familyStatusCommand(
@@ -60,109 +141,124 @@ export async function familyStatusCommand(
 ): Promise<void> {
   const spinner = ora('Fetching family pipeline status...').start();
 
+  const bionftAddr = options.bionftAddress || DEFAULT_BIONFT_CONTRACT;
+  const claraAddr = options.claraAddress || DEFAULT_CLARA_JOB_NFT_CONTRACT;
+  let blockNumber: number | null = null;
+  let chainReachable = false;
+  let provider: ethers.JsonRpcProvider | null = null;
+  let bionft: ethers.Contract | null = null;
+  let claraJobNft: ethers.Contract | null = null;
+
   try {
-    // Connect to Sequentia
-    const provider = new ethers.JsonRpcProvider(SEQUENTIA_RPC);
-    const blockNumber = await provider.getBlockNumber();
+    provider = new ethers.JsonRpcProvider(SEQUENTIA_RPC, undefined, { staticNetwork: true } as any);
+    blockNumber = await provider.getBlockNumber();
+    chainReachable = true;
+    bionft = new ethers.Contract(bionftAddr, BIONFT_ABI, provider);
+    claraJobNft = new ethers.Contract(claraAddr, CLARA_JOB_NFT_ABI, provider);
+  } catch (e: any) {
+    spinner.warn(chalk.yellow(`Chain RPC unreachable at ${SEQUENTIA_RPC} — proceeding with off-chain inventory only.`));
+    Logger.debug(`RPC error: ${e?.message || e}`);
+  }
 
-    const bionft = new ethers.Contract(BIONFT_CONTRACT, BIONFT_ABI, provider);
-    const claraJobNft = new ethers.Contract(CLARA_JOB_NFT_CONTRACT, CLARA_JOB_NFT_ABI, provider);
+  const familyMembers: FamilyMember[] = [];
 
-    const familyMembers: FamilyMember[] = [];
+  for (const serial of biosampleSerials) {
+    let tokenId = 0n;
+    let owner = '';
+    let name = '';
+    const derivatives: FamilyMember['derivatives'] = [];
 
-    // Fetch data for each biosample
-    for (const serial of biosampleSerials) {
+    if (chainReachable && bionft) {
       try {
-        const tokenId = await bionft.serialToTokenId(serial);
-
-        if (tokenId === 0n) {
-          familyMembers.push({
-            serial,
-            bionftTokenId: 0n,
-            owner: '',
-            derivatives: []
-          });
-          continue;
-        }
-
-        const owner = await bionft.ownerOf(tokenId);
-
-        // Get biosample info if available
-        let name = '';
-        let sampleType = '';
-        try {
-          const info = await bionft.getBiosampleInfo(tokenId);
-          name = info.ownerName || '';
-          sampleType = info.sampleType || '';
-        } catch {
-          // Function may not exist
-        }
-
-        // Get derivatives
-        const derivatives: FamilyMember['derivatives'] = [];
-        const derivCount = await bionft.derivativeCount(tokenId);
-
-        if (derivCount > 0n) {
-          const derivs = await bionft.getDerivatives(tokenId);
-          for (const d of derivs) {
-            derivatives.push({
-              contract: d.contractAddress,
-              tokenId: d.tokenId,
-              type: d.derivativeType,
-              description: d.description,
-              timestamp: d.timestamp
-            });
+        tokenId = await bionft.serialToTokenId(serial);
+        if (tokenId !== 0n) {
+          owner = await bionft.ownerOf(tokenId);
+          try {
+            const info = await bionft.getBiosampleInfo(tokenId);
+            name = info.ownerName || '';
+          } catch {
+            // function may not exist on this deployment
+          }
+          try {
+            const derivCount = await bionft.derivativeCount(tokenId);
+            if (derivCount > 0n) {
+              const derivs = await bionft.getDerivatives(tokenId);
+              for (const d of derivs) {
+                derivatives.push({
+                  contract: d.contractAddress,
+                  tokenId: d.tokenId,
+                  type: d.derivativeType,
+                  description: d.description,
+                  timestamp: d.timestamp,
+                });
+              }
+            }
+          } catch {
+            // derivatives API may not exist on this deployment
           }
         }
-
-        familyMembers.push({
-          serial,
-          name,
-          bionftTokenId: tokenId,
-          owner,
-          derivatives
-        });
-      } catch (error) {
-        Logger.debug(`Error fetching ${serial}: ${error}`);
-        familyMembers.push({
-          serial,
-          bionftTokenId: 0n,
-          owner: '',
-          derivatives: []
-        });
+      } catch (e: any) {
+        Logger.debug(`Chain query failed for ${serial}: ${e?.message || e}`);
       }
     }
 
-    spinner.stop();
-
-    // JSON output
-    if (options.json) {
-      const output = familyMembers.map(m => ({
-        serial: m.serial,
-        name: m.name,
-        bionft_token_id: m.bionftTokenId.toString(),
-        owner: m.owner,
-        derivatives: m.derivatives.map(d => ({
-          contract: d.contract,
-          token_id: d.tokenId.toString(),
-          type: d.type,
-          description: d.description
-        }))
-      }));
-      console.log(JSON.stringify(output, null, 2));
-      return;
+    let inventory: FamilyMember['inventory'] | undefined;
+    if (!options.noInventory) {
+      try {
+        inventory = fetchInventorySummary(serial, !!options.verbose);
+      } catch (e: any) {
+        Logger.debug(`Inventory fetch threw for ${serial}: ${e?.message || e}`);
+      }
     }
 
-    // Display formatted output
-    const network = SEQUENTIA_NETWORK;
+    familyMembers.push({
+      serial,
+      name,
+      bionftTokenId: tokenId,
+      owner,
+      derivatives,
+      inventory,
+    });
+  }
 
-    console.log('');
-    console.log(chalk.cyan('═'.repeat(70)));
-    console.log(chalk.bold.cyan('  🧬 FAMILY GENOMIC PIPELINE STATUS'));
-    console.log(chalk.cyan('═'.repeat(70)));
-    console.log(`  ${chalk.gray('Network:')} ${network.name} (Chain ID: ${CHAIN_ID})`);
-    console.log(`  ${chalk.gray('Block:')} ${blockNumber}`);
-    console.log(chalk.cyan('═'.repeat(70)));
+  spinner.stop();
+
+  // JSON output
+  if (options.json) {
+    const output = familyMembers.map(m => ({
+      serial: m.serial,
+      name: m.name,
+      bionft_token_id: m.bionftTokenId.toString(),
+      owner: m.owner,
+      derivatives: m.derivatives.map(d => ({
+        contract: d.contract,
+        token_id: d.tokenId.toString(),
+        type: d.type,
+        description: d.description,
+      })),
+      inventory: m.inventory ? {
+        file_types: m.inventory.fileTypes,
+        total_bytes: m.inventory.totalBytes,
+        labs: m.inventory.labs,
+        summary: m.inventory.summary,
+      } : null,
+    }));
+    console.log(JSON.stringify(output, null, 2));
+    return;
+  }
+
+  // Display formatted output
+  const network = SEQUENTIA_NETWORK;
+
+  console.log('');
+  console.log(chalk.cyan('═'.repeat(70)));
+  console.log(chalk.bold.cyan('  🧬 FAMILY GENOMIC PIPELINE STATUS'));
+  console.log(chalk.cyan('═'.repeat(70)));
+  console.log(`  ${chalk.gray('Network:')} ${network.name} (Chain ID: ${CHAIN_ID})`);
+  console.log(`  ${chalk.gray('RPC:')} ${chainReachable ? chalk.green('✓ ') + SEQUENTIA_RPC : chalk.red('✗ ') + SEQUENTIA_RPC + ' (unreachable)'}`);
+  console.log(`  ${chalk.gray('Block:')} ${blockNumber ?? chalk.gray('n/a')}`);
+  console.log(`  ${chalk.gray('BioNFT:')} ${bionftAddr}`);
+  console.log(chalk.cyan('═'.repeat(70)));
 
     // Calculate totals
     const totalBioNFTs = familyMembers.filter(m => m.bionftTokenId > 0n).length;
@@ -182,7 +278,25 @@ export async function familyStatusCommand(
       const childPrefix = isLast ? '   ' : '│  ';
 
       if (member.bionftTokenId === 0n) {
-        console.log(chalk.gray(`${prefix} ${member.serial}: ❌ Not tokenized`));
+        // Even without on-chain BioNFT, surface off-chain inventory so the
+        // sample isn't reported as "missing" when it actually exists.
+        const labelTokenless = member.inventory
+          ? chalk.yellow(`${prefix} ${member.serial}: ⚠️  Not on-chain (off-chain inventory present)`)
+          : chalk.gray(`${prefix} ${member.serial}: ❌ Not tokenized, no inventory found`);
+        console.log(labelTokenless);
+        if (member.inventory) {
+          console.log(chalk.gray(`${childPrefix}├─ Files: ${member.inventory.fileTypes} types  |  Size: ${formatBytes(member.inventory.totalBytes)}`));
+          if (member.inventory.labs.length > 0) {
+            console.log(chalk.gray(`${childPrefix}├─ Lab hints: ${member.inventory.labs.join(', ')}`));
+          }
+          const top = Object.entries(member.inventory.summary)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 6)
+            .map(([k, v]) => `${k}=${v}`)
+            .join(', ');
+          console.log(chalk.gray(`${childPrefix}└─ Top types: ${top}`));
+        }
+        console.log('');
         continue;
       }
 
@@ -191,6 +305,9 @@ export async function familyStatusCommand(
       console.log(chalk.white(`${prefix} 🧬 BioNFT #${member.bionftTokenId}${nameStr}`));
       console.log(chalk.gray(`${childPrefix}├─ Serial: ${member.serial}`));
       console.log(chalk.gray(`${childPrefix}├─ Owner: ${member.owner.substring(0, 20)}...`));
+      if (member.inventory) {
+        console.log(chalk.gray(`${childPrefix}├─ Inventory: ${member.inventory.fileTypes} file types, ${formatBytes(member.inventory.totalBytes)} (${member.inventory.labs.join(', ')})`));
+      }
 
       // Derivatives
       if (member.derivatives.length === 0) {
@@ -258,13 +375,7 @@ export async function familyStatusCommand(
       }
     }
 
-    console.log('');
-
-  } catch (error: any) {
-    spinner.fail(chalk.red('Failed to fetch family status'));
-    Logger.error(`Error: ${error.message}`);
-    throw error;
-  }
+  console.log('');
 }
 
 
