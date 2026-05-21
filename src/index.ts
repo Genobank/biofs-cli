@@ -17,6 +17,18 @@ import { tokenizeFastqsCommand, TokenizeFastqsOptions } from './commands/tokeniz
 import { tokenizeBiosampleCommand, TokenizeBiosampleOptions } from './commands/tokenize-biosample';
 import { linkClaraCommand, LinkClaraOptions } from './commands/link-clara';
 import { familyStatusCommand, FamilyStatusOptions } from './commands/family-status';
+import { credIssueCommand, CredIssueOptions } from './commands/cred/issue';
+import { bionftViewCommand, BionftViewOptions } from './commands/bionft/view';
+import { bionftRevokeCommand, BionftRevokeOptions } from './commands/bionft/revoke';
+import { bionftStatusCommand } from './commands/bionft/status';
+import { vaultSetupCommand, VaultSetupOptions } from './commands/vault/setup';
+import { vaultMountCommand, VaultMountOptions } from './commands/vault/mount';
+import { vaultStatusCommand } from './commands/vault/status';
+import { vaultUnmountCommand } from './commands/vault/unmount';
+import { credStatusCommand, CredStatusOptions } from './commands/cred/status';
+import { credListCommand, CredListOptions } from './commands/cred/list';
+import { credRevokeCommand, CredRevokeOptions } from './commands/cred/revoke';
+import { uploadFastqCommand, UploadFastqOptions } from './commands/upload-fastq';
 import { accessRequestCommand, AccessRequestOptions } from './commands/access/request';
 import { accessGrantCommand, AccessGrantOptions } from './commands/access/grant';
 import { accessRevokeCommand, AccessRevokeOptions } from './commands/access/revoke';
@@ -34,6 +46,7 @@ import { pipeCommand, PipeOptions } from './commands/pipe';
 import { aliasCommand, AliasOptions } from './commands/alias';
 import { htsgetServiceInfoCommand, htsgetTicketCommand } from './commands/htsget';
 import { submitClaraCommand, ClaraJobOptions } from './commands/job/submit-clara';
+import { recallCommand, RecallOptions } from './commands/job/recall';
 import { contextCreateCommand, ContextCreateOptions } from './commands/context/create';
 import { contextPublishCommand, ContextPublishOptions } from './commands/context/publish';
 import { contextVerifyCommand } from './commands/context/verify';
@@ -54,6 +67,8 @@ import { reportCommand, ReportOptions } from './commands/report';
 import { createAdminCommand } from './commands/admin';
 import { fuseListCommand, fuseMountCommand, fuseStreamCommand, fuseSampleCommand, FuseOptions } from './commands/fuse';
 import { annotateSubmitCommand, AnnotateSubmitOptions } from './commands/annotate/submit';
+import { pipelineRunWesCommand, PipelineRunWesOptions } from './commands/pipeline/runWes';
+import { routeCheckCommand, routeHealCommand } from './commands/route';
 import { annotateStatusCommand, AnnotateStatusOptions } from './commands/annotate/status';
 import { paymentBalanceCommand, PaymentBalanceOptions } from './commands/payment/balance';
 import { paymentPricingCommand, PaymentPricingOptions } from './commands/payment/pricing';
@@ -61,15 +76,50 @@ import { paymentSetupCommand, PaymentSetupOptions } from './commands/payment/set
 import { paymentFaucetCommand, PaymentFaucetOptions } from './commands/payment/faucet';
 import { paymentHistoryCommand, PaymentHistoryOptions } from './commands/payment/history';
 import { X402Network } from './types/x402';
+import { resolveCommand, ResolveOptions } from './commands/resolve';
+import { variantsCommand, VariantsOptions } from './commands/variants';
+import { fourierScoreCommand, FourierScoreOptions } from './commands/fourier-score';
+import { matchCommand, MatchOptions } from './commands/match';
+import { ticketCommand, TicketOptions } from './commands/ticket';
+import { scanCommand, ScanOptions } from './commands/scan';
+import { inventoryCommand, InventoryOptions } from './commands/inventory';
+import { dedupCommand, DedupOptions } from './commands/dedup';
+import { fingerprintCommand, FingerprintOptions } from './commands/fingerprint';
+import { researcherRegisterCommand, ResearcherRegisterOptions } from './commands/researcher/register';
+import { researcherStatusCommand, ResearcherStatusOptions } from './commands/researcher/status';
 import { Logger } from './lib/utils/logger';
+import { ErrorReporter } from './utils/errorReporter';
+import { CredentialsManager } from './lib/auth/credentials';
 
 const program = new Command();
+
+// Global catch-all so uncaught errors in ANY command still reach telemetry.
+// Individual commands continue to call ErrorReporter.report directly (e.g.
+// mount/umount) for richer context — this is the safety net for the rest.
+async function reportAndExit(command: string, err: any, code: number): Promise<never> {
+  try {
+    const creds = await CredentialsManager.getInstance().loadCredentials().catch(() => null);
+    const error = err instanceof Error ? err : new Error(String(err));
+    await ErrorReporter.report(command, error, creds?.wallet_address, { argv: process.argv.slice(2) });
+  } catch { /* telemetry failure must never block exit */ }
+  process.exit(code);
+}
+
+process.on('uncaughtException', (err) => {
+  Logger.error(`Uncaught: ${err?.message || err}`);
+  reportAndExit(process.argv.slice(2).join(' ') || 'unknown', err, 1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  Logger.error(`UnhandledRejection: ${(reason as any)?.message || reason}`);
+  reportAndExit(process.argv.slice(2).join(' ') || 'unknown', reason, 1);
+});
 
 // Set up the CLI
 program
   .name('biofs')
   .description('BioFS by GenoBank.io - BioNFT-Gated S3 CLI for genomic data')
-  .version('2.7.1')
+  .version('3.2.0')
   .option('--debug', 'Enable debug output')
   .hook('preAction', (thisCommand) => {
     // Set global debug flag if --debug is passed
@@ -174,6 +224,7 @@ program
   .option('--stream', 'Stream large files (>100MB)')
   .option('--quiet', 'No progress bar')
   .option('--skip-consent', 'Skip GDPR consent (for automation)')
+  .option('--gs-uri <uri>', 'Bypass BioFiles discovery and fetch directly from gs:// URI (for owner-only file inspection)')
   .action(async (biocidOrFilename: string, destination: string | undefined, options: DownloadOptions) => {
     try {
       await downloadCommandWithConsent(biocidOrFilename, destination, options);
@@ -341,6 +392,7 @@ program
   .description('Stream a BioNFT-gated VCF/BAM to stdout via htsget (pipe into bcftools/samtools/pysam)')
   .option('--kind <variants|reads>', 'force datatype (default: auto-detect from filename)')
   .option('--htsget-url <url>', 'override htsget endpoint (default: https://htsget.genobank.app)')
+  .option('--annotated', 'stream the OpenCRAVAT-annotated VCF sibling (Phase D) instead of raw')
   .option('-q, --quiet', 'suppress info messages')
   .action(async (id: string, options: StreamOptions) => {
     try {
@@ -511,10 +563,13 @@ linkCmd
 program
   .command('family-status')
   .alias('family')
-  .description('Show family genomic pipeline status (BioNFT → ClaraJobNFT → etc.)')
+  .description('Show family genomic pipeline status (BioNFT → ClaraJobNFT → bioroutes.inventory)')
   .argument('<biosample_serials...>', 'Biosample serial numbers')
   .option('--json', 'Output as JSON')
   .option('--verbose', 'Show detailed information')
+  .option('--no-inventory', 'Skip the bioroutes.inventory enrichment (chain-only mode)')
+  .option('--bionft-address <addr>', 'Override BioNFT contract (for legacy deployments)')
+  .option('--clara-address <addr>', 'Override ClaraJobNFT contract')
   .action(async (biosampleSerials: string[], options: FamilyStatusOptions) => {
     try {
       await familyStatusCommand(biosampleSerials, options);
@@ -524,18 +579,98 @@ program
     }
   });
 
+// Inventory command - Fast read-only summary of bioroutes.inventory (no GCS walk)
+program
+  .command('inventory')
+  .alias('inv')
+  .description('Show what is currently registered in bioroutes.inventory (admin/lab-custodian)')
+  .option('--json', 'Output as JSON')
+  .option('--buckets', 'List all buckets, not just top 15')
+  .option('--verbose', 'Show debug information')
+  .action(async (options: InventoryOptions) => {
+    try {
+      await inventoryCommand(options);
+    } catch (error) {
+      Logger.error(`Inventory failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Fingerprint command - Submit async fingerprint jobs (background worker uses gcsfuse)
+program
+  .command('fingerprint')
+  .description('Compute real contentHashes for inventory rows via background worker (admin/lab-custodian)')
+  .option('--biocid <id>', 'Single biocid to fingerprint')
+  .option('--serial <id>', 'Single sample serial')
+  .option('--serials <csv>', 'Comma-separated sample serials')
+  .option('--filetypes <csv>', 'Filter to filetype list (e.g. vcf,gvcf)')
+  .option('--include-superseded', 'Also fingerprint SUPERSEDED rows')
+  .option('--limit <n>', 'Max rows to process per job', '50')
+  .option('--dry-run', 'Show eligible rows without submitting')
+  .option('--json', 'Output as JSON')
+  .action(async (options: FingerprintOptions) => {
+    try {
+      await fingerprintCommand(options);
+    } catch (error) {
+      Logger.error(`Fingerprint failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Dedup command - Pick canonical biocid per (sample, filetype, basename)
+program
+  .command('dedup')
+  .description('Collapse duplicate biocid registrations to one canonical row (admin/lab-custodian)')
+  .option('--serial <id>', 'Single sample serial')
+  .option('--serials <csv>', 'Comma-separated sample serials')
+  .option('--lab <name>', 'Limit to one originlab')
+  .option('--bucket <name>', 'Limit to one bucket')
+  .option('--apply', 'Actually mark superseded (default is dry-run)')
+  .option('--json', 'Output as JSON')
+  .option('--verbose', 'Show debug information')
+  .action(async (options: DedupOptions) => {
+    try {
+      await dedupCommand(options);
+    } catch (error) {
+      Logger.error(`Dedup failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Scan command - Walk GCS bucket(s) and register objects in bioroutes.inventory
+// Default scope: full canonical bucket fleet. Lab origin inferred per-file.
+program
+  .command('scan')
+  .description('Scan GCS into bioroutes.inventory (per-file lab inference; admin/lab-custodian only)')
+  .option('--bucket <name>', 'Single bucket (e.g. genobank-parabricks-output)')
+  .option('--buckets <csv>', 'Comma-separated bucket list')
+  .option('--prefix <path>', 'Object prefix (requires single --bucket)')
+  .option('--filter-lab <name>', 'Register only files whose inferred lab matches')
+  .option('--dry-run', 'Preview without writing to MongoDB')
+  .option('--json', 'Output as JSON')
+  .option('--verbose', 'Show debug information')
+  .action(async (options: ScanOptions) => {
+    try {
+      await scanCommand(options);
+    } catch (error) {
+      Logger.error(`Scan failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
 // Annotate command group - OpenCRAVAT VCF annotation
 const annotateCmd = program
   .command('annotate')
-  .description('Annotate VCF files with OpenCRAVAT (146 annotators)');
+  .description('Annotate VCF files with OpenCRAVAT (curated panels or all 146 annotators)');
 
 // annotate submit - Submit VCF for annotation
 annotateCmd
   .command('submit <biosample_serial>')
   .description('Submit VCF to OpenCRAVAT for annotation with all 146 annotators')
   .option('--vcf-path <path>', 'Manual VCF path override')
+  .option('--vcf-uri <uri>', 'GCS or S3 URI for a freshly-minted VCF (skips discovery; used by biofs pipeline)')
   .option('--annotators <list>', 'Custom annotators (comma-separated), defaults to all 146')
-  .option('--package <package>', 'Analysis package (rare_coding, hereditary_cancer, splicing, drug_interaction, pathogenic)', 'rare_coding')
+  .option('--package <package>', 'Analysis package (rare_coding, hereditary_cancer, splicing, drug_interaction, pathogenic, wes_default, wgs_default)', 'rare_coding')
   .option('--phenotype <text>', 'Clinical phenotype description for AI analysis')
   .option('--assembly <genome>', 'Reference genome (hg38, hg19)', 'hg38')
   .option('--wait', 'Wait for job to complete')
@@ -802,6 +937,190 @@ accessCmd
     }
   });
 
+// ~/genobank/vault commands (v2.9.0 · biovault Phase B)
+// Portable vault: scaffolds ~/genobank/vault/ with a per-BioNFT subdirectory
+// per owned token, then `biofs vault mount` downloads the annotated VCFs via
+// htsget. Works on macOS + Linux without macFUSE kernel signing.
+const vaultCmd = program
+  .command('vault')
+  .description('Local ~/genobank/vault — your owned BioNFTs as a real directory tree');
+
+vaultCmd
+  .command('setup')
+  .description('Scan Sequentia for BioNFTs owned by your wallet and scaffold ~/genobank/vault/')
+  .option('--path <dir>', 'override vault path (default: ~/genobank/vault)')
+  .option('--force', 're-scaffold even if directory already exists')
+  .action(async (options: VaultSetupOptions) => {
+    try { await vaultSetupCommand(options); }
+    catch (error) { Logger.error(`vault setup failed: ${error}`); process.exit(1); }
+  });
+
+vaultCmd
+  .command('mount')
+  .description('Download BioNFT-gated data (raw + annotated VCFs) into the vault')
+  .option('--path <dir>', 'override vault path (default: ~/genobank/vault)')
+  .option('--refresh', 'force re-download of existing files')
+  .option('--skip-annotated', 'download only raw VCFs, skip OpenCRAVAT annotations')
+  .option('--categories <csv>', 'comma-separated BioNFT categories to mount', 'DATA_FILE_CHILD')
+  .action(async (options: VaultMountOptions) => {
+    try { await vaultMountCommand(options); }
+    catch (error) { Logger.error(`vault mount failed: ${error}`); process.exit(1); }
+  });
+
+vaultCmd
+  .command('status')
+  .description('Show vault state: wallet, BioNFT inventory, per-token file sizes')
+  .option('--path <dir>', 'override vault path')
+  .action(async (options: { path?: string }) => {
+    try { await vaultStatusCommand(options); }
+    catch (error) { Logger.error(`vault status failed: ${error}`); process.exit(1); }
+  });
+
+vaultCmd
+  .command('unmount')
+  .description('Remove local cache. Manifest preserved unless --purge.')
+  .option('--path <dir>', 'override vault path')
+  .option('--purge', 'delete the whole vault dir (manifest + all files)')
+  .option('--force', 'skip confirmation prompt')
+  .action(async (options: { path?: string; purge?: boolean; force?: boolean }) => {
+    try { await vaultUnmountCommand(options); }
+    catch (error) { Logger.error(`vault unmount failed: ${error}`); process.exit(1); }
+  });
+
+// BioNFT on-chain commands (v2.9.0 · biovault Phase F)
+// Read/revoke any BioNFT (BIOSAMPLE_PARENT, DATA_FILE_CHILD, RENT_AGREEMENT,
+// INGEST_TICKET) directly from Sequentia. No REST hop — ethers talks to the
+// deployed contracts. This replaces `biofs cred revoke` for on-chain credentials
+// and fixes the CherryPy DELETE-body bug we hit in Phase A.7.
+const bionftCmd = program
+  .command('bionft')
+  .description('View and revoke BioNFTs directly on Sequentia (biovault Phase F)');
+
+bionftCmd
+  .command('view <tokenId>')
+  .description('Show on-chain state + metadata for any BioNFT tokenId')
+  .option('--json', 'Output as JSON')
+  .action(async (tokenId: string, options: BionftViewOptions) => {
+    try {
+      await bionftViewCommand(tokenId, options);
+    } catch (error) {
+      Logger.error(`bionft view failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+bionftCmd
+  .command('status <tokenId>')
+  .description('One-line on-chain status of a BioNFT')
+  .action(async (tokenId: string) => {
+    try {
+      await bionftStatusCommand(tokenId);
+    } catch (error) {
+      Logger.error(`bionft status failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+bionftCmd
+  .command('revoke <tokenId>')
+  .description('Patient-signed on-chain revoke. RENT_AGREEMENT or INGEST_TICKET only. Requires GENOBANK_OWNER_PRIVATE_KEY.')
+  .option('--reason <text>', 'Why you are revoking', 'user_cli')
+  .option('--force', 'Skip confirmation prompt')
+  .action(async (tokenId: string, options: BionftRevokeOptions) => {
+    try {
+      await bionftRevokeCommand(tokenId, options);
+    } catch (error) {
+      Logger.error(`bionft revoke failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Scoped write-only credential commands (v2.8.0 · biovault Phase A)
+const credCmd = program
+  .command('cred')
+  .description('Scoped write-only FASTQ/BAM/VCF upload credentials (biovault)');
+
+credCmd
+  .command('issue')
+  .description('Issue a single-use write credential for a biosample (requires BIOFS_LAB_PRIVATE_KEY)')
+  .requiredOption('--biosample <serial>', 'Biosample serial (e.g. 55052008714049)')
+  .requiredOption('--kind <kind>', 'FASTQ | FASTQ_R1 | FASTQ_R2 | BAM | VCF | GVCF', 'FASTQ_R1')
+  .option('--lab-id <id>', 'Laboratory ID (or $GENOBANK_LABORATORY_ID)', (v) => parseInt(v, 10))
+  .option('--source-file <path>', 'Compute size + sha256 from this file (required unless --size/--sha256 given)')
+  .option('--size <bytes>', 'Estimated upload size in bytes', (v) => parseInt(v, 10))
+  .option('--sha256 <hex>', 'Claimed SHA256 hash (64 hex chars)')
+  .option('--filename <name>', 'Logical filename to record server-side')
+  .option('--json', 'Output as JSON')
+  .action(async (options: CredIssueOptions) => {
+    try {
+      await credIssueCommand(options);
+    } catch (error) {
+      Logger.error(`cred issue failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+credCmd
+  .command('status <cred_id>')
+  .description('Show the current state of a credential')
+  .option('--json', 'Output as JSON')
+  .action(async (credId: string, options: CredStatusOptions) => {
+    try {
+      await credStatusCommand(credId, options);
+    } catch (error) {
+      Logger.error(`cred status failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+credCmd
+  .command('list')
+  .description('List credentials for a biosample')
+  .option('--biosample <serial>', 'Biosample serial')
+  .option('--status <status>', 'Filter by status (issued|consumed|quarantined|burned)')
+  .option('--json', 'Output as JSON')
+  .action(async (options: CredListOptions) => {
+    try {
+      await credListCommand(options);
+    } catch (error) {
+      Logger.error(`cred list failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+credCmd
+  .command('revoke <cred_id>')
+  .description('Owner-signed burn of an unused credential (requires GENOBANK_OWNER_PRIVATE_KEY)')
+  .option('--reason <text>', 'Why you are burning this credential', 'user_cli')
+  .option('--force', 'Skip confirmation prompt')
+  .action(async (credId: string, options: CredRevokeOptions) => {
+    try {
+      await credRevokeCommand(credId, options);
+    } catch (error) {
+      Logger.error(`cred revoke failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// upload-fastq: thin wrapper around the Python genobank-upload CLI (resumable + resume buffer)
+program
+  .command('upload-fastq <file>')
+  .description('Upload a FASTQ/BAM/VCF via scoped credential + GCS resumable (wraps genobank-upload)')
+  .requiredOption('--biosample <serial>', 'Biosample serial')
+  .option('--kind <kind>', 'FASTQ | FASTQ_R1 | FASTQ_R2 | BAM | VCF | GVCF', 'FASTQ_R1')
+  .option('--lab-id <id>', 'Laboratory ID (or $GENOBANK_LABORATORY_ID)', (v) => parseInt(v, 10))
+  .option('--api-base <url>', 'Override API base URL')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Output as JSON on completion')
+  .action(async (file: string, options: UploadFastqOptions) => {
+    try {
+      await uploadFastqCommand(file, options);
+    } catch (error) {
+      Logger.error(`upload-fastq failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
 // BioContext manifest commands (v2.6.0)
 const contextCmd = program
   .command('context')
@@ -971,6 +1290,21 @@ jobCmd
     }
   });
 
+// job recall - Naive DeepVariant from pre-aligned BAM (no kit restriction)
+jobCmd
+  .command('recall <sample_id>')
+  .description('Run naive (no-kit) DeepVariant from a BAM already on the GPU VM')
+  .requiredOption('--bam <vm_path>', 'BAM path on GPU VM (host path, e.g. /home/ubuntu/data/output/A014/A014.bam)')
+  .option('--json', 'Output as JSON')
+  .action(async (sampleId: string, options: RecallOptions) => {
+    try {
+      await recallCommand(sampleId, options);
+    } catch (error) {
+      Logger.error(`Recall failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
 // Agent Health - Check processing agent readiness
 program
   .command('agent-health')
@@ -983,6 +1317,41 @@ program
       await agentHealthCommand(options);
     } catch (error) {
       Logger.error(`Health check failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Researcher registration and identity (multi-provider social + MetaMask)
+const researcherCmd = program
+  .command('researcher')
+  .description('Researcher identity — register via ORCID, Google, LinkedIn, Twitter, Apple, or MetaMask');
+
+researcherCmd
+  .command('register')
+  .description('Register as a researcher (opens browser for social or MetaMask sign-in)')
+  .option('--port <number>', 'Callback server port', parseInt)
+  .option('--no-browser', "Don't auto-open browser (headless mode)")
+  .option('--timeout <seconds>', 'Auth timeout in seconds', parseInt)
+  .option('--provider <provider>', 'Force a specific provider (orcid, google, linkedin, twitter, apple, metamask)')
+  .action(async (options: ResearcherRegisterOptions) => {
+    try {
+      await researcherRegisterCommand(options);
+    } catch (error) {
+      Logger.error(`Researcher registration failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+researcherCmd
+  .command('status')
+  .description('Show your researcher profile and credentials')
+  .option('--json', 'Output as JSON')
+  .option('--refresh', 'Refresh profile from server')
+  .action(async (options: ResearcherStatusOptions) => {
+    try {
+      await researcherStatusCommand(options);
+    } catch (error) {
+      Logger.error(`Researcher status failed: ${error}`);
       process.exit(1);
     }
   });
@@ -1053,6 +1422,105 @@ program
     }
   });
 
+// Fourier-score — Cosic RRM EIIP+DFT biophysical scoring of missense variants
+program
+  .command('fourier-score <variants>')
+  .description('Cosic-RRM EIIP+DFT biophysical scoring of missense variants (returns Σ|ΔF|, max|ΔF| as biophysical complement to REVEL/AlphaMissense)')
+  .option('--window <N>', 'Window size for non-TM residues (default: 31, must be odd)')
+  .option('--window-tm <N>', 'Window size for TM-residue variants (default: 51, must be odd)')
+  .option('--uniprot <accession>', 'Override UniProt accession (for single variant or unknown gene)')
+  .option('--format <type>', 'Output format: table | tsv | json (default: table)', 'table')
+  .option('--output <path>', 'Write output to file instead of stdout')
+  .option('--plot <path>', 'Render |ΔF| spectrum to PNG (one panel per variant)')
+  .option('--quiet', 'Suppress progress output')
+  .action(async (variants: string, options: FourierScoreOptions) => {
+    try {
+      await fourierScoreCommand(variants, options);
+    } catch (error) {
+      Logger.error(`Fourier scoring failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Variants — query annotated variants from the latest OpenCRAVAT sqlite
+program
+  .command('variants <biosample_serial>')
+  .description('Query annotated variants from the latest OpenCRAVAT sqlite for a biosample (gene/region/SO/AF/ClinVar filters)')
+  .option('--gene <symbols>', 'Comma-separated HUGO gene symbols (e.g. ITGA2B,ITGB3)')
+  .option('--region <chr:start-end>', 'Genomic region (e.g. chr17:44372210-44511666)')
+  .option('--so <terms>', 'Sequence-ontology terms or "all" (default: missense+LoF+canonical splice)')
+  .option('--max-af <number>', 'Population AF cap across gnomAD3/4 + AllOfUs (default: 0.01)')
+  .option('--clinvar <class>', 'ClinVar significance filter: patho|likely|vus|benign|all (default: all)')
+  .option('--columns <names>', 'Comma-separated annotator columns to display (default panel)')
+  .option('--format <type>', 'Output format: table | tsv | json (default: table)', 'table')
+  .option('--output <path>', 'Write output to file instead of stdout')
+  .option('--refresh', 'Re-download sqlite even if cached')
+  .option('--sqlite-uri <gsuri>', 'Override biorouter resolution with an explicit gs://....sqlite URI')
+  .option('--job-id <timestamp>', 'Require a specific OC job timestamp (e.g. 260411-053533)')
+  .option('--quiet', 'Suppress progress output')
+  .option('--debug', 'Show route-resolver stdout for debugging')
+  .action(async (biosampleSerial: string, options: VariantsOptions) => {
+    try {
+      await variantsCommand(biosampleSerial, options);
+    } catch (error) {
+      Logger.error(`Variant query failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Resolve - BioRoutes on-chain route resolution (Phase G.2)
+program
+  .command('resolve <biocid_or_fingerprint>')
+  .description('Resolve a biocid or fingerprint to its storage route via BioRoutes on-chain (Sequentia)')
+  .option('--by-fingerprint', 'Treat the argument as a contentHash fingerprint instead of a biocid')
+  .option('--verify', 'Verify that the resolved URI is accessible and fingerprint matches')
+  .option('--dispute', 'If --verify detects mismatch, submit RouteDisputed tx on-chain')
+  .option('--json', 'Output as JSON')
+  .option('--verbose', 'Show debug information')
+  .action(async (identifier: string, options: ResolveOptions) => {
+    try {
+      await resolveCommand(identifier, options);
+    } catch (error) {
+      Logger.error(`Resolve failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Match - 3-stage privacy-preserving SNP match (ICISSP 2024 Figure 1)
+program
+  .command('match')
+  .description('Match SNPs against an owner corpus via Bloom/accumulator (Matcher → Ticket → Resolver)')
+  .requiredOption('--owner <wallet>', 'Owner wallet address to match against')
+  .option('--snps <list>', 'Comma-separated SNPs in rsid:chrom:pos:genotype format')
+  .option('--snp-file <path>', 'File with one SNP per line (rsid:chrom:pos:genotype)')
+  .option('--json', 'Output as JSON')
+  .option('--verbose', 'Show debug information')
+  .action(async (options: MatchOptions) => {
+    try {
+      await matchCommand(options);
+    } catch (error) {
+      Logger.error(`Match failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Ticket - Privacy ticket management (ICISSP 2024 §6)
+program
+  .command('ticket')
+  .description('List or revoke privacy tickets (BioNFTCredentials-bound access tokens)')
+  .option('--list', 'List active tickets (default)')
+  .option('--revoke <ticketId>', 'Revoke a ticket by ID (burns BioNFTCredentials token)')
+  .option('--json', 'Output as JSON')
+  .option('--verbose', 'Show debug information')
+  .action(async (options: TicketOptions) => {
+    try {
+      await ticketCommand(options);
+    } catch (error) {
+      Logger.error(`Ticket command failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
 // Dissect - GDPR Data Minimization: Extract phenotype-specific SNPs
 // NOW USES SEQUENTIA PROTOCOL BY DEFAULT (solves 0xd4d910b4 Story Protocol error!)
 program
@@ -1099,6 +1567,56 @@ program
     }
   });
 
+// Pipeline command group — end-to-end FASTQ → Digital Twin orchestration
+const pipelineCmd = program
+  .command('pipeline')
+  .description('End-to-end agentic pipeline (FASTQ → Clara → CRAVAT → Vault → Digital Twin)');
+
+pipelineCmd
+  .command('run-wes <biosample_serial>')
+  .description('Run the full WES/WGS pipeline on a biosample, producing a Digital Twin URL')
+  .option('--mode <WES|WGS>', 'Override auto-detection (WES or WGS)')
+  .option('--bed <path>', 'Override interval BED path (forces WES)')
+  .option('--phase <range>', 'Run a subset of phases (e.g. "1-4", "5-10", or "all")')
+  .option('--run-id <id>', 'Resume an existing pipeline run by id')
+  .option('--watch', 'Stream Parabricks pipeline log live')
+  .option('--dry-run', 'Print what would happen but don\'t execute side-effecting phases')
+  .option('--skip-twin', 'Skip phase 9 (Digital Twin HTML render)')
+  .option('--remote', 'Force SSH-to-prod execution even if local orchestrator exists')
+  .option('--mongo-uri <uri>', 'MongoDB connection string (default: localhost:27017 on the executor)')
+  .option('--json', 'Emit raw JSON-line events instead of pretty output')
+  .action(async (biosampleSerial: string, options: PipelineRunWesOptions) => {
+    try {
+      const rc = await pipelineRunWesCommand(biosampleSerial, options);
+      process.exit(rc);
+    } catch (error) {
+      Logger.error(`pipeline run-wes failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// BioRouter route resolver — diagnose and heal gcsfuse mounts on compute nodes
+const routeCmd = program
+  .command('route')
+  .description('BioRouter route resolver — lint & heal gcsfuse mounts for biosamples');
+
+routeCmd
+  .command('check <biosample_serial...>')
+  .description('Resolve every route for the given biosample(s) and report mount status')
+  .option('--json', 'Emit raw JSON output instead of pretty table')
+  .action(async (serials: string[], options) => {
+    await routeCheckCommand(serials, options);
+  });
+
+routeCmd
+  .command('heal <biosample_serial...>')
+  .description('Mount every bucket required by the biosamples on a compute node')
+  .option('--node <user@host>', 'Target node (default: parabricks-gpu-spot@10.128.0.7)')
+  .option('--json', 'Emit raw JSON output')
+  .action(async (serials: string[], options) => {
+    await routeHealCommand(serials, options);
+  });
+
 // Help command
 program
   .command('help [command]')
@@ -1119,8 +1637,8 @@ program
 // Show welcome message if no command
 if (process.argv.length === 2) {
   console.log(chalk.cyan('\n╔═════════════════════════════════════════════╗'));
-  console.log(chalk.cyan('║  BioFS CLI v2.4.0                           ║'));
-  console.log(chalk.cyan('║  BioNFT-Gated S3 + x402 Pay + Kite AI       ║'));
+  console.log(chalk.cyan('║  BioFS CLI v3.2.0                           ║'));
+  console.log(chalk.cyan('║  BioNFT-Gated Genomics + Researcher ID      ║'));
   console.log(chalk.cyan('╚═════════════════════════════════════════════╝\n'));
 
   console.log('Available commands:');
@@ -1135,10 +1653,14 @@ if (process.argv.length === 2) {
   console.log(`  ${chalk.green('mount-remote')} - Mount biosample on agent`);
   console.log(`  ${chalk.green('upload')}      - Upload files`);
   console.log(`  ${chalk.green('tokenize')}    - Tokenize genomic data as BioNFT`);
+  console.log(`  ${chalk.green('researcher')}  - Register & manage researcher identity`);
   console.log(`  ${chalk.green('labnfts')}     - List approved research labs`);
   console.log(`  ${chalk.green('share')}       - Share with lab (dual NFT)`);
   console.log(`  ${chalk.green('shares')}      - View permission graph`);
   console.log(`  ${chalk.green('verify')}      - Verify file integrity (Bloom filter)`);
+  console.log(`  ${chalk.green('resolve')}     - Resolve biocid via BioRoutes (on-chain)`);
+  console.log(`  ${chalk.green('match')}       - Privacy-preserving SNP match (3-stage)`);
+  console.log(`  ${chalk.green('ticket')}      - Manage privacy tickets`);
   console.log(`  ${chalk.green('dissect')}     - Extract phenotype SNPs (GDPR)`);
   console.log(`  ${chalk.green('access')}      - Manage BioNFT access control`);
   console.log(`  ${chalk.green('job')}         - Manage research jobs (BioOS)`);
@@ -1161,6 +1683,10 @@ if (process.argv.length === 2) {
   console.log(`  ${chalk.cyan('payment setup')}     - Configure payment wallet`);
   console.log(`  ${chalk.cyan('payment faucet')}    - Get testnet tokens`);
   console.log(`  ${chalk.cyan('payment history')}   - View transaction history\n`);
+
+  console.log('Researcher subcommands:');
+  console.log(`  ${chalk.cyan('researcher register')}           - Register via ORCID, Google, LinkedIn, MetaMask, etc.`);
+  console.log(`  ${chalk.cyan('researcher status')}             - View your researcher profile\n`);
 
   console.log('Kite AI Agent subcommands:');
   console.log(`  ${chalk.cyan('agent register')} --all     - Register BioFS agents on Kite`);

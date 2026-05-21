@@ -9,6 +9,8 @@ import { ConsentManager } from '../lib/consent/consent-manager';
 import { ConsentPrompt } from '../lib/consent/consent-prompt';
 import { CredentialsManager } from '../lib/auth/credentials';
 import { Logger } from '../lib/utils/logger';
+import { spawnSync } from 'child_process';
+import * as fs from 'fs';
 import chalk from 'chalk';
 import * as path from 'path';
 
@@ -17,6 +19,7 @@ export interface DownloadOptions {
   stream?: boolean;
   quiet?: boolean;
   skipConsent?: boolean; // For automated/batch operations
+  gsUri?: string;        // bypass BioFiles discovery, fetch directly via gs:// URI
 }
 
 export async function downloadCommandWithConsent(
@@ -24,6 +27,38 @@ export async function downloadCommandWithConsent(
   destination?: string,
   options: DownloadOptions = {}
 ): Promise<void> {
+  // Direct gs:// path — for files that resolve via `biofs route check`
+  // (bioroutes.inventory) but aren't in the BioFiles discovery API index.
+  // Auth is via the local gcloud service account; consent flow is skipped
+  // because this path is for biosample-owner inspection of their own files.
+  const directGs =
+    options.gsUri ||
+    (biocidOrFilename.startsWith('gs://') ? biocidOrFilename : null);
+  if (directGs) {
+    if (!directGs.startsWith('gs://')) {
+      throw new Error(`--gs-uri must start with gs://, got: ${directGs}`);
+    }
+    const defaultName = directGs.split('/').pop() || 'download.bin';
+    const target = destination || options.output || defaultName;
+    if (!options.quiet) {
+      Logger.info(`Direct GCS fetch (bypassing BioFiles discovery): ${directGs}`);
+    }
+    const r = spawnSync('gcloud', ['storage', 'cp', directGs, target], {
+      encoding: 'utf8',
+      stdio: options.quiet ? 'pipe' : 'inherit',
+      maxBuffer: 50 * 1024 * 1024,
+    });
+    if (r.status !== 0) {
+      Logger.error(`gcloud storage cp failed: ${r.stderr || r.stdout || 'unknown'}`);
+      process.exit(1);
+    }
+    if (!options.quiet) {
+      const sz = fs.existsSync(target) ? fs.statSync(target).size : 0;
+      Logger.success(`Downloaded to: ${chalk.green(target)} (${(sz / 1e6).toFixed(1)} MB)`);
+    }
+    return;
+  }
+
   const downloader = new FileDownloader();
   const resolver = new BioCIDResolver();
   const consentManager = new ConsentManager();
