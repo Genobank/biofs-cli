@@ -1,191 +1,289 @@
-/**
- * GA4GH Researcher Registration Command
- *
- * Registers a researcher with their GA4GH Passport on Sequentia Network
- *
- * @author GenoBank.io
- */
-
-import { Command } from 'commander';
+import { CallbackServer } from '../../lib/auth/server';
+import { BrowserLauncher } from '../../lib/auth/browser';
+import { CredentialsManager } from '../../lib/auth/credentials';
+import { Logger } from '../../lib/utils/logger';
+import { CONFIG } from '../../lib/config/constants';
+import { BioFilesCacheManager } from '../../lib/storage/biofiles-cache';
+import { BioCIDResolver } from '../../lib/biofiles/resolver';
+import { ErrorReporter } from '../../utils/errorReporter';
+import chalk from 'chalk';
+import * as readline from 'readline';
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import chalk from 'chalk';
-import ora from 'ora';
-import inquirer from 'inquirer';
-import { ethers } from 'ethers';
-import { ApiClient } from '../../lib/api/client';
-import { loadCredentials } from '../../lib/auth/credentials';
-import { logger } from '../../lib/utils/logger';
+import axios from 'axios';
 
-interface RegisterOptions {
-  jwtFile: string;
-  wallet?: string;
-  visaFiles?: string[];
-  masterNode?: string;
+export interface ResearcherRegisterOptions {
+  port?: number;
+  browser?: boolean;
+  timeout?: number;
+  provider?: string;
 }
 
-/**
- * Register researcher with GA4GH Passport
- */
-export async function registerResearcher(options: RegisterOptions) {
-  const spinner = ora();
+export interface ResearcherProfile {
+  wallet_address: string;
+  provider: string;
+  registered_at: string;
+  name?: string;
+  email?: string;
+  orcid_id?: string;
+  institution?: string;
+}
+
+const RESEARCHER_PROFILE_FILE = 'researcher.json';
+
+function getResearcherProfilePath(): string {
+  return path.join(CONFIG.HOME_DIR, CONFIG.CONFIG_DIR_NAME, RESEARCHER_PROFILE_FILE);
+}
+
+export async function loadResearcherProfile(): Promise<ResearcherProfile | null> {
+  const profilePath = getResearcherProfilePath();
+  try {
+    if (await fs.pathExists(profilePath)) {
+      return await fs.readJson(profilePath);
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+export async function researcherRegisterCommand(options: ResearcherRegisterOptions): Promise<void> {
+  const credManager = CredentialsManager.getInstance();
+
+  // Check if already registered
+  if (await credManager.hasCredentials()) {
+    const creds = await credManager.loadCredentials();
+    if (creds) {
+      const profile = await loadResearcherProfile();
+      if (profile) {
+        Logger.info(`Already registered as researcher: ${Logger.formatWallet(creds.wallet_address)}`);
+        Logger.info(`Provider: ${profile.provider}`);
+        Logger.info('Run "biofs logout" to switch accounts, or "biofs researcher status" for details');
+        return;
+      }
+    }
+  }
+
+  // Headless mode (--no-browser)
+  if (options.browser !== undefined && options.browser === false) {
+    await headlessResearcherRegister();
+    return;
+  }
+
+  const config = await credManager.loadConfig();
+  const port = options.port || config.callback_port || CONFIG.CALLBACK_PORT;
+
+  const server = new CallbackServer();
+  const callbackUrl = server.getCallbackUrl(port);
+  const sessionId = server.getSessionId();
+
+  const params = new URLSearchParams({
+    returnUrl: callbackUrl,
+    sessionId: sessionId,
+    cli: 'true',
+    mode: 'researcher'
+  });
+  if (options.provider) {
+    params.set('provider', options.provider);
+  }
+  const registerUrl = `${CONFIG.RESEARCHER_REGISTER_URL}?${params.toString()}`;
+
+  console.log('\n' + chalk.cyan('═══════════════════════════════════════════════════════════════'));
+  console.log(chalk.bold.white('  BioFS Researcher Registration'));
+  console.log(chalk.cyan('═══════════════════════════════════════════════════════════════\n'));
+
+  console.log(chalk.white('Choose your sign-in method in the browser:\n'));
+  console.log(`  ${chalk.green('●')} ${chalk.white('ORCID iD')}        — Academic identity verification`);
+  console.log(`  ${chalk.green('●')} ${chalk.white('Google')}          — Google account`);
+  console.log(`  ${chalk.green('●')} ${chalk.white('LinkedIn')}        — Professional identity`);
+  console.log(`  ${chalk.green('●')} ${chalk.white('Twitter / X')}     — Social identity`);
+  console.log(`  ${chalk.green('●')} ${chalk.white('Apple')}           — Apple ID`);
+  console.log(`  ${chalk.green('●')} ${chalk.white('MetaMask')}        — Existing Ethereum wallet\n`);
+
+  console.log(chalk.gray('  A custodial Research Biowallet (EIP-55) will be provisioned'));
+  console.log(chalk.gray('  for social sign-ins. MetaMask uses your existing wallet.\n'));
+
+  console.log(chalk.cyan('───────────────────────────────────────────────────────────────\n'));
+
+  if ((options.browser === undefined || options.browser === true) && config.auto_open_browser !== false) {
+    Logger.info('Opening browser for researcher registration...');
+    await BrowserLauncher.openAuthUrl(registerUrl);
+  } else {
+    console.log(chalk.cyan('Please open this URL in your browser:'));
+    console.log(chalk.underline(registerUrl) + '\n');
+  }
+
+  const spinner = Logger.spinner('Waiting for registration (timeout: 5 minutes)...');
 
   try {
-    // Load credentials
-    const credentials = await loadCredentials();
-    if (!credentials || !credentials.wallet) {
-      logger.error('Please login first using: biofs-cli auth login');
-      process.exit(1);
-    }
+    const result = await server.start(port);
+    spinner.succeed('Registration successful!');
 
-    const wallet = options.wallet || credentials.wallet;
+    await credManager.saveCredentials(result.wallet, result.signature);
 
-    // Validate wallet address
-    if (!ethers.isAddress(wallet)) {
-      logger.error(`Invalid wallet address: ${wallet}`);
-      process.exit(1);
-    }
+    const profile = await fetchAndSaveResearcherProfile(result.wallet);
 
-    // Read passport JWT
-    spinner.start('Reading GA4GH Passport JWT...');
-    const passportPath = path.resolve(options.jwtFile);
-    if (!await fs.pathExists(passportPath)) {
-      spinner.fail(`JWT file not found: ${passportPath}`);
-      process.exit(1);
-    }
+    await initializeBioFilesCache(result.wallet);
 
-    const passportJWT = await fs.readFile(passportPath, 'utf-8');
-    spinner.succeed('Passport JWT loaded');
+    ErrorReporter.reportEvent('session_start', 'researcher register', result.wallet, {
+      flow: 'browser',
+      provider: profile?.provider || 'unknown'
+    }).catch(() => {});
 
-    // Read visa JWTs if provided
-    const visaJWTs: string[] = [];
-    if (options.visaFiles && options.visaFiles.length > 0) {
-      spinner.start('Reading visa JWTs...');
-      for (const visaFile of options.visaFiles) {
-        const visaPath = path.resolve(visaFile);
-        if (await fs.pathExists(visaPath)) {
-          const visaJWT = await fs.readFile(visaPath, 'utf-8');
-          visaJWTs.push(visaJWT);
-        } else {
-          logger.warn(`Visa file not found: ${visaPath}`);
-        }
-      }
-      spinner.succeed(`Loaded ${visaJWTs.length} visa JWTs`);
-    }
+    showSuccessBox(result.wallet, profile);
 
-    // Decode passport to show summary
-    try {
-      const passportData = JSON.parse(
-        Buffer.from(passportJWT.split('.')[1], 'base64').toString()
-      );
+    Logger.success('Credentials saved to: ~/.biofs/credentials.json');
 
-      console.log('\n' + chalk.cyan('📋 Passport Summary:'));
-      console.log(chalk.gray('  Issuer:'), passportData.iss);
-      console.log(chalk.gray('  Subject:'), passportData.sub);
-      console.log(chalk.gray('  Issued:'), new Date(passportData.iat * 1000).toISOString());
-      console.log(chalk.gray('  Expires:'), new Date(passportData.exp * 1000).toISOString());
-
-      if (passportData.ga4gh_passport_v1) {
-        console.log(chalk.gray('  Visas:'), passportData.ga4gh_passport_v1.length);
-        passportData.ga4gh_passport_v1.forEach((visa: any) => {
-          console.log(chalk.gray(`    - ${visa.type}:`), visa.value);
-        });
-      }
-    } catch (error) {
-      logger.warn('Could not decode passport for preview');
-    }
-
-    // Confirm registration
-    console.log('\n' + chalk.yellow('⚠️  This will register your GA4GH Passport on-chain'));
-    console.log(chalk.gray('   The passport hash will be permanently stored on Sequentia Network'));
-    console.log(chalk.gray('   The full JWT will be encrypted and stored in S3'));
-
-    const { confirm } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'confirm',
-        message: 'Do you want to proceed with registration?',
-        default: false,
-      },
-    ]);
-
-    if (!confirm) {
-      console.log(chalk.gray('Registration cancelled'));
-      process.exit(0);
-    }
-
-    // Initialize API client
-    const apiClient = new ApiClient({
-      baseUrl: options.masterNode || process.env.BIOFS_MASTER_NODE || 'http://localhost:3000',
-      credentials,
-    });
-
-    // Register with master node
-    spinner.start('Registering GA4GH Passport on Sequentia Network...');
-
-    const response = await apiClient.post('/api/v1/researchers/register', {
-      wallet,
-      ga4gh_passport_jwt: passportJWT,
-      visas: visaJWTs,
-    });
-
-    if (response.success) {
-      spinner.succeed('GA4GH Passport registered successfully!');
-      console.log('\n' + chalk.green('✅ Registration Complete'));
-      console.log(chalk.gray('  Transaction:'), response.txHash);
-      console.log(chalk.gray('  Wallet:'), wallet);
-      console.log(chalk.gray('  Explorer:'), `https://explorer.sequentia.network/tx/${response.txHash}`);
-
-      // Save registration info
-      const configPath = path.join(process.env.HOME || '~', '.biofs', 'ga4gh.json');
-      await fs.ensureDir(path.dirname(configPath));
-      await fs.writeJson(configPath, {
-        wallet,
-        registeredAt: new Date().toISOString(),
-        txHash: response.txHash,
-      }, { spaces: 2 });
-
-      console.log('\n' + chalk.cyan('💡 Next Steps:'));
-      console.log('  1. Verify your registration: biofs-cli researcher verify');
-      console.log('  2. Check your profile: biofs-cli researcher status');
-      console.log('  3. Request dataset access: biofs-cli data request-access');
-    } else {
-      spinner.fail('Registration failed');
-      logger.error(response.error || 'Unknown error');
-      process.exit(1);
-    }
-  } catch (error: any) {
+    setImmediate(() => process.exit(0));
+  } catch (error) {
     spinner.fail('Registration failed');
-    logger.error(error.message);
+    Logger.error(`Error: ${error}`);
     process.exit(1);
   }
 }
 
-/**
- * Create the register command
- */
-export function createRegisterCommand(): Command {
-  return new Command('register')
-    .description('Register researcher with GA4GH Passport')
-    .requiredOption(
-      '-j, --jwt-file <file>',
-      'Path to GA4GH Passport JWT file'
-    )
-    .option(
-      '-w, --wallet <address>',
-      'Researcher wallet address (defaults to logged-in wallet)'
-    )
-    .option(
-      '-v, --visa-files <files...>',
-      'Additional visa JWT files'
-    )
-    .option(
-      '-m, --master-node <url>',
-      'Master node URL',
-      process.env.BIOFS_MASTER_NODE
-    )
-    .action(async (options: RegisterOptions) => {
-      await registerResearcher(options);
-    });
+async function headlessResearcherRegister(): Promise<void> {
+  const credManager = CredentialsManager.getInstance();
+
+  console.log('\n' + chalk.cyan('═══════════════════════════════════════════════════════════════'));
+  console.log(chalk.bold.yellow('  Headless Researcher Registration'));
+  console.log(chalk.cyan('═══════════════════════════════════════════════════════════════\n'));
+
+  console.log(chalk.white('Since you\'re on a server without a browser, follow these steps:\n'));
+
+  console.log(chalk.yellow('1.') + chalk.white(' Open this URL on a machine with a browser:'));
+  console.log(chalk.cyan.underline(`\n   ${CONFIG.RESEARCHER_REGISTER_URL}?headless=true\n`));
+
+  console.log(chalk.yellow('2.') + chalk.white(' Sign in using ORCID, Google, LinkedIn, Twitter, Apple, or MetaMask'));
+  console.log(chalk.yellow('3.') + chalk.white(' Copy the wallet address and signature shown after registration'));
+  console.log(chalk.yellow('4.') + chalk.white(' Paste them below\n'));
+
+  console.log(chalk.cyan('───────────────────────────────────────────────────────────────\n'));
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const question = (q: string): Promise<string> => new Promise(resolve => rl.question(q, resolve));
+
+  try {
+    const wallet = await question(chalk.green('Enter wallet address: '));
+    if (!wallet?.trim()) { Logger.error('Wallet address is required'); rl.close(); process.exit(1); }
+    if (!wallet.trim().match(/^0x[a-fA-F0-9]{40}$/)) {
+      Logger.error('Invalid wallet address format. Expected Ethereum address (0x...)');
+      rl.close(); process.exit(1);
+    }
+
+    const signature = await question(chalk.green('Enter signature: '));
+    if (!signature?.trim()) { Logger.error('Signature is required'); rl.close(); process.exit(1); }
+    if (!signature.trim().match(/^0x[a-fA-F0-9]{130}$/)) {
+      Logger.error('Invalid signature format. Expected 65-byte signature (0x...)');
+      rl.close(); process.exit(1);
+    }
+
+    rl.close();
+    console.log('\n' + chalk.cyan('───────────────────────────────────────────────────────────────\n'));
+
+    const spinner = Logger.spinner('Saving credentials...');
+    await credManager.saveCredentials(wallet.trim(), signature.trim());
+    spinner.succeed('Credentials saved!');
+
+    const profile = await fetchAndSaveResearcherProfile(wallet.trim());
+    await initializeBioFilesCache(wallet.trim());
+
+    ErrorReporter.reportEvent('session_start', 'researcher register', wallet.trim(), {
+      flow: 'headless',
+      provider: profile?.provider || 'unknown'
+    }).catch(() => {});
+
+    showSuccessBox(wallet.trim(), profile);
+    Logger.success('Credentials saved to: ~/.biofs/credentials.json');
+  } catch (error) {
+    rl.close();
+    Logger.error(`Registration failed: ${error}`);
+    process.exit(1);
+  }
 }
 
+async function fetchAndSaveResearcherProfile(wallet: string): Promise<ResearcherProfile | null> {
+  try {
+    const response = await axios.get(
+      `${CONFIG.API_BASE_URL}/api_biofs_researcher_status`,
+      { params: { wallet }, timeout: 5000 }
+    );
+
+    if (response.data?.wallet_address) {
+      const profile: ResearcherProfile = {
+        wallet_address: response.data.wallet_address,
+        provider: response.data.provider || 'metamask',
+        registered_at: response.data.registered_at || new Date().toISOString(),
+        name: response.data.name,
+        email: response.data.email,
+        orcid_id: response.data.orcid_id,
+        institution: response.data.institution
+      };
+
+      await fs.writeJson(getResearcherProfilePath(), profile, { spaces: 2 });
+      return profile;
+    }
+  } catch { /* API may not have the endpoint yet */ }
+
+  const profile: ResearcherProfile = {
+    wallet_address: wallet,
+    provider: 'unknown',
+    registered_at: new Date().toISOString()
+  };
+
+  await fs.ensureDir(path.join(CONFIG.HOME_DIR, CONFIG.CONFIG_DIR_NAME));
+  await fs.writeJson(getResearcherProfilePath(), profile, { spaces: 2 });
+  return profile;
+}
+
+async function initializeBioFilesCache(walletAddress: string): Promise<void> {
+  const spinner = Logger.spinner('Discovering your BioFiles...');
+
+  try {
+    const resolver = new BioCIDResolver();
+    const cacheManager = new BioFilesCacheManager();
+    const biofiles = await resolver.discoverAllBioFiles(false);
+
+    const cacheBiofiles = biofiles.map(bf => ({
+      filename: bf.filename,
+      locations: {
+        s3: bf.s3_path,
+        biocid: bf.biocid,
+        story_ip: bf.ip_asset,
+        avalanche_biosample: bf.source === 'Avalanche' ? bf.biocid?.split('/').pop() : undefined,
+        local_path: undefined
+      },
+      metadata: {
+        file_type: bf.type,
+        size: bf.size,
+        created_at: bf.created_at,
+        tokenized: !!bf.ip_asset,
+        shared_with: bf.granted ? [bf.owner || ''] : undefined,
+        license_type: bf.license_type
+      }
+    }));
+
+    cacheManager.update(walletAddress, cacheBiofiles);
+    spinner.succeed(`Discovered ${biofiles.length} BioFiles`);
+  } catch (error) {
+    spinner.warn('Failed to initialize BioFiles cache - will fetch on demand');
+  }
+}
+
+function showSuccessBox(wallet: string, profile: ResearcherProfile | null): void {
+  const providerLine = profile?.provider && profile.provider !== 'unknown'
+    ? `\nProvider: ${chalk.yellow(profile.provider)}`
+    : '';
+  const orcidLine = profile?.orcid_id
+    ? `\nORCID iD: ${chalk.yellow(profile.orcid_id)}`
+    : '';
+
+  Logger.box(
+    `Research Biowallet: ${chalk.green(wallet)}${providerLine}${orcidLine}\n\n` +
+    `You can now use:\n` +
+    `  ${chalk.cyan('biofs files')}              - List available BioFiles\n` +
+    `  ${chalk.cyan('biofs access request')}     - Request access to datasets\n` +
+    `  ${chalk.cyan('biofs download')}           - Download files\n` +
+    `  ${chalk.cyan('biofs mount')}              - Mount BioNFT-gated files\n` +
+    `  ${chalk.cyan('biofs researcher status')}  - View your researcher profile`,
+    'Researcher Registration Complete'
+  );
+}

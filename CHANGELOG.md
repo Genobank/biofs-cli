@@ -1,3 +1,176 @@
+# v3.5.0 — biofs clinical: phenotype-driven multi-exome ACMG/AMP 2015 + ClinGen-SVI classifier
+
+**Published**: 2026-05-23. Server endpoint at `POST https://genobank.app/api_biofs_fuse/clinical_acmg` (analyzer at `/home/ubuntu/Genobank_APIs/production_api/clinical_acmg/clinical_acmg.py`).
+
+## New verb: `biofs clinical <biosample_serial>`
+
+Phenotype-driven, n-of-1 or joint-N exome ACMG/AMP 2015 + ClinGen-SVI 2024 (Pejaver-2022 calibrated) variant classifier. Complements `cohort-acmg` which is batch-mode-across-probands ClinVar P/LP only; `clinical` is single-proband, applies ACMG criteria de novo across the full variant set, ranks by phenotype-gene match.
+
+### CLI surface
+
+```bash
+# joint 4-exome with phenotype words
+biofs clinical 55052008714014 \
+  --serials 55052008714060,55052008713972,55052008714008 \
+  --phenotype "skeletal disability, bone fractures, under development, wheelchair" \
+  --panel skeletal_dysplasia
+
+# explicit HPO codes + photo (graceful fallback if FDNA Face2Gene key not set server-side)
+biofs clinical 55052008714014 \
+  --hpo HP:0000924,HP:0002659,HP:0001263 \
+  --photo ./patient.jpg
+```
+
+### Inputs
+
+- Primary biosample serial (positional) + optional `--serials` list for joint-N pass
+- `--phenotype "<text>"` — mapped to HPO via local HPOA annotations at `/home/ubuntu/data/hpo_cache/`
+- `--hpo HP:...` — explicit codes, additive with `--phenotype`
+- `--photo <path>` — Face2Gene-style syndrome predictor; returns `no_api_key` with graceful fallback to phenotype-text mapping when `CLINICAL_FACE2GENE_KEY` not configured server-side
+- `--panel skeletal_dysplasia` — built-in panel (HPO-curated genes auto-augment)
+- `--max-af 0.01` — gnomAD AF ceiling
+- `--case-label <name>` — privacy-safe (no proper names; defaults to `proband-<wallet-prefix>`)
+
+### ACMG criteria implemented
+
+- **PVS1** (Very Strong): null variant (frameshift, stop-gain, splice donor/acceptor, start-lost) in HPO-matched / panel gene
+- **PS3**: ClinVar Pathogenic; **PS3_Supporting** for Likely Pathogenic
+- **PM2_Supporting**: absent / ultra-rare in gnomAD (AF ≤ 1e-4)
+- **PP3** (Pejaver-2022 calibration):
+  - REVEL Supporting ≥0.644 / Moderate ≥0.773 / Strong ≥0.932
+  - AlphaMissense ≥0.564 (Supporting)
+  - SpliceAI ≥0.5 / ≥0.8 (Moderate / Strong)
+  - SIFT damaging, PolyPhen2 hVAR damaging (Supporting)
+- **PP4** (custom phenotype-gene match): patient HPO terms hit curated set for gene (Supporting=1, Moderate=≥2)
+- **BA1** (Stand-alone Benign): gnomAD AF ≥ 0.05 (hard override)
+- **BS1** (Strong Benign): gnomAD AF ≥ 0.01
+- **BP4** (Pejaver-2022 calibrated benign thresholds): REVEL ≤0.290, AlphaMissense ≤0.340
+
+Final classification via Pejaver/Tavtigian Bayesian-integer scoring:
+- Pathogenic ≥ +8, Likely Pathogenic ≥ +6, VUS −1..+5, Likely Benign ≥ −6, Benign ≤ −7
+- BA1 short-circuits to Benign
+
+### Output
+
+- `<output-dir>/<case-label>__clinical_acmg.json` — full report with per-variant ACMG evidence stack
+- `<output-dir>/<case-label>__clinical_acmg.html` — light-themed HTML report (per `[[feedback-no-dark-themes]]`)
+
+### Validation (case proband, joint 4 exomes, 2026-05-23)
+
+- Phenotype: "skeletal disability, bone fractures, under development, wheelchair"
+- HPO mapped: HP:0000924, HP:0001263, HP:0001371, HP:0001508, HP:0002355, HP:0002540, HP:0002659, HP:0002757
+- 4,900 variants classified; **3 P/LP candidates**: PIGL c.494+1G>A (P, CHIME syndrome), SLC12A3 p.Asp486Ala (P, Gitelman), PGAP1 p.Lys111Glu (LP, AR intellectual disability + hereditary spastic paraplegia; 2 HPO matches).
+
+### Files touched
+
+- `src/commands/clinical.ts` — new
+- `src/index.ts` — registered the `clinical <biosample_serial>` command
+- Server: `plugins/api_biofs_fuse.py` got a `clinical_acmg` POST handler (subprocesses to `clinical_acmg.py`)
+- Server: `/home/ubuntu/Genobank_APIs/production_api/clinical_acmg/clinical_acmg.py` — analyzer
+
+### Privacy
+
+Per `CLAUDE.md`: no proper names anywhere. Case label is operator-private; subject referenced by EIP-55 biowallet otherwise. No genomic bytes touch the laptop — server resolves OC sqlites via `bioroutes.inventory` (with a `biosamples.lab_internal_id` fallback for minted research serials not yet in inventory).
+
+---
+
+# v3.4.0 — biofs cohort-fourier-score: cohort-scale Cosic-RRM spectral scoring (verb scaffold)
+
+**Published**: pending the server-side `/api_biofs_fuse/cohort_fourier_score` endpoint. Client-side verb, types, and command registration are landed; npm publish blocked until the prod endpoint exists. See `docs/specs/cohort_fourier_score_endpoint.md` for the contract.
+
+## New verb: `biofs cohort-fourier-score`
+
+The missing rung between single-variant `biofs fourier-score` and per-gene ClinVar `biofs cohort-train`. Computes the per-patient × per-variant Cosic-RRM spectral score matrix that Section 14.4 of the biofs-rrm internal paper proposes, at cohort scale across a list of biosample serials or a prior `cohort-acmg` cohort summary.
+
+Per CLAUDE.md "ALL jobs originate and run through biofs-cli + biofs-node protocol": this verb is the canonical replacement for any ad-hoc gcloud SSH script that previously would have iterated sqlites on prod. Same NFT-gated, server-side, gcsfuse-mounted pattern as `cohort-acmg`. Zero genomic bytes on the laptop.
+
+### Per-variant output fields
+
+For each rare-missense variant passing the filter, the verb returns:
+
+1. `eiip_delta` — single-residue EIIP swap magnitude (Cosic 1994 Rydberg)
+2. `window_size` — 31 default, 51 if the residue falls in a UniProt-annotated transmembrane segment
+3. `window_sum_abs_df` — windowed Σ|ΔF|(k≥1)
+4. `window_delta_energy_pct` — windowed energy change
+5. `full_spectrum_l1` — L1 distance across all bins, full protein
+6. `fc_period_aa`, `fc_snr` — family characteristic-frequency context (cached at `~/.biofs/cache/rrm/<gene>.json`)
+7. `fc_ratio_mw`, `fc_delta_energy_pct` — mutant/wildtype magnitude ratio at f_c
+8. `weighted_agg_delta_energy_pct` — weighted across top consensus peaks
+9. `fc_cache_hit`, `scoring_status` — provenance and error-handling signals
+
+### CLI surface
+
+```bash
+# from a serials file
+biofs cohort-fourier-score --serials cohort.txt --max-af 0.005 --include-vus
+
+# from a prior cohort-acmg summary (recovers biowallet→serial mapping locally)
+biofs cohort-fourier-score --from-acmg ./cohort_acmg_reports/cohort_summary.json
+
+# rare-and-novel-high-AM mode (admits AM >= threshold even if absent from ClinVar)
+biofs cohort-fourier-score --serials cohort.txt --include-high-am --am-threshold 0.5
+```
+
+### Output layout
+
+1. `<output-dir>/<biowallet>.json` — per-proband Cosic-RRM score matrix
+2. `<output-dir>/cohort_fourier_summary.json` — cohort-wide aggregate with `variants_per_proband`, `variants_per_gene`, `top_l1_per_biowallet`
+
+### What's NOT in this release
+
+1. Server endpoint `/api_biofs_fuse/cohort_fourier_score` (specified at `docs/specs/cohort_fourier_score_endpoint.md`, implementation owed by the next session on the prod GenoBank API).
+2. On-chain anchoring (deferred to Sprint 2 via `ClaraBatchJobNFT` + biofs-node `/agent/batch-complete`).
+3. A multi-panel cohort plot generator (deferred; users can pivot the JSON in their own notebook for now).
+
+### Files touched
+
+1. `src/commands/cohort-fourier-score.ts` — new (≈ 330 LOC)
+2. `src/lib/api/fuse-client.ts` — new `FuseFourierVariantRow`, `FuseCohortFourierPerSerial`, `FuseCohortFourierResponse` types and `cohortFourierScorePerSerial()` method
+3. `src/index.ts` — import + new `.command('cohort-fourier-score')` block after the existing `cohort-acmg` registration
+4. `docs/specs/cohort_fourier_score_endpoint.md` — endpoint contract spec (new)
+5. `package.json` — version bump 3.3.0 → 3.4.0
+
+---
+
+# v3.3.0 — Zero-local-cache refactor: variants + cohort-acmg now server-side via NFT-gated API
+
+**Published**: 2026-05-22 (pending)
+
+## Breaking change: the laptop no longer holds genomic bytes
+
+Prior versions of `biofs variants` and `biofs cohort-acmg` resolved an OpenCRAVAT sqlite via biorouter, then ran `gcloud storage cp <gs:// URI> ~/.biofs/cache/cravat/<serial>.sqlite` to download the ~250-MB file to local disk before querying. A cohort of 59 probands filled 21 GB of laptop disk in the prior session.
+
+This release deletes that pattern entirely. Both verbs now call NFT-gated server-side endpoints on `https://genobank.app/api_biofs_fuse/`:
+
+- `GET /api_biofs_fuse/variants` — server resolves the OpenCRAVAT sqlite via the bioroutes inventory, runs sqlite3 in-process against the `/mnt/gcsfuse-bioroutes/<bucket>/<obj>.sqlite` mount, returns filtered rows as JSON. Wallet-signature-gated. Supports the full PY_QUERY_SCRIPT surface: multi-gene, multi-region, multi-AF-column cap, ClinVar filters, trio zygosity join.
+- `GET /api_biofs_fuse/cohort_acmg` — batch variant of the above (still present for completeness; client now prefers per-proband parallel `variants` calls to avoid the Cloudflare 100 s edge timeout).
+
+The Mac CLI is now a pure API client. Zero `gcloud storage cp` invocations. `~/.biofs/cache/cravat/` is never written. Patient genomic bytes never traverse the laptop.
+
+### Server-side `immutable=1` URI fix
+
+gcsfuse-backed sqlite files fail plain `sqlite3.connect(path)` because sqlite's WAL handshake tries to lock the `-wal`/`-shm` sidecars and gcsfuse does not support shared write locks on FUSE-backed files. The server now opens with the `file:<path>?immutable=1` URI flag, which skips all WAL/journal/locking and works against read-only FUSE mounts. Verified working against `/mnt/gcsfuse-bioroutes/deepvariant-fastq-to-vcf-genobank-app/...`.
+
+## Removed (no longer needed; behaviour subsumed by the API)
+
+- `~/.biofs/cache/cravat/` (the offending cache directory). Cleared on disk; never re-created.
+- `src/commands/variants.ts` — `CACHE_DIR`, `ensureCacheDir`, `resolveOpencravatSqlite`, `downloadSqlite`, `buildPayload`, `PY_QUERY_SCRIPT`, `querySqlite`. ~225 lines deleted.
+- `src/commands/cohort-acmg.ts` — `CRAVAT_CACHE`, `fetchSqliteToCache`, `extractAcmgFindings`, `resolveOpencravatPath` (and the local Python sqlite query embedded in `extractAcmgFindings`). ~150 lines deleted.
+
+## Flag changes
+
+- `biofs variants --refresh` — now a no-op (kept for back-compat; the server reads fresh on every call).
+- `biofs variants --sqlite-uri <gs://>` — deprecated. The server resolves the sqlite via the bioroutes inventory only; use `--job-id <timestamp>` to disambiguate when multiple sqlites exist.
+- `biofs variants --with-acmg` — NEW. Attaches the ACMG-SVI evidence stack (single-tool PP3 + PVS1 + PM2 per Section 2.7 of the biofs-rrm paper) to each row.
+
+## How to upgrade
+
+```bash
+npm install -g @genobank/biofs@3.3.0
+```
+
+If you had `~/.biofs/cache/cravat/` from a previous version, delete it: `rm -rf ~/.biofs/cache/cravat/`. The directory will never be re-created.
+
 # v3.2.0 — Annotated-variant queries + Cosic-RRM Fourier scoring + family-status fix
 
 **Published**: 2026-05-20 (pending)

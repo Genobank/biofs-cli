@@ -19,9 +19,24 @@ export class BioCIDParser {
     };
   }
 
-  static generate(wallet: string, filename: string): string {
+  /**
+   * Build a canonical BioCID.
+   *
+   * BioRouter's promise is to be the oracle / source of truth for biodata
+   * origin, so we REFUSE to generate a biocid with an unknown origin prefix.
+   * Passing anything that isn't a 0x-prefixed 40-hex-char wallet or contract
+   * address produces a `resolver_err/*` prefix that's obviously broken and
+   * gets flagged by the caller, instead of the silent `unknown` sentinel
+   * that used to leak through (see biofiles resolver refactor · 2026-04-24).
+   */
+  static generate(origin: string, filename: string): string {
     const type = this.detectFileType(filename);
-    return `biocid://${wallet.toLowerCase()}/${type}/${filename}`;
+    const safe =
+      typeof origin === 'string' &&
+      /^0x[a-fA-F0-9]{40}$/.test(origin)
+        ? origin.toLowerCase()
+        : `resolver_err/${origin || 'missing-origin'}`;
+    return `biocid://${safe}/${type}/${filename}`;
   }
 
   static detectFileType(filename: string): string {

@@ -5,6 +5,7 @@ import { Logger } from '../lib/utils/logger';
 import { CONFIG } from '../lib/config/constants';
 import { BioFilesCacheManager } from '../lib/storage/biofiles-cache';
 import { BioCIDResolver } from '../lib/biofiles/resolver';
+import { ErrorReporter } from '../utils/errorReporter';
 import chalk from 'chalk';
 import * as readline from 'readline';
 
@@ -40,6 +41,10 @@ export async function loginCommand(options: LoginOptions): Promise<void> {
 
     // Initialize biofiles cache
     await initializeBioFilesCache(options.wallet);
+
+    ErrorReporter.reportEvent('session_start', 'login', options.wallet, {
+      flow: 'direct'
+    }).catch(() => { /* swallow */ });
 
     // Show success message
     Logger.box(
@@ -110,6 +115,12 @@ export async function loginCommand(options: LoginOptions): Promise<void> {
     // Initialize biofiles cache
     await initializeBioFilesCache(result.wallet);
 
+    // Fire-and-forget session_start telemetry so ops can see new installs.
+    // Does not block UX; fails silently. See ErrorReporter.reportEvent.
+    ErrorReporter.reportEvent('session_start', 'login', result.wallet, {
+      flow: 'browser'
+    }).catch(() => { /* swallow */ });
+
     // Show success message
     Logger.box(
       `Wallet: ${chalk.green(result.wallet)}\n\n` +
@@ -122,6 +133,10 @@ export async function loginCommand(options: LoginOptions): Promise<void> {
     );
 
     Logger.success(`Credentials saved to: ~/.biofs/credentials.json`);
+
+    // Belt-and-suspenders: explicitly exit so any lingering keep-alive
+    // sockets from the callback server cannot keep the event loop alive.
+    setImmediate(() => process.exit(0));
   } catch (error) {
     spinner.fail('Authentication failed');
     Logger.error(`Error: ${error}`);
@@ -252,6 +267,10 @@ async function headlessLogin(): Promise<void> {
 
     // Initialize biofiles cache
     await initializeBioFilesCache(wallet.trim());
+
+    ErrorReporter.reportEvent('session_start', 'login', wallet.trim(), {
+      flow: 'headless'
+    }).catch(() => { /* swallow */ });
 
     // Show success message
     Logger.box(

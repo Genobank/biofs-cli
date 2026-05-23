@@ -16,6 +16,9 @@ interface ErrorReport {
         os_version: string;
     };
     timestamp: string;
+    event_type?: 'error' | 'session_start';
+    locale?: string;
+    tz?: string;
 }
 
 export class ErrorReporter {
@@ -136,6 +139,65 @@ export class ErrorReporter {
 
         // Replace /Users/username or /home/username patterns
         return path.replace(/\/(Users|home)\/[^\/]+/g, '/~');
+    }
+
+    /**
+     * Emit a non-error event (e.g., session_start on successful login).
+     * Reuses the same telemetry endpoint & schema; sets event_type so the
+     * server-side admin query can filter error vs. lifecycle events.
+     */
+    static async reportEvent(
+        eventType: 'session_start',
+        command: string,
+        walletAddress?: string,
+        additionalContext?: Record<string, any>
+    ): Promise<void> {
+        if (process.env.BIOFS_TELEMETRY === 'false') return;
+        if (!this.enabled) return;
+
+        try {
+            const packageJsonPath = join(__dirname, '../../package.json');
+            let version = '3.0.1';
+            try {
+                const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+                version = packageJson.version;
+            } catch { /* fallback */ }
+
+            let locale: string | undefined;
+            let tz: string | undefined;
+            try {
+                locale = Intl.DateTimeFormat().resolvedOptions().locale;
+                tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            } catch { /* ignore */ }
+
+            const report: ErrorReport = {
+                biofs_version: version,
+                command,
+                error_message: `[${eventType}]`,  // server schema requires non-empty string
+                wallet_address: walletAddress,
+                system_info: {
+                    platform: os.platform(),
+                    arch: os.arch(),
+                    node_version: process.version,
+                    os_version: os.release()
+                },
+                timestamp: new Date().toISOString(),
+                event_type: eventType,
+                locale,
+                tz
+            };
+
+            if (additionalContext) {
+                (report as any).context = this.sanitizeContext(additionalContext);
+            }
+
+            await axios.post(this.TELEMETRY_ENDPOINT, report, {
+                timeout: 3000,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        } catch {
+            // Telemetry must never interrupt the user
+        }
     }
 
     /**

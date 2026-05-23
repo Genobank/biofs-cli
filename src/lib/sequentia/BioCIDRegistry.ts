@@ -13,7 +13,7 @@ import { ethers } from 'ethers';
 import { Logger } from '../utils/logger';
 
 // Sequentia Network Configuration
-const SEQUENTIA_RPC_URL = 'http://52.90.163.112:8545';
+const SEQUENTIA_RPC_URL = 'https://seqrpc.genobank.app';
 const SEQUENTIA_CHAIN_ID = 15132025;
 
 // Contract Addresses (deployed on Sequentia)

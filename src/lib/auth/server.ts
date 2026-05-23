@@ -130,8 +130,10 @@ export class CallbackServer {
         });
       }
 
-      // Close server after successful auth
-      setTimeout(() => this.stop(), 1000);
+      // Close server after successful auth. Node's keep-alive sockets (browser
+      // tab still holding connections open) would otherwise pin the event loop
+      // and prevent the CLI from exiting. Force them closed.
+      setTimeout(() => this.stop(), 500);
     });
 
     // Health check endpoint
@@ -149,6 +151,7 @@ export class CallbackServer {
       this.server = this.app.listen(port, () => {
         console.log(`🔐 Callback server listening on http://localhost:${port}`);
       });
+      this.server.unref();
 
       this.server.on('error', (error: any) => {
         if (error.code === 'EADDRINUSE') {
@@ -158,6 +161,7 @@ export class CallbackServer {
           this.server = this.app.listen(altPort, () => {
             console.log(`🔐 Callback server listening on http://localhost:${altPort}`);
           });
+          this.server.unref();
         } else {
           reject(error);
         }
@@ -178,6 +182,15 @@ export class CallbackServer {
     }
 
     if (this.server) {
+      // Force-close keep-alive sockets so Node's event loop can exit
+      // (Node >=18.2). server.close() alone waits for drain.
+      const srv = this.server as any;
+      if (typeof srv.closeAllConnections === 'function') {
+        try { srv.closeAllConnections(); } catch { /* ignore */ }
+      }
+      if (typeof srv.closeIdleConnections === 'function') {
+        try { srv.closeIdleConnections(); } catch { /* ignore */ }
+      }
       this.server.close();
       this.server = null;
     }
