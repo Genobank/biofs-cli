@@ -79,6 +79,18 @@ import { X402Network } from './types/x402';
 import { resolveCommand, ResolveOptions } from './commands/resolve';
 import { variantsCommand, VariantsOptions } from './commands/variants';
 import { fourierScoreCommand, FourierScoreOptions } from './commands/fourier-score';
+import { rrmConsensusCommand, RrmConsensusOptions } from './commands/rrm-consensus';
+import { rrmDistributionCommand, RrmDistributionOptions } from './commands/rrm-distribution';
+import { rrmTrainCommand, RrmTrainOptions } from './commands/rrm-train';
+import { cohortTrainCommand, CohortTrainOptions } from './commands/cohort-train';
+import { myvariantCommand, MyVariantOptions } from './commands/myvariant';
+import { cohortAcmgCommand, CohortAcmgOptions } from './commands/cohort-acmg';
+import { clinicalCommand, ClinicalOptions } from './commands/clinical';
+import { cohortFourierScoreCommand, CohortFourierScoreOptions } from './commands/cohort-fourier-score';
+import { biowalletCreateCommand, BiowalletCreateOptions } from './commands/biowallet/create';
+import { biowalletListCommand, BiowalletListOptions } from './commands/biowallet/list';
+import { biowalletBindCommand, BiowalletBindOptions } from './commands/biowallet/bind';
+import { familyCreateCommand, familyDeriveCommand, familyListCommand, FamilyCreateOptions, FamilyDeriveOptions, FamilyListOptions } from './commands/biowallet/family';
 import { matchCommand, MatchOptions } from './commands/match';
 import { ticketCommand, TicketOptions } from './commands/ticket';
 import { scanCommand, ScanOptions } from './commands/scan';
@@ -1422,6 +1434,301 @@ program
     }
   });
 
+// RRM-consensus — pre-compute Cosic characteristic frequency f_c from a
+// gene's functional family for downstream f_c-based variant scoring.
+program
+  .command('rrm-consensus <gene>')
+  .description('Compute Cosic-RRM characteristic frequency f_c via cross-spectrum of a gene\'s functional family')
+  .option('--source <family|orthologs>', 'Sequence source: Pfam family (default) or same-name orthologs', 'family')
+  .option('--taxonomy <id>', 'NCBI taxonomy id (default 7742 = Vertebrata)', '7742')
+  .option('--no-reviewed', 'Include TrEMBL entries (default: Swiss-Prot reviewed only)')
+  .option('--max <N>', 'Max sequences to pull (default 100)', '100')
+  .option('--uniprot <acc>', 'Override UniProt accession (for novel genes)')
+  .option('--pfam <id>', 'Override Pfam family (for novel genes)')
+  .option('--refresh', 'Re-fetch and recompute even if cached')
+  .option('--plot <path>', 'Render consensus spectrum to PNG with f_c annotated')
+  .option('--quiet', 'Suppress progress output')
+  .action(async (gene: string, options: RrmConsensusOptions) => {
+    try {
+      await rrmConsensusCommand(gene, options);
+    } catch (error) {
+      Logger.error(`RRM consensus failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Biowallet — mint and manage de-novo EIP-55 custodial biowallets for patients
+const biowalletCmd = program
+  .command('biowallet')
+  .description('Mint and manage de-novo EIP-55 custodial biowallets that patients can later claim');
+
+biowalletCmd
+  .command('create')
+  .description('Mint a fresh EIP-55 biowallet (random keypair, BIP-39 mnemonic, encrypted keystore)')
+  .option('--bind-biosample <serials>', 'Comma-separated biosample serials to bind to the new biowallet')
+  .option('--label <text>', 'Human-readable label (stored locally only, not on-chain)')
+  .option('--password <pw>', 'Keystore password; if omitted, a random one is generated and printed once')
+  .option('--out-dir <path>', 'Alternative output directory (default ~/.biofs/biowallets/)')
+  .option('--no-mnemonic-file', "Don't persist the mnemonic to disk (operator must transcribe at creation)")
+  .option('--json', 'Output as JSON (DANGER: includes secrets)')
+  .option('--quiet', 'Suppress progress output')
+  .action(async (options: BiowalletCreateOptions) => {
+    try {
+      await biowalletCreateCommand(options);
+    } catch (error) {
+      Logger.error(`Biowallet create failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+biowalletCmd
+  .command('list')
+  .description('List all local biowallets and their bound biosamples')
+  .option('--operator <wallet>', 'Filter by operator wallet address')
+  .option('--status <s>', 'Filter by status (operator-custodial | patient-claimed)')
+  .option('--biosample <serial>', 'Filter to wallets bound to a specific biosample')
+  .option('--short', 'Print addresses only, one per line')
+  .option('--json', 'Output as JSON')
+  .action(async (options: BiowalletListOptions) => {
+    try {
+      await biowalletListCommand(options);
+    } catch (error) {
+      Logger.error(`Biowallet list failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+biowalletCmd
+  .command('bind <address> <biosample>')
+  .description('Bind an existing local biowallet to a biosample serial')
+  .option('--json', 'Output as JSON')
+  .option('--quiet', 'Suppress progress output')
+  .action(async (address: string, biosample: string, options: BiowalletBindOptions) => {
+    try {
+      await biowalletBindCommand(address, biosample, options);
+    } catch (error) {
+      Logger.error(`Biowallet bind failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Family vault — BIP-32 HD wallet, one mnemonic deriving N child biowallets
+const familyCmd = biowalletCmd
+  .command('family')
+  .description('Family Vault: one BIP-32 master mnemonic deriving N child biowallets (m/44\'/60\'/0\'/0/index)');
+
+familyCmd
+  .command('create')
+  .description('Create a new family vault with optional initial members')
+  .option('--label <text>', 'Human-readable label for the family')
+  .option('--password <pw>', 'Keystore password (random if omitted)')
+  .option('--members <list>', 'Comma-separated initial members in "role:biosample[:label]" format (e.g. mother:56102007614179,father:56102007614180,child:56102007614196,child:56102007614194)')
+  .option('--no-mnemonic-file', "Don't persist the master mnemonic to disk")
+  .option('--json', 'Output as JSON (DANGER: includes master mnemonic)')
+  .option('--quiet', 'Suppress progress output')
+  .action(async (options: FamilyCreateOptions) => {
+    try {
+      await familyCreateCommand(options);
+    } catch (error) {
+      Logger.error(`Family create failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+familyCmd
+  .command('derive <family_id> <index>')
+  .description('Derive an additional member at a specific index in an existing family vault')
+  .option('--role <text>', 'Role label (mother, father, child_1, etc.)')
+  .option('--bind-biosample <serials>', 'Comma-separated biosample serials to bind')
+  .option('--label <text>', 'Human-readable label')
+  .option('--json', 'Output as JSON')
+  .option('--quiet', 'Suppress progress output')
+  .action(async (familyId: string, index: string, options: FamilyDeriveOptions) => {
+    try {
+      await familyDeriveCommand(familyId, index, options);
+    } catch (error) {
+      Logger.error(`Family derive failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+familyCmd
+  .command('list [family_id]')
+  .description('List family vaults (and members if a family_id is given)')
+  .option('--json', 'Output as JSON')
+  .action(async (familyId: string | undefined, options: FamilyListOptions) => {
+    try {
+      await familyListCommand(familyId, options);
+    } catch (error) {
+      Logger.error(`Family list failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// RRM-distribution — pull ClinVar classified missense for a gene and rank
+// patient variants against the empirical distribution.
+program
+  .command('rrm-distribution <gene>')
+  .description('Pull ClinVar classified missense for a gene and compute Cosic-RRM features for each, with optional patient-variant highlight and optional gnomAD pseudo-benign synthesis')
+  .option('--highlight <variants>', 'Comma-separated HGVS protein changes to mark on the distribution (e.g. ITGA2B:p.Val779Ala,ITGA2B:p.Leu225Arg)')
+  .option('--retmax <N>', 'Max ClinVar IDs to pull (default 10000; ClinVar VUS / Conflicting are excluded server-side)', '10000')
+  .option('--gnomad-benigns <N>', 'Synthesize N pseudo-benign control variants from gnomAD common missense (e.g. 40 for rare-disease genes whose ClinVar B+LB is empty)')
+  .option('--gnomad-min-af <af>', 'gnomAD AF threshold for pseudo-benign eligibility (default 0.01)', '0.01')
+  .option('--plot <path>', 'Render 4-panel distribution figure to PNG')
+  .option('--refresh', 'Re-fetch and recompute even if cached')
+  .option('--quiet', 'Suppress progress output')
+  .action(async (gene: string, options: RrmDistributionOptions) => {
+    try {
+      await rrmDistributionCommand(gene, options);
+    } catch (error) {
+      Logger.error(`RRM distribution failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Clinical — phenotype-driven multi-exome ACMG classifier for a single proband
+// (n-of-1 or joint-N exomes from the same individual). Complements `cohort-acmg`
+// which is batch-mode across many probands but only emits ClinVar P/LP.
+program
+  .command('clinical <biosample_serial>')
+  .description('Phenotype-driven, multi-exome ACMG/AMP 2015 + ClinGen-SVI 2024 classifier. Provide a primary biosample serial, optional --serials list (joint-N exomes), and phenotype context (--phenotype words OR --hpo codes; --photo optional). Returns P/LP/VUS/LB/B with per-variant evidence stacks. Server-side, NFT-gated, no genomic bytes on laptop.')
+  .option('--serials <list>', 'Comma-separated additional biosample serials for joint analysis (all assumed same individual)')
+  .option('--hpo <codes>', 'Comma-separated HPO codes, e.g. HP:0000924,HP:0002659')
+  .option('--phenotype <text>', 'Free-text phenotype description (mapped to HPO via local HPOA annotations)')
+  .option('--photo <path>', 'Patient photo for Face2Gene-style syndrome prediction (graceful fallback if server lacks API key)')
+  .option('--panel <name>', 'Gene panel name: skeletal_dysplasia (default), or none for HPO-only', 'skeletal_dysplasia')
+  .option('--max-af <af>', 'gnomAD AF ceiling (default 0.01)', '0.01')
+  .option('--output <dir>', 'Output directory (default ./clinical_reports/)')
+  .option('--case-label <label>', 'Privacy-safe label for the case (no proper names per CLAUDE.md). Default proband-<wallet-prefix>.')
+  .option('--format <fmt>', 'json | html | both (default both)', 'both')
+  .option('--quiet', 'Suppress progress output')
+  .option('--debug', 'Print full server response on error')
+  .action(async (biosample: string, options: ClinicalOptions) => {
+    try {
+      await clinicalCommand(biosample, options);
+    } catch (error) {
+      Logger.error(`clinical failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Cohort-acmg — batch ACMG/SVI-compliant processor for an n-of-many cohort
+program
+  .command('cohort-acmg')
+  .description('Batch process a cohort of biosample serials: mint biowallets (idempotent), extract ClinVar P+LP, apply ACMG-SVI evidence stacks per Section 2.7 of the biofs-rrm paper. Output keyed on biowallet (operator-private serial mapping preserved).')
+  .option('--serials <file>', 'File with one biosample serial per line (required)')
+  .option('--output <dir>', 'Output directory for per-biowallet JSON reports (default ./cohort_acmg_reports/)')
+  .option('--limit <N>', 'Process at most N serials (0 = all)', '0')
+  .option('--skip-existing', 'Skip serials whose per-biowallet report already exists')
+  .option('--quiet', 'Suppress per-proband progress spinners')
+  .action(async (options: CohortAcmgOptions) => {
+    try {
+      await cohortAcmgCommand(options);
+    } catch (error) {
+      Logger.error(`cohort-acmg failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Cohort-fourier-score — per-patient × per-variant Cosic-RRM spectral scoring,
+// the missing rung between single-variant `biofs fourier-score` and the
+// per-gene ClinVar `biofs cohort-train`. Section 14.4 of the biofs-rrm paper
+// proposes this verb explicitly. Server-side, NFT-gated, gcsfuse-mounted.
+program
+  .command('cohort-fourier-score')
+  .description('Cohort-scale Cosic-RRM (EIIP + DFT) spectral scoring: for each biosample serial, extract rare missense variants, compute the five Cosic metrics (windowed Σ|ΔF|, windowed ΔE%, full-spectrum L1, f_c ratio, weighted aggregate ΔE%) against the cached family characteristic frequency, return per-biowallet score matrices. Server-side, NFT-gated, zero genomic bytes on laptop.')
+  .option('--serials <file>', 'File with one biosample serial per line (mutually exclusive with --from-acmg)')
+  .option('--from-acmg <path>', 'Recover serials from a prior `biofs cohort-acmg` cohort_summary.json via the operator-private biowallet index (recommended path)')
+  .option('--output <dir>', 'Output directory for per-biowallet JSON reports (default ./cohort_fourier_reports/)')
+  .option('--limit <N>', 'Process at most N serials (0 = all)', '0')
+  .option('--max-af <af>', 'gnomAD AF ceiling for rare-missense filter (default 0.01)', '0.01')
+  .option('--am-threshold <s>', 'AlphaMissense threshold for the --include-high-am rule (default 0.5)', '0.5')
+  .option('--include-vus', 'Also score ClinVar VUS variants (otherwise ClinVar P/LP only)')
+  .option('--include-high-am', 'Also score variants with AlphaMissense ≥ --am-threshold even if absent from ClinVar')
+  .option('--window <N>', 'Window size (residues) for the centered Σ|ΔF| (default 31)')
+  .option('--window-tm <N>', 'Window size for variants in transmembrane regions (default 51)')
+  .option('--skip-existing', 'Skip serials whose per-biowallet report already exists')
+  .option('--quiet', 'Suppress per-proband progress spinners')
+  .action(async (options: CohortFourierScoreOptions) => {
+    try {
+      await cohortFourierScoreCommand(options);
+    } catch (error) {
+      Logger.error(`cohort-fourier-score failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// MyVariant — standalone interface to MyVariant.info v1 API
+program
+  .command('myvariant [id_or_query]')
+  .description('Query MyVariant.info v1: single variant, batch from file, gene-wide, or raw /query expression')
+  .option('--batch <file>', 'Batch lookup from a file with one ID (HGVS or rsID) per line')
+  .option('--gene <symbol>', 'Fetch variants in a gene via /query (uses dbnsfp/clinvar/snpeff gene_name)')
+  .option('--query', 'Treat the positional argument as a raw /query expression')
+  .option('--fields <list>', 'Comma-separated MyVariant.info field paths (overrides presets)')
+  .option('--predictors', 'Shortcut for AM/REVEL/PrimateAI/EVE/ESM1b/CADD/MetaRNN/BayesDel/ClinPred')
+  .option('--clinical', 'Shortcut for ClinVar/COSMIC/gnomAD/1000G/ExAC/EMV')
+  .option('--basic', 'Shortcut for dbSNP rsID/HGVS/VCF/SnpEff annotations')
+  .option('--all', 'Predictors + clinical + basic')
+  .option('--assembly <hg19|hg38>', 'Assembly for HGVS-coordinate queries (informational)', 'hg38')
+  .option('--limit <N>', 'Max records for /gene or /query mode (default 500 gene, 200 query)')
+  .option('--json', 'Output raw JSON')
+  .option('--csv', 'Output as CSV')
+  .option('--tsv', 'Output as TSV')
+  .option('--out-file <path>', 'Write output to file instead of stdout')
+  .option('--quiet', 'Suppress progress spinner')
+  .action(async (idArg: string | undefined, options: MyVariantOptions) => {
+    try {
+      await myvariantCommand(idArg, options);
+    } catch (error) {
+      Logger.error(`MyVariant query failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Cohort-train — apply the rrm-consensus + rrm-distribution + rrm-train pipeline
+// across a cohort of disease genes to characterize Cosic-RRM's applicability domain
+program
+  .command('cohort-train')
+  .description('Multi-gene benchmark: run rrm-consensus + rrm-distribution + rrm-train across a cohort and report per-gene AUC deltas')
+  .option('--genes <list>', 'Comma-separated gene symbols')
+  .option('--gene-file <path>', 'File with one gene symbol per line (lines starting with # are comments)')
+  .option('--min-train <N>', 'Skip genes with fewer than N labeled training variants (default 8)', '8')
+  .option('--ortholog-source <s>', 'rrm-consensus --source value (default "orthologs")', 'orthologs')
+  .option('--refresh-consensus', 'Re-fetch UniProt orthologs and recompute consensus even if cached')
+  .option('--refresh-distribution', 'Re-fetch ClinVar variants and recompute distribution even if cached')
+  .option('--gnomad-benigns <N>', 'Synthesize N pseudo-benign control variants per gene from gnomAD common missense (unlocks AUC benchmarking on rare-disease genes whose ClinVar B+LB is empty)')
+  .option('--gnomad-min-af <af>', 'gnomAD AF threshold for pseudo-benign eligibility (default 0.01)', '0.01')
+  .option('--output <path>', 'JSON manifest output path (default ~/.biofs/cache/rrm/cohort_<hash>.json)')
+  .option('--plot <path>', 'Render 3-panel cohort benchmark figure to PNG')
+  .option('--quiet', 'Suppress per-gene progress output')
+  .action(async (options: CohortTrainOptions) => {
+    try {
+      await cohortTrainCommand(options);
+    } catch (error) {
+      Logger.error(`Cohort training failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// RRM-train — XGBoost ensemble combining Cosic-RRM with deep-learning predictors
+program
+  .command('rrm-train <gene>')
+  .description('Train XGBoost ensemble combining Cosic-RRM features with AlphaMissense/REVEL/PrimateAI for variant pathogenicity prediction')
+  .option('--predict <variants>', 'Comma-separated HGVS protein changes to predict (e.g. ITGA2B:p.Val779Ala,ITGA2B:p.Leu225Arg)')
+  .option('--folds <N>', 'Stratified CV folds (default 5)', '5')
+  .option('--plot <path>', 'Render ROC curves + feature importance to PNG')
+  .option('--refresh', 'Re-fetch MyVariant.info scores even if cached')
+  .option('--quiet', 'Suppress progress output')
+  .action(async (gene: string, options: RrmTrainOptions) => {
+    try {
+      await rrmTrainCommand(gene, options);
+    } catch (error) {
+      Logger.error(`RRM training failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
 // Fourier-score — Cosic RRM EIIP+DFT biophysical scoring of missense variants
 program
   .command('fourier-score <variants>')
@@ -1431,7 +1738,9 @@ program
   .option('--uniprot <accession>', 'Override UniProt accession (for single variant or unknown gene)')
   .option('--format <type>', 'Output format: table | tsv | json (default: table)', 'table')
   .option('--output <path>', 'Write output to file instead of stdout')
-  .option('--plot <path>', 'Render |ΔF| spectrum to PNG (one panel per variant)')
+  .option('--plot <path>', 'Render |ΔF| windowed spectrum to PNG (one panel per variant)')
+  .option('--consensus-fc', 'Also score full-protein DFT at family characteristic frequency f_c (requires `biofs rrm-consensus <gene>` first)')
+  .option('--plot-full <path>', 'Render full-protein |X(k)| spectrum to PNG with f_c annotated (requires --consensus-fc)')
   .option('--quiet', 'Suppress progress output')
   .action(async (variants: string, options: FourierScoreOptions) => {
     try {
@@ -1454,11 +1763,13 @@ program
   .option('--columns <names>', 'Comma-separated annotator columns to display (default panel)')
   .option('--format <type>', 'Output format: table | tsv | json (default: table)', 'table')
   .option('--output <path>', 'Write output to file instead of stdout')
-  .option('--refresh', 'Re-download sqlite even if cached')
-  .option('--sqlite-uri <gsuri>', 'Override biorouter resolution with an explicit gs://....sqlite URI')
-  .option('--job-id <timestamp>', 'Require a specific OC job timestamp (e.g. 260411-053533)')
+  .option('--refresh', 'No-op (kept for back-compat; variants now runs server-side, no local cache)')
+  .option('--sqlite-uri <gsuri>', 'Deprecated: no longer supported (server-side runs against bioroutes inventory only)')
+  .option('--job-id <timestamp>', 'Pick a specific OC job timestamp (e.g. 260411-053533) when multiple sqlites exist')
+  .option('--with-acmg', 'Attach ACMG-SVI evidence stack per Section 2.7 to each row (single-tool PP3 + PVS1 + PM2)')
+  .option('--limit <n>', 'Cap rows returned by the server (handy for fast probes of a large sqlite)')
   .option('--quiet', 'Suppress progress output')
-  .option('--debug', 'Show route-resolver stdout for debugging')
+  .option('--debug', 'Show server resolution debug info')
   .action(async (biosampleSerial: string, options: VariantsOptions) => {
     try {
       await variantsCommand(biosampleSerial, options);

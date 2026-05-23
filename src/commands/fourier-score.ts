@@ -47,17 +47,21 @@ const AA_3_TO_1: Record<string, string> = {
 };
 
 // Canonical UniProt accessions for genes we support out-of-the-box
-const GENE_TO_UNIPROT: Record<string, string> = {
-  ITGA2B: 'P08514',
-  ITGB3: 'P05106',
-  // Extend as needed; users can pass --uniprot to override
-};
+import { GENE_TO_UNIPROT } from '../lib/gene-map';
+
 
 // UniProt-feature TM regions for known genes (inclusive 1-based residue ranges).
 // Variants inside these ranges get the wider N=51 window by default.
 const TM_REGIONS: Record<string, [number, number]> = {
   ITGA2B: [988, 1009],
-  ITGB3: [716, 738],
+  ITGB3:  [716, 738],
+  // Tetraspanin-6 has four TM helices (UniProt O43657 feature lines)
+  TSPAN6: [12, 32],     // TM1 (we annotate the first; runtime widening for any in the protein)
+  // COL27A1 is secreted, no TM
+  // NRCAM single-pass TM
+  NRCAM:  [1117, 1137],
+  // PGAP1 is an ER-membrane multipass
+  PGAP1:  [11, 31],
 };
 
 export interface FourierScoreOptions {
@@ -66,7 +70,9 @@ export interface FourierScoreOptions {
   uniprot?: string;       // override UniProt accession (single-variant mode)
   format?: string;        // table | tsv | json
   output?: string;
-  plot?: string;          // path to write |ΔF| spectrum PNG (one panel per variant)
+  plot?: string;          // path to write |ΔF| windowed-spectrum PNG (one panel per variant)
+  consensusFc?: boolean;  // also compute full-protein DFT at consensus f_c (requires `biofs rrm-consensus` cache)
+  plotFull?: string;      // path to write full-protein |X(k)| spectrum PNG with f_c annotated
   quiet?: boolean;
 }
 
@@ -226,6 +232,173 @@ interface ScoreRow {
   deltaVectorDetrended: number[];
   wtSeq: string;
   mtSeq: string;
+  // Full-protein f_c scoring (Cosic's canonical RRM metric, only set when --consensus-fc)
+  fcBin?: number;
+  fcFreqNormalized?: number;
+  fcPeriodAa?: number;
+  fullXwtAtFc?: number;
+  fullXmtAtFc?: number;
+  fcRatio?: number;            // |X_MT(f_c)| / |X_WT(f_c)| — values <1 indicate loss-of-function signature
+  fcDelta?: number;            // |X_WT(f_c)| - |X_MT(f_c)|
+  fcEnergyChangePct?: number;  // 100 × (|X_MT(f_c)|² - |X_WT(f_c)|²) / |X_WT(f_c)|²
+  fullSpectrumWt?: number[];   // saved for plot
+  fullSpectrumMt?: number[];
+}
+
+interface ConsensusCache {
+  gene: string;
+  uniprot: string;
+  characteristic_frequency_bin: number;
+  characteristic_frequency_normalized: number;
+  characteristic_frequency_period_aa: number;
+  common_length: number;
+  consensus_peak_bins: Array<{ bin: number; freq_normalized: number; magnitude: number }>;
+  signal_to_noise_ratio: number;
+}
+
+function loadConsensus(gene: string): ConsensusCache {
+  const cachePath = path.join(os.homedir(), '.biofs', 'cache', 'rrm', `${gene}.json`);
+  if (!fs.existsSync(cachePath)) {
+    throw new Error(
+      `No consensus f_c cached for ${gene}. Run first: biofs rrm-consensus ${gene}\n` +
+      `(expected at ${cachePath})`
+    );
+  }
+  return JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+}
+
+interface FullProteinFftResult {
+  wtMag: number[];
+  mtMag: number[];
+  wtAtFc: number;
+  mtAtFc: number;
+  fcBinInProteinSpectrum: number;
+}
+
+interface MultiPeakScore {
+  bin: number;
+  period: number;
+  consensusSnr: number;
+  consensusMagnitude: number;
+  wtMagnitude: number;
+  mtMagnitude: number;
+  ratio: number;
+  energyChangePct: number;
+}
+
+interface ExtendedFullProteinFftResult extends FullProteinFftResult {
+  multiPeakScores?: MultiPeakScore[];
+  weightedAggregateDeltaEPct?: number;
+  fullSpectrumL1?: number;
+  totalEnergyChangePct?: number;
+}
+
+function computeFullProteinFft(
+  fullWt: string,
+  fullMt: string,
+  fcFreqNormalized: number,
+  commonLength: number,
+  consensusPeaks?: Array<{ bin: number; freq_normalized: number; magnitude: number; snr?: number }>,
+  consensusSpectrum?: number[],
+): ExtendedFullProteinFftResult {
+  const py = `
+import json, sys, numpy as np
+
+EIIP = {
+    'A': 0.0373, 'R': 0.0959, 'N': 0.0036, 'D': 0.1263, 'C': 0.0829,
+    'E': 0.0058, 'Q': 0.0761, 'G': 0.0050, 'H': 0.0242, 'I': 0.0000,
+    'L': 0.0000, 'K': 0.0371, 'M': 0.0823, 'F': 0.0946, 'P': 0.0198,
+    'S': 0.0829, 'T': 0.0941, 'W': 0.0548, 'Y': 0.0516, 'V': 0.0057,
+}
+
+d = json.loads(sys.stdin.read())
+
+def encode(seq, target_len):
+    s = seq[:target_len]
+    if len(s) < target_len:
+        s = s + 'X' * (target_len - len(s))
+    v = np.array([EIIP.get(aa, 0.0) for aa in s], dtype=float)
+    return v - v.mean()
+
+wt_eiip = encode(d['wt'], d['common_length'])
+mt_eiip = encode(d['mt'], d['common_length'])
+
+Xw = np.abs(np.fft.rfft(wt_eiip))
+Xm = np.abs(np.fft.rfft(mt_eiip))
+# Normalize each to unit total energy so the result is comparable to the
+# consensus magnitudes (which were also unit-normalized).
+if Xw.sum() > 0: Xw = Xw / Xw.sum()
+if Xm.sum() > 0: Xm = Xm / Xm.sum()
+
+# The consensus f_c was computed on a spectrum of length common_length // 2 + 1
+# in the same normalization (cycles/residue). Our full-protein DFT has the
+# same axis, so we look up the bin directly.
+N = len(Xw)
+fc_bin = int(round(d['fc_freq'] * 2 * (N - 1)))
+fc_bin = max(0, min(N - 1, fc_bin))
+
+# Multi-peak scoring: if the caller passed consensus_peaks, score at each.
+multi_peak = []
+weighted_num = 0.0
+weighted_den = 0.0
+consensus_peaks = d.get('consensus_peaks') or []
+for p in consensus_peaks:
+    k = int(p['bin'])
+    if k >= N: continue
+    xw, xm = float(Xw[k]), float(Xm[k])
+    ratio = xm / xw if xw > 0 else 0.0
+    de = 100.0 * (xm*xm - xw*xw) / (xw*xw) if xw > 0 else 0.0
+    mag = float(p.get('magnitude', 0))
+    snr = float(p.get('snr', 0))
+    multi_peak.append({
+        'bin': k,
+        'period': 1.0 / (k / (2*(N-1))) if k > 0 else 0,
+        'consensusSnr': snr,
+        'consensusMagnitude': mag,
+        'wtMagnitude': xw,
+        'mtMagnitude': xm,
+        'ratio': ratio,
+        'energyChangePct': de,
+    })
+    weighted_num += mag * de
+    weighted_den += mag
+
+weighted_agg = weighted_num / weighted_den if weighted_den > 0 else 0.0
+
+# Full-spectrum integrated metrics (Cosic-style "informational spectrum distance")
+spec_l1 = float(np.sum(np.abs(Xm - Xw)))
+total_e_wt = float(np.sum(Xw**2))
+total_e_mt = float(np.sum(Xm**2))
+total_de_pct = 100.0 * (total_e_mt - total_e_wt) / total_e_wt if total_e_wt > 0 else 0.0
+
+out = {
+    'wtMag': Xw.tolist(),
+    'mtMag': Xm.tolist(),
+    'wtAtFc': float(Xw[fc_bin]),
+    'mtAtFc': float(Xm[fc_bin]),
+    'fcBinInProteinSpectrum': fc_bin,
+    'multiPeakScores': multi_peak,
+    'weightedAggregateDeltaEPct': weighted_agg,
+    'fullSpectrumL1': spec_l1,
+    'totalEnergyChangePct': total_de_pct,
+}
+print(json.dumps(out))
+`;
+  const r = spawnSync('python3', ['-c', py], {
+    encoding: 'utf8',
+    input: JSON.stringify({
+      wt: fullWt,
+      mt: fullMt,
+      common_length: commonLength,
+      fc_freq: fcFreqNormalized,
+      consensus_peaks: consensusPeaks || [],
+    }),
+    maxBuffer: 50 * 1024 * 1024,
+  });
+  if (r.status !== 0) {
+    throw new Error(`Full-protein FFT failed: ${r.stderr || r.stdout}`);
+  }
+  return JSON.parse(r.stdout);
 }
 
 function scoreOne(parsed: ParsedHGVS, opts: FourierScoreOptions): ScoreRow {
@@ -258,7 +431,7 @@ function scoreOne(parsed: ParsedHGVS, opts: FourierScoreOptions): ScoreRow {
   const mtVec = toEIIPVector(mtSeq);
   const fft = computeFft(wtVec, mtVec);
 
-  return {
+  const row: ScoreRow = {
     variant: parsed.original,
     gene: parsed.gene,
     pos: parsed.pos,
@@ -283,6 +456,163 @@ function scoreOne(parsed: ParsedHGVS, opts: FourierScoreOptions): ScoreRow {
     wtSeq,
     mtSeq,
   };
+
+  // Cosic RRM canonical scoring at the family characteristic frequency
+  // (with multi-peak + full-spectrum integrated metrics).
+  if (opts.consensusFc) {
+    if (!parsed.gene) {
+      throw new Error(`--consensus-fc requires a gene name in the HGVS (e.g. ITGA2B:p.Val779Ala)`);
+    }
+    const cons = loadConsensus(parsed.gene);
+    const consensusSpectrum: number[] | undefined = (cons as any).consensus_spectrum;
+    // Surface the top consensus peaks as scoring sites. If the cached file
+    // only has one (strict 3σ threshold filtered the rest), augment by
+    // walking the full consensus spectrum and grabbing the top-10 bins.
+    let peaksWithSnr = (cons.consensus_peak_bins || []).map(p => ({
+      bin: p.bin,
+      freq_normalized: p.freq_normalized,
+      magnitude: p.magnitude,
+      snr: 0,
+    }));
+    if (peaksWithSnr.length < 10 && consensusSpectrum) {
+      const ranked = consensusSpectrum
+        .map((m, k) => ({ k, m }))
+        .filter(({ k }) => k >= 2)
+        .sort((a, b) => b.m - a.m)
+        .slice(0, 10);
+      const N = consensusSpectrum.length;
+      const median = ((arr: number[]) => {
+        const s = [...arr].sort((a, b) => a - b);
+        return s.length % 2 === 0 ? (s[s.length / 2 - 1] + s[s.length / 2]) / 2 : s[(s.length - 1) / 2];
+      })(consensusSpectrum);
+      const mean = consensusSpectrum.reduce((a, b) => a + b, 0) / consensusSpectrum.length;
+      const sd = Math.sqrt(consensusSpectrum.reduce((a, b) => a + (b - mean) ** 2, 0) / consensusSpectrum.length);
+      peaksWithSnr = ranked.map(({ k, m }) => ({
+        bin: k,
+        freq_normalized: k / (2 * (N - 1)),
+        magnitude: m,
+        snr: (m - median) / (sd + 1e-12),
+      }));
+    }
+
+    // Build the full mutant sequence by swapping the one residue at parsed.pos.
+    const mtFull = seq.slice(0, parsed.pos - 1) + parsed.alt + seq.slice(parsed.pos);
+    const full = computeFullProteinFft(
+      seq,
+      mtFull,
+      cons.characteristic_frequency_normalized,
+      cons.common_length,
+      peaksWithSnr,
+      consensusSpectrum,
+    );
+
+    row.fcBin = full.fcBinInProteinSpectrum;
+    row.fcFreqNormalized = cons.characteristic_frequency_normalized;
+    row.fcPeriodAa = cons.characteristic_frequency_period_aa;
+    row.fullXwtAtFc = full.wtAtFc;
+    row.fullXmtAtFc = full.mtAtFc;
+    row.fcRatio = full.wtAtFc > 0 ? full.mtAtFc / full.wtAtFc : 0;
+    row.fcDelta = full.wtAtFc - full.mtAtFc;
+    row.fcEnergyChangePct = full.wtAtFc > 0
+      ? 100 * (full.mtAtFc * full.mtAtFc - full.wtAtFc * full.wtAtFc) / (full.wtAtFc * full.wtAtFc)
+      : 0;
+    row.fullSpectrumWt = full.wtMag;
+    row.fullSpectrumMt = full.mtMag;
+    (row as any).multiPeakScores = full.multiPeakScores;
+    (row as any).weightedAggregateDeltaEPct = full.weightedAggregateDeltaEPct;
+    (row as any).fullSpectrumL1 = full.fullSpectrumL1;
+    (row as any).totalEnergyChangePct = full.totalEnergyChangePct;
+  }
+
+  return row;
+}
+
+function renderFcSection(rows: ScoreRow[]): string {
+  if (!rows.some(r => r.fcRatio !== undefined)) return '';
+  const lines: string[] = [];
+  const sep = '━'.repeat(120);
+  lines.push('');
+  lines.push(chalk.magenta(sep));
+  lines.push(chalk.bold.magenta('  Cosic-RRM full-protein scoring at family characteristic frequency f_c'));
+  lines.push(chalk.magenta(sep));
+  lines.push(
+    chalk.bold(
+      'variant'.padEnd(30) +
+        'f_c bin'.padEnd(10) +
+        'period (aa)'.padEnd(13) +
+        '|X_WT(f_c)|'.padEnd(14) +
+        '|X_MT(f_c)|'.padEnd(14) +
+        'ratio MT/WT'.padEnd(13) +
+        'ΔE @ f_c'
+    )
+  );
+  lines.push(chalk.magenta('-'.repeat(120)));
+  for (const r of rows) {
+    if (r.fcRatio === undefined) continue;
+    const ratio = r.fcRatio;
+    const ratioStr = ratio.toFixed(4);
+    const ratioColor = ratio < 0.8 ? chalk.red : ratio > 1.2 ? chalk.yellow : chalk.white;
+    lines.push(
+      r.variant.padEnd(30) +
+        String(r.fcBin).padEnd(10) +
+        (r.fcPeriodAa ?? 0).toFixed(2).padEnd(13) +
+        (r.fullXwtAtFc ?? 0).toExponential(3).padEnd(14) +
+        (r.fullXmtAtFc ?? 0).toExponential(3).padEnd(14) +
+        ratioColor(ratioStr.padEnd(13)) +
+        ((r.fcEnergyChangePct ?? 0).toFixed(2) + '%')
+    );
+  }
+  lines.push(chalk.magenta(sep));
+  lines.push(chalk.gray('   ratio MT/WT  <0.8 = significant loss of energy at characteristic frequency (LoF signature)'));
+  lines.push(chalk.gray('                ≈1.0 = no perturbation of family-conserved resonance'));
+  lines.push(chalk.gray('                >1.2 = energy gain (rare, may indicate altered specificity)'));
+
+  // Multi-peak + full-spectrum integrated metrics (Cosic's "informational spectrum distance")
+  for (const r of rows) {
+    const mps = (r as any).multiPeakScores as MultiPeakScore[] | undefined;
+    if (!mps || mps.length === 0) continue;
+    lines.push('');
+    lines.push(chalk.magenta('-'.repeat(120)));
+    lines.push(chalk.bold(`  Per-peak Cosic-RRM scoring  ${r.variant}`));
+    lines.push(
+      chalk.gray(
+        '    ' +
+          'k'.padStart(5) +
+          'period'.padStart(10) +
+          'SNR'.padStart(8) +
+          '|X_WT|'.padStart(14) +
+          '|X_MT|'.padStart(14) +
+          'ratio'.padStart(10) +
+          'ΔE%'.padStart(10)
+      )
+    );
+    for (const p of mps.slice(0, 10)) {
+      const ratioStr = p.ratio.toFixed(4);
+      const deStr = (p.energyChangePct >= 0 ? '+' : '') + p.energyChangePct.toFixed(2) + '%';
+      const color = Math.abs(p.energyChangePct) > 5 ? chalk.red : Math.abs(p.energyChangePct) > 2 ? chalk.yellow : chalk.gray;
+      lines.push(
+        '    ' +
+          String(p.bin).padStart(5) +
+          p.period.toFixed(1).padStart(10) +
+          (p.consensusSnr.toFixed(2) + 'σ').padStart(8) +
+          p.wtMagnitude.toExponential(2).padStart(14) +
+          p.mtMagnitude.toExponential(2).padStart(14) +
+          color(ratioStr.padStart(10)) +
+          color(deStr.padStart(10))
+      );
+    }
+    const wagg = (r as any).weightedAggregateDeltaEPct;
+    const l1 = (r as any).fullSpectrumL1;
+    const tde = (r as any).totalEnergyChangePct;
+    if (wagg !== undefined) {
+      lines.push('');
+      lines.push(chalk.magenta('    Summary metrics:'));
+      lines.push(`      weighted aggregate ΔE% (top-N peaks): ${(wagg >= 0 ? '+' : '') + wagg.toFixed(4)}%`);
+      lines.push(`      full-spectrum L1 distance:            ${l1.toExponential(4)}`);
+      lines.push(`      total energy change:                  ${(tde >= 0 ? '+' : '') + tde.toFixed(4)}%`);
+    }
+  }
+  return lines.join('\n');
 }
 
 function renderTable(rows: ScoreRow[]): string {
@@ -388,18 +718,77 @@ export async function fourierScoreCommand(variantsArg: string, opts: FourierScor
     rendered = renderTable(rows);
   }
 
+  // Append the Cosic-RRM f_c section if any rows have it
+  const fcSection = renderFcSection(rows);
+
   if (opts.output) {
-    fs.writeFileSync(opts.output, rendered.replace(/\x1b\[[0-9;]*m/g, ''));
+    fs.writeFileSync(opts.output, (rendered + '\n' + fcSection).replace(/\x1b\[[0-9;]*m/g, ''));
     if (!opts.quiet) {
       console.error(chalk.green(`✓ Wrote scores for ${rows.length} variant(s) to ${opts.output}`));
     }
   } else {
     console.log(rendered);
+    if (fcSection) console.log(fcSection);
   }
 
   if (opts.plot) {
     plotSpectra(rows, opts.plot, opts.quiet || false);
   }
+  if (opts.plotFull && rows.some(r => r.fullSpectrumWt)) {
+    plotFullProteinSpectra(rows, opts.plotFull, opts.quiet || false);
+  }
+}
+
+function plotFullProteinSpectra(rows: ScoreRow[], outPath: string, quiet: boolean): void {
+  const py = `
+import json, sys
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+
+d = json.loads(sys.stdin.read())
+rows = [r for r in d["rows"] if r.get("fullSpectrumWt")]
+n = len(rows)
+fig, axes = plt.subplots(n, 1, figsize=(12, 3.8 * n), squeeze=False)
+
+for i, r in enumerate(rows):
+    ax = axes[i, 0]
+    Xw = np.array(r["fullSpectrumWt"])
+    Xm = np.array(r["fullSpectrumMt"])
+    freqs = np.linspace(0, 0.5, len(Xw))
+    ax.plot(freqs, Xw, color="#1f77b4", linewidth=0.9, label="|X_WT(k)|", alpha=0.9)
+    ax.plot(freqs, Xm, color="#d62728", linewidth=0.9, label="|X_MT(k)|", alpha=0.9, linestyle="--")
+    fc_freq = r["fcFreqNormalized"]
+    ax.axvline(fc_freq, color="#2ca02c", linewidth=1.2, linestyle=":", label=f"f_c = {fc_freq:.4f} (period {r['fcPeriodAa']:.1f} aa)")
+    # Zoom in to the low-frequency region where f_c lives
+    ax.set_xlim(0, max(0.05, fc_freq * 8))
+    ax.set_xlabel("normalized frequency (cycles/residue)")
+    ax.set_ylabel("|X(k)| (unit-energy normalized)")
+    ratio = r["fcRatio"]
+    de = r["fcEnergyChangePct"]
+    ax.set_title(
+        f"{r['variant']}  ({r['ref']}{r['pos']}{r['alt']})    "
+        f"|X_WT(f_c)|={r['fullXwtAtFc']:.3e}  |X_MT(f_c)|={r['fullXmtAtFc']:.3e}  "
+        f"ratio MT/WT={ratio:.4f}  ΔE@f_c={de:+.2f}%"
+    )
+    ax.legend(loc="upper right", fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+fig.suptitle("Cosic-RRM full-protein DFT at family characteristic frequency  |  biofs fourier-score --consensus-fc", y=1.0, fontsize=11)
+fig.tight_layout()
+fig.savefig(d["out_path"], dpi=150, bbox_inches="tight")
+print(f"OK: {d['out_path']}", file=sys.stderr)
+`;
+  const r = spawnSync('python3', ['-c', py], {
+    encoding: 'utf8',
+    input: JSON.stringify({ rows, out_path: outPath }),
+    maxBuffer: 200 * 1024 * 1024,
+  });
+  if (r.status !== 0) {
+    throw new Error(`Full-protein plot failed: ${r.stderr || r.stdout}`);
+  }
+  if (!quiet) console.error(chalk.green(`✓ Full-protein f_c spectrum saved to ${outPath}`));
 }
 
 function plotSpectra(rows: ScoreRow[], outPath: string, quiet: boolean): void {

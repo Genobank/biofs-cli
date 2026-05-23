@@ -9,6 +9,7 @@ export const CONFIG = {
   API_BASE_URL: process.env.GENOBANK_API_BASE || 'https://genobank.app',
   AUTH_BASE_URL: process.env.GENOBANK_AUTH_BASE || 'https://auth.genobank.app',
   HEADLESS_AUTH_URL: process.env.GENOBANK_HEADLESS_AUTH || 'https://genobank.io/consent/consent-access.html?headless=true',
+  RESEARCHER_REGISTER_URL: process.env.GENOBANK_RESEARCHER_REGISTER || 'https://genobank.io/researcher/register',
   IPFS_GATEWAY: 'https://ipfs.genobank.app/ipfs',
 
   // Local server
@@ -39,16 +40,21 @@ export const CONFIG = {
     X402_ROUTER: '0xe95f101dcBe711Ba9252043943ba28f7D9aE8014',
     VALIDATOR_MANAGER: '0x4E21d10CCd98D46CA7045C475C4B46bdC6244B3a',
     SEQUSDC: '0x85f8B3F5A3f6EA2E02BeE85a1C96F5e7e08f30F9',
-    STAKING_VALIDATOR: '0xbe31AB4fb4631d89a3b2D69D1e0E496B3D2F5df3'
+    STAKING_VALIDATOR: '0xbe31AB4fb4631d89a3b2D69D1e0E496B3D2F5df3',
+    // Phase G — BioRoutes "DNS of biodata" (deployed April 25, 2026)
+    BIOROUTES: '0xF758e2b3c4774F0f7e7D95eAa4c265b258d14bAD',
+    BIO_ASSET_VAULT: '0x2fd98bFF77571F1338bf1F44E68b80Be77205850',
+    BIO_ROUTER: '0xc92f9f1D68A445189Ad3ad28524186A11Be30DcA',
+    BIO_RECOVERY: '0x1555eC4e6397645147595918657b713Ebb5c8fBD',
   }
 };
 
 // Sequentia Blockchain Network Configuration (Cosmos SDK + EVM Module v0.5.0)
 export const SEQUENTIA_NETWORK = {
-  rpc: process.env.SEQUENTIA_RPC_URL || 'http://52.90.163.112:8545',
-  chainId: parseInt(process.env.SEQUENTIA_CHAIN_ID || '262144'),
+  rpc: process.env.SEQUENTIA_RPC_URL || 'https://seqrpc.genobank.app',
+  chainId: parseInt(process.env.SEQUENTIA_CHAIN_ID || '15132025'),
   cosmosChainId: process.env.SEQUENTIA_COSMOS_CHAIN_ID || 'sequentia-15132025',
-  explorer: process.env.SEQUENTIA_EXPLORER || 'http://52.90.163.112:26657',
+  explorer: process.env.SEQUENTIA_EXPLORER || 'https://explorer.sequentias-test.genobank.io',
   name: 'Sequentia v4 Mainnet'
 };
 

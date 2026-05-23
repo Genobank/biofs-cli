@@ -27,7 +27,7 @@ export { BloomFilterFingerprint, calculateFingerprint, extractPhenotypeSubset, t
 
 // Network Configuration
 export const SEQUENTIA_CONFIG = {
-    rpcUrl: 'http://52.90.163.112:8545',
+    rpcUrl: 'https://seqrpc.genobank.app',
     chainId: 15132025,
     usdcToken: '0xD837B344e931cc265ec54879A0B388DE6F0015c9',          // SeqUSDC
     treasury: '0x5C9d00f5BC59037A038A2936F0F614b770f947A7',            // Sequentia Treasury

@@ -5,6 +5,7 @@ import { CredentialsManager } from '../auth/credentials';
 import { FileLocation, BioFile } from '../../types/biofiles';
 import { CONFIG } from '../config/constants';
 import { Logger } from '../utils/logger';
+import { BioRoutesClient, biocidToKey } from '../bioroutes/client';
 
 export class BioCIDResolver {
   private api: GenoBankAPIClient;
@@ -15,6 +16,39 @@ export class BioCIDResolver {
 
   async resolve(biocidOrFilename: string): Promise<FileLocation> {
     let searchIdentifier: string;
+
+    // G.2 BioRoutes-first: attempt on-chain resolution before legacy paths.
+    // BioRoutes resolves biocid:// URIs and plain biocid strings to GCS storage URIs
+    // anchored on Sequentia. Falls through to legacy on miss (during parallel window).
+    if (biocidOrFilename.startsWith('biocid://') || biocidOrFilename.includes('/')) {
+      try {
+        const bioRoutesClient = new BioRoutesClient();
+        const result = await bioRoutesClient.resolveBiocid(biocidOrFilename);
+        if (result.primary) {
+          Logger.debug(`BioRoutes hit: ${result.primary.storageURI} (${result.routeCount} routes)`);
+          const uri = result.primary.storageURI;
+          const isGCS = uri.startsWith('gs://');
+          const parts = isGCS ? uri.replace('gs://', '').split('/') : [];
+          const bucket = isGCS ? parts[0] : undefined;
+          const objectPath = isGCS ? parts.slice(1).join('/') : uri;
+
+          let presignedUrl: string | undefined;
+          try {
+            presignedUrl = (await bioRoutesClient.getPresignedUrl(uri)) || undefined;
+          } catch { /* presign is best-effort */ }
+
+          return {
+            type: isGCS ? 'GCS' : 'S3',
+            path: objectPath,
+            bucket,
+            presigned_url: presignedUrl,
+            filename: objectPath?.split('/').pop(),
+          };
+        }
+      } catch (err: any) {
+        Logger.debug(`BioRoutes lookup failed (falling through): ${err.message}`);
+      }
+    }
 
     // Check if it's an IP Asset ID (starts with 0x and 42 chars)
     if (biocidOrFilename.startsWith('0x') && biocidOrFilename.length === 42) {
@@ -134,6 +168,45 @@ export class BioCIDResolver {
   async discoverAllBioFiles(verbose: boolean = false): Promise<BioFile[]> {
     const bioFiles: BioFile[] = [];
 
+    // The caller's wallet — always known post-login, always a valid fallback
+    // origin for any BioNFT we list. BioRouter's role as the "source of truth
+    // of biodata origin" is defeated if we ever emit `biocid://unknown/...`,
+    // so every resolution below MUST prefer (in order):
+    //   1. the on-chain collection contract address for the asset, if present,
+    //   2. the asset's owner wallet from the backend response,
+    //   3. the caller's own wallet (always ≥ cryptographic proof of custody).
+    // If none of the three are available we LOG LOUDLY and tag the biocid
+    // with `resolver_err/<reason>` so the bug is discoverable downstream
+    // instead of silently producing `unknown`.
+    let callerWallet = '';
+    try {
+      const credManager = CredentialsManager.getInstance();
+      const creds = await credManager.loadCredentials();
+      callerWallet = (creds?.wallet_address || '').toLowerCase();
+    } catch { /* stays empty */ }
+
+    const originFor = (asset: any, hint?: string): string => {
+      const candidates = [
+        asset?.collection_address,
+        asset?.collection?.address,
+        asset?.ip_metadata?.collection,
+        asset?.nft_contract,
+        asset?.contract_address,
+        asset?.owner,
+        asset?.wallet_address,
+        asset?.owner_address,
+        callerWallet,
+      ];
+      for (const c of candidates) {
+        if (typeof c === 'string' && c.startsWith('0x') && c.length === 42) {
+          return c.toLowerCase();
+        }
+      }
+      const reason = hint || 'no-owner-no-collection';
+      Logger.debug(`BioCID origin fallback failed (${reason}); tagging as resolver_err`);
+      return `resolver_err/${reason}`;
+    };
+
     // Data Source 1: Sequentia IP Assets (includes BioIP files registered on Sequentia)
     try {
       if (verbose) console.log('🔍 Fetching Sequentia assets...');
@@ -153,7 +226,7 @@ export class BioCIDResolver {
 
         bioFiles.push({
           filename,
-          biocid: `biocid://${asset.owner || asset.wallet_address || 'unknown'}/sequentia/${asset.ipId}`,
+          biocid: `biocid://${originFor(asset, 'sequentia-asset')}/sequentia/${asset.ipId}`,
           type: fileType,
           source: 'Sequentia',
           created_at: asset.created_at,
@@ -200,9 +273,13 @@ export class BioCIDResolver {
         const type = BioCIDParser.detectFileType(filename);
         const gcsPath = (file as any).gcs_path;
         const s3Path = file.s3_path;
+        // The caller uploaded this file, so the caller's wallet is the canonical
+        // origin when the backend didn't stamp an explicit biocid. Never fall
+        // back to 'unknown' — BioRouter is an oracle, not an amnesia.
+        const uploaderWallet = callerWallet || originFor(file, 'uploaded-file');
         bioFiles.push({
           filename,
-          biocid: file.biocid || BioCIDParser.generate('unknown', filename),
+          biocid: file.biocid || BioCIDParser.generate(uploaderWallet, filename),
           type,
           size: file.size,
           source: gcsPath ? 'GCS' : 'S3',
