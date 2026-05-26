@@ -40,6 +40,7 @@ export interface RrmTrainOptions {
   folds?: string;               // CV folds (default 5)
   plot?: string;                // PNG path for ROC + feature importance
   quiet?: boolean;
+  includePredictions?: boolean; // persist per-variant CV predictions for stacking analysis
 }
 
 const PY_TRAIN = `
@@ -63,6 +64,7 @@ predict_targets = cfg.get('predict_targets', [])
 n_folds = int(cfg.get('folds', 5))
 plot_path = cfg.get('plot_path')
 gene = cfg['gene']
+include_predictions = bool(cfg.get('include_predictions', False))
 
 # Fetch AM/REVEL/PrimateAI etc. via MyVariant.info batch using dbSNP rsIDs.
 # rsID-based queries return scalar dbnsfp.<predictor> values directly;
@@ -350,10 +352,24 @@ out = {
     'feature_names': feature_names,
     'feature_coverage': {fn: int(np.sum(~np.isnan(X[:, i]))) for i, fn in enumerate(feature_names)},
     'feature_importance': feature_importance,
-    'results': {k: {kk: vv for kk, vv in v.items() if kk != 'all_probs'} for k, v in results.items()},
+    'results': (
+        # When stacking analysis is requested, keep per-variant CV predictions
+        # so downstream callers can fit a meta-learner without re-training.
+        results if include_predictions
+        else {k: {kk: vv for kk, vv in v.items() if kk != 'all_probs'} for k, v in results.items()}
+    ),
     'raw_alphamissense_auc': raw_am_auc,
     'predictions': predictions,
 }
+if include_predictions:
+    # The all_probs arrays are indexed by training-set order; emit the
+    # variant identifiers and true labels so downstream stacking knows which
+    # row corresponds to which variant.
+    out['stacking_inputs'] = {
+        'variants': [{'hgvs_protein': r['hgvs_protein'], 'hgvs_genomic': r['hgvs_genomic'], 'classification_simple': r['classification']} for r in variant_records],
+        'y_true': y.tolist(),
+        'feature_names': feature_names,
+    }
 print(json.dumps(out, indent=2))
 `;
 
@@ -442,6 +458,7 @@ export async function rrmTrainCommand(gene: string, opts: RrmTrainOptions): Prom
       predict_targets: predictTargets,
       folds: opts.folds || '5',
       plot_path: opts.plot || '',
+      include_predictions: opts.includePredictions === true,
     }),
     maxBuffer: 500 * 1024 * 1024,
     timeout: 900_000,
