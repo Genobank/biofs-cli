@@ -80,6 +80,12 @@ import { resolveCommand, ResolveOptions } from './commands/resolve';
 import { variantsCommand, VariantsOptions } from './commands/variants';
 import { fourierScoreCommand, FourierScoreOptions } from './commands/fourier-score';
 import { rrmConsensusCommand, RrmConsensusOptions } from './commands/rrm-consensus';
+import { psmConsensusCommand, PsmConsensusOptions } from './commands/psm-consensus';
+import { bodeCommand, BodeOptions } from './commands/bode';
+import { waveletConsensusCommand, WaveletConsensusOptions } from './commands/wavelet-consensus';
+import { tokenizeSpectrumCommand, TokenizeSpectrumOptions } from './commands/tokenize-spectrum';
+import { inventoryRegisterSqliteCommand, InventoryRegisterSqliteOptions } from './commands/inventory-register-sqlite';
+import { ingestRnaTpmCommand, IngestRnaTpmOptions } from './commands/ingest-rna-tpm';
 import { rrmDistributionCommand, RrmDistributionOptions } from './commands/rrm-distribution';
 import { rrmTrainCommand, RrmTrainOptions } from './commands/rrm-train';
 import { cohortTrainCommand, CohortTrainOptions } from './commands/cohort-train';
@@ -90,11 +96,15 @@ import { cohortFourierScoreCommand, CohortFourierScoreOptions } from './commands
 import { biowalletCreateCommand, BiowalletCreateOptions } from './commands/biowallet/create';
 import { biowalletListCommand, BiowalletListOptions } from './commands/biowallet/list';
 import { biowalletBindCommand, BiowalletBindOptions } from './commands/biowallet/bind';
+import { labRefreshCoverageCommand, labRefreshCoverageStatusCommand, LabRefreshCoverageOptions } from './commands/lab/refreshCoverage';
 import { familyCreateCommand, familyDeriveCommand, familyListCommand, FamilyCreateOptions, FamilyDeriveOptions, FamilyListOptions } from './commands/biowallet/family';
 import { matchCommand, MatchOptions } from './commands/match';
 import { ticketCommand, TicketOptions } from './commands/ticket';
 import { scanCommand, ScanOptions } from './commands/scan';
 import { inventoryCommand, InventoryOptions } from './commands/inventory';
+import { inventoryCohortCommand, InventoryCohortOptions } from './commands/inventory/cohort';
+import { jobReconcileCommand, JobReconcileOptions } from './commands/job/reconcile';
+import { cohortPipelineCommand, CohortPipelineOptions } from './commands/cohort-pipeline';
 import { dedupCommand, DedupOptions } from './commands/dedup';
 import { fingerprintCommand, FingerprintOptions } from './commands/fingerprint';
 import { researcherRegisterCommand, ResearcherRegisterOptions } from './commands/researcher/register';
@@ -131,7 +141,7 @@ process.on('unhandledRejection', (reason) => {
 program
   .name('biofs')
   .description('BioFS by GenoBank.io - BioNFT-Gated S3 CLI for genomic data')
-  .version('3.2.0')
+  .version('3.6.0')
   .option('--debug', 'Enable debug output')
   .hook('preAction', (thisCommand) => {
     // Set global debug flag if --debug is passed
@@ -592,7 +602,7 @@ program
   });
 
 // Inventory command - Fast read-only summary of bioroutes.inventory (no GCS walk)
-program
+const inventoryCmd = program
   .command('inventory')
   .alias('inv')
   .description('Show what is currently registered in bioroutes.inventory (admin/lab-custodian)')
@@ -604,6 +614,26 @@ program
       await inventoryCommand(options);
     } catch (error) {
       Logger.error(`Inventory failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// inventory cohort sub-command: extract filtered cohort of biosample serials
+inventoryCmd
+  .command('cohort')
+  .description('Extract a filtered cohort of biosample serials from bioroutes.inventory (the canonical "what should I process next?" query)')
+  .requiredOption('--originlab <name>', 'Lab name (e.g. augenomics, neochromosome, somos, tecbase, genobank)')
+  .option('--has <csv>', 'CSV of filetypes the serial MUST have (e.g. fastq)')
+  .option('--missing <csv>', 'CSV of filetypes the serial MUST NOT have (e.g. vcf,gvcf)')
+  .option('--paired', 'For FASTQ, require both R1 and R2 to exist')
+  .option('--limit <N>', 'Cap on returned serials')
+  .option('--output <file>', 'Write serials one-per-line to file (suitable for `biofs cohort-pipeline --serials`)')
+  .option('--json', 'Output full JSON response')
+  .action(async (options: InventoryCohortOptions) => {
+    try {
+      await inventoryCohortCommand(options);
+    } catch (error) {
+      Logger.error(`inventory cohort failed: ${error}`);
       process.exit(1);
     }
   });
@@ -1317,6 +1347,22 @@ jobCmd
     }
   });
 
+// job reconcile - Mark stale clara_jobs (processing/queued) as failed
+jobCmd
+  .command('reconcile')
+  .description('Mark stale clara_jobs (processing/queued past N hours) as failed — admin only. Required cleanup after GPU spot preemption before launching a fresh cohort-pipeline.')
+  .option('--older-than <hours>', 'Threshold in hours (default 12)', '12')
+  .option('--statuses <csv>', 'Comma-separated statuses to reconcile (default processing,queued)', 'processing,queued')
+  .option('--json', 'Output as JSON')
+  .action(async (options: JobReconcileOptions) => {
+    try {
+      await jobReconcileCommand(options);
+    } catch (error) {
+      Logger.error(`job reconcile failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
 // Agent Health - Check processing agent readiness
 program
   .command('agent-health')
@@ -1382,6 +1428,48 @@ program
       await labNFTsCommand(options);
     } catch (error) {
       Logger.error(`Failed to fetch labs: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Lab — single-lab operations (refresh-coverage, future: backfill, audit)
+// Distinct from the read-only `labnfts` (plural) registry-listing command above.
+const labCmd = program
+  .command('lab')
+  .description('Single-lab operations (refresh-coverage, audit, backfill)');
+
+labCmd
+  .command('refresh-coverage')
+  .description('Stream higher-coverage FASTQ replacements from a lab S3 origin into the GCS mirror, supersede stale inventory rows, optionally invalidate downstream pipeline outputs')
+  .requiredOption('--lab <name>', 'Lab name (e.g. augenomics, tecbase)')
+  .requiredOption('--source <s3_uri>', 'S3 source prefix (e.g. s3://genobank/Demux/20240412_ExomeGB_ExtraReadsCombined)')
+  .option('--aws-profile <profile>', 'AWS profile name for the source bucket (server-side)', 'augenomics')
+  .option('--serials <csv>', 'Comma-separated biosample serials to upgrade (with or without lab FR prefix)')
+  .option('--serials-file <path>', 'Newline-separated serials file (alternative to --serials)')
+  .option('--invalidate-downstream', 'Mark prior BAM/VCF/sqlite as SUPERSEDED so the pipeline re-runs with the deeper FASTQs')
+  .option('--re-run-pipeline', 'After refresh, queue `biofs pipeline run-wes` for each upgraded serial')
+  .option('--dry-run', 'Print plan + byte deltas, do not stream')
+  .option('--wait', 'Poll until job terminal (done|failed); 90-min ceiling')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'JSON output')
+  .action(async (options: LabRefreshCoverageOptions) => {
+    try {
+      await labRefreshCoverageCommand(options);
+    } catch (error) {
+      Logger.error(`refresh-coverage failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+labCmd
+  .command('refresh-coverage-status <job_id>')
+  .description('Show progress of a refresh-coverage job')
+  .option('--json', 'JSON output')
+  .action(async (jobId: string, options: { json?: boolean }) => {
+    try {
+      await labRefreshCoverageStatusCommand(jobId, options);
+    } catch (error) {
+      Logger.error(`status failed: ${error}`);
       process.exit(1);
     }
   });
@@ -1453,6 +1541,152 @@ program
       await rrmConsensusCommand(gene, options);
     } catch (error) {
       Logger.error(`RRM consensus failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// PSM-consensus — Piezoelectric Signal Model: same cross-spectrum maths as
+// rrm-consensus, but with side-chain dipole moment (Debye) replacing EIIP.
+// Tests the hypothesis that the piezoelectric encoding picks up
+// electromechanical resonances that the electron-donor EIIP table misses,
+// especially in ion channels, transporters, and force sensors.
+program
+  .command('psm-consensus <gene>')
+  .description('Piezoelectric Signal Model: characteristic frequency f_c via side-chain-dipole cross-spectrum')
+  .option('--source <family|orthologs>', 'Sequence source: Pfam family (default) or same-name orthologs', 'family')
+  .option('--taxonomy <id>', 'NCBI taxonomy id (default 7742 = Vertebrata)', '7742')
+  .option('--no-reviewed', 'Include TrEMBL entries (default: Swiss-Prot reviewed only)')
+  .option('--max <N>', 'Max sequences to pull (default 100)', '100')
+  .option('--uniprot <acc>', 'Override UniProt accession (for novel genes)')
+  .option('--pfam <id>', 'Override Pfam family (for novel genes)')
+  .option('--refresh', 'Re-fetch and recompute even if cached')
+  .option('--plot <path>', 'Render PSM spectrum to PNG with f_c annotated')
+  .option('--quiet', 'Suppress progress output')
+  .action(async (gene: string, options: PsmConsensusOptions) => {
+    try {
+      await psmConsensusCommand(gene, options);
+    } catch (error) {
+      Logger.error(`PSM consensus failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Wavelet-consensus — 2-D (position by scale) Morlet CWT consensus map for a
+// gene's functional family. Spatial-spectral generalization of rrm-consensus.
+// Addresses the v1 paper auditor's third upgrade point: localize variants at
+// position and scale jointly rather than at a single fixed window size.
+program
+  .command('wavelet-consensus <gene>')
+  .description('Morlet continuous wavelet transform consensus map (position by scale) for a gene family')
+  .option('--source <family|orthologs>', 'Sequence source (default orthologs)', 'orthologs')
+  .option('--taxonomy <id>', 'NCBI taxonomy id', '7742')
+  .option('--no-reviewed', 'Include TrEMBL (default Swiss-Prot only)')
+  .option('--max <N>', 'Max sequences', '100')
+  .option('--uniprot <acc>', 'Override UniProt accession')
+  .option('--pfam <id>', 'Override Pfam family')
+  .option('--encoding <eiip|piezo>', 'Per-residue index (default eiip)', 'eiip')
+  .option('--scales <list>', 'Comma scales in aa (default 2,3,4,6,8,12,16,24,32,48,64,96)')
+  .option('--refresh', 'Re-fetch + recompute')
+  .option('--quiet', 'Suppress progress')
+  .action(async (gene: string, options: WaveletConsensusOptions) => {
+    try {
+      await waveletConsensusCommand(gene, options);
+    } catch (error: any) {
+      Logger.error(`wavelet-consensus failed: ${error?.message || error}`);
+      process.exit(1);
+    }
+  });
+
+// Inventory subcommand: register-sqlite (closes v2 audit gap §5 item 2).
+program
+  .command('inventory-register-sqlite <sqlite-path>')
+  .description('Register an externally-produced OpenCRAVAT annotation sqlite into bioroutes.inventory (v3.8.0 endpoint)')
+  .requiredOption('--sample-serial <serial>', 'Biosample serial identifier (14-digit or lab-case-id form)')
+  .option('--owner-wallet <addr>', 'Override owner biowallet (default: from `biofs login`)')
+  .option('--case-id <id>', 'Optional lab case identifier (e.g., TN25-336147)')
+  .option('--gcs-uri <uri>', 'Optional GCS URI if the sqlite is also stored in GCS')
+  .option('--originlab <name>', 'Source lab name (e.g., caris, augenomics, genobank)', 'genobank')
+  .option('--api-base <url>', 'GenoBank API base (default https://genobank.app)')
+  .option('--dry-run', 'Compute and print the registration payload without calling the API')
+  .option('--output <path>', 'Write the registration payload to a JSON file')
+  .option('--quiet', 'Suppress progress')
+  .action(async (sqlitePath: string, options: InventoryRegisterSqliteOptions) => {
+    try {
+      await inventoryRegisterSqliteCommand(sqlitePath, options);
+    } catch (error: any) {
+      Logger.error(`inventory-register-sqlite failed: ${error?.message || error}`);
+      process.exit(1);
+    }
+  });
+
+// Ingest rna-tpm — canonical wrapper for RNA TPM CSV ingestion (closes v2 audit
+// gap §5 item 4).
+program
+  .command('ingest-rna-tpm <case-id>')
+  .description('Ingest a gene-level RNA TPM CSV into the caris_rna_tpm MongoDB collection (v3.8.0 endpoint)')
+  .option('--biocid <id>', 'BioRouter biocid pointing to the RNA TPM CSV')
+  .option('--gcs-path <uri>', 'GCS URI of the RNA TPM CSV (if biocid is not yet registered)')
+  .option('--owner-wallet <addr>', 'Override owner biowallet (default: from `biofs login`)')
+  .option('--source-lab <name>', 'Source lab (e.g., caris, augenomics)', 'unknown')
+  .option('--data-category <type>', 'Data category tag (default rna)', 'rna')
+  .option('--expected-columns <list>', 'CSV column names', 'Gene,TPM,NumReads')
+  .option('--no-drop-zero-tpm', 'Keep zero-TPM rows (default drops them)')
+  .option('--api-base <url>', 'GenoBank API base (default https://genobank.app)')
+  .option('--dry-run', 'Compute and print the ingest payload without calling the API')
+  .option('--quiet', 'Suppress progress')
+  .action(async (caseId: string, options: IngestRnaTpmOptions) => {
+    try {
+      await ingestRnaTpmCommand(caseId, options);
+    } catch (error: any) {
+      Logger.error(`ingest-rna-tpm failed: ${error?.message || error}`);
+      process.exit(1);
+    }
+  });
+
+// Tokenize-spectrum — emit LLM-friendly POS_NNNN__FREQ_F.FF__E_BINxx__P_BINxx
+// tokens from a cached wavelet consensus (v3.8.0 roadmap item P2). Designed
+// for autonomous-agent consumption on Claude / GPT / Llama. Reversibility via
+// regex r"POS_(\d+)" on any flagged token.
+program
+  .command('tokenize-spectrum <gene>')
+  .description('Emit LLM-friendly discrete spectral tokens for a gene with optional variant context')
+  .option('--variant <hgvs>', 'Center the position window on this HGVS variant (e.g. p.Gly12Asp)')
+  .option('--position-window <N>', 'Residues on each side of the variant', '10')
+  .option('--encoding <eiip|piezo>', 'Primary encoding to load (both are included if cached)', 'eiip')
+  .option('--vocab-bins <list>', 'Comma dB cutoffs for the BIN00-BIN06 vocabulary', '0,3,6,10,15,20')
+  .option('--scale-binning <mode>', 'top5 (default), all, or characteristic', 'top5')
+  .option('--format <type>', 'tokens (default plain string) or json', 'tokens')
+  .option('--output <path>', 'Write to file instead of stdout')
+  .option('--quiet', 'Suppress progress')
+  .action(async (gene: string, options: TokenizeSpectrumOptions) => {
+    try {
+      await tokenizeSpectrumCommand(gene, options);
+    } catch (error: any) {
+      Logger.error(`tokenize-spectrum failed: ${error?.message || error}`);
+      process.exit(1);
+    }
+  });
+
+// Bode — render log-log |H(jω)| transfer function plots from cached rrm-consensus
+// and psm-consensus spectra. Single-gene mode (bode <gene>) or panel mode
+// (bode --panel <list>) for paper figures.
+program
+  .command('bode [gene]')
+  .description('Log-log Bode plot of protein-family transfer function |H(jω)| from rrm-consensus / psm-consensus caches')
+  .option('--panel <list>', 'Comma gene symbols for multi-gene panel grid')
+  .option('--output <path>', 'Output file path (default ~/.biofs/cache/bode/<gene-or-hash>.png)')
+  .option('--pdf', 'Emit PDF instead of PNG')
+  .option('--rna-tpm <case_id>', 'Pull Caris RNA TPM for the case_id and annotate each gene')
+  .option('--api-base <url>', 'GenoBank API base for RNA TPM lookups (default https://genobank.app)')
+  .option('--no-rrm', 'Suppress RRM (EIIP) curve')
+  .option('--no-psm', 'Suppress PSM (piezo) curve')
+  .option('--cols <N>', 'Panel grid column count (default 3)')
+  .option('--quiet', 'Suppress progress (still prints output path)')
+  .action(async (gene: string | undefined, options: BodeOptions) => {
+    try {
+      await bodeCommand(gene, options);
+    } catch (error: any) {
+      Logger.error(`bode failed: ${error?.message || error}`);
       process.exit(1);
     }
   });
@@ -1612,6 +1846,35 @@ program
     }
   });
 
+// Cohort-pipeline — batch FASTQ→VCF→sqlite→fhir.variant→Digital-Twin via
+// the canonical biofs-cli + biofs-node + BioRouter + Sequentia protocol.
+// Each per-serial run is `biofs pipeline run-wes <serial>`; this verb just
+// fans them out with concurrency control + auto-mints custodial biowallets.
+program
+  .command('cohort-pipeline')
+  .description('Batch end-to-end pipeline (FASTQ → Clara → CRAVAT → Vault → Digital Twin) across a cohort of biosample serials. Internally fans out `biofs pipeline run-wes <serial>`; auto-mints custodial biowallets for unbound serials via `biofs biowallet create --bind-biosample`. Resume-aware (skips serials already PHASE_RANGE_DONE in bioroutes.pipeline_runs).')
+  .requiredOption('--serials <file>', 'File with one biosample serial per line. Use `biofs inventory cohort` to generate.')
+  .option('--concurrency <N>', 'Number of parallel per-serial pipelines (default 1; max 2 for 2× A100 GPU)', '1')
+  .option('--limit <N>', 'Process at most N serials (0 = all)', '0')
+  .option('--output <dir>', 'Output directory for per-serial result JSONs + cohort summary (default ./cohort_pipeline_runs/<timestamp>/)')
+  .option('--no-skip-existing', 'Re-run serials even if they already have a PHASE_RANGE_DONE pipeline_run')
+  .option('--no-auto-mint-wallets', 'Skip the biowallet pre-mint step (assumes wallets already bound)')
+  .option('--mode <WES|WGS>', 'Override auto-detection of WES vs WGS for the whole cohort')
+  .option('--phase <range>', 'Run a subset of phases per serial (e.g. "1-4", "5-10", "all")')
+  .option('--exclude <csv>', 'Comma-separated serials to skip (e.g. operator\'s own genome, already-ingested samples)')
+  .option('--stop-on-failure <mode>', 'When to halt cohort: "first" (default), "never", or integer N for N consecutive failures', 'first')
+  .option('--dry-run', 'Print what would happen but don\'t execute side-effecting phases')
+  .option('--quiet', 'Suppress per-serial progress')
+  .option('--json', 'Emit machine-readable JSON summary')
+  .action(async (options: CohortPipelineOptions) => {
+    try {
+      await cohortPipelineCommand(options);
+    } catch (error) {
+      Logger.error(`cohort-pipeline failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
 // Cohort-acmg — batch ACMG/SVI-compliant processor for an n-of-many cohort
 program
   .command('cohort-acmg')
@@ -1719,6 +1982,7 @@ program
   .option('--folds <N>', 'Stratified CV folds (default 5)', '5')
   .option('--plot <path>', 'Render ROC curves + feature importance to PNG')
   .option('--refresh', 'Re-fetch MyVariant.info scores even if cached')
+  .option('--include-predictions', 'Persist per-variant CV predictions for downstream stacking analysis')
   .option('--quiet', 'Suppress progress output')
   .action(async (gene: string, options: RrmTrainOptions) => {
     try {
