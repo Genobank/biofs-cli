@@ -1,0 +1,18 @@
+{"variant_id":"CFTR_F508del","gene":"CFTR","hgvs":"NM_000492.4:c.1521_1523delCTT","protein":"p.Phe508del","truth":"P","note":"Most common cystic fibrosis allele; ClinVar Pathogenic, expert-panel reviewed"}
+{"variant_id":"HBB_E6V","gene":"HBB","hgvs":"NM_000518.5:c.20A>T","protein":"p.Glu6Val","truth":"P","note":"Sickle cell disease; ClinVar Pathogenic, multiple submitters"}
+{"variant_id":"HBB_Q40X","gene":"HBB","hgvs":"NM_000518.5:c.118C>T","protein":"p.Gln40Ter","truth":"P","note":"Beta-thalassemia (Cd39); ClinVar Pathogenic"}
+{"variant_id":"BRCA1_185delAG","gene":"BRCA1","hgvs":"NM_007294.4:c.68_69del","protein":"p.Glu23ValfsTer17","truth":"P","note":"Ashkenazi founder; ClinVar Pathogenic, ENIGMA expert panel"}
+{"variant_id":"BRCA2_6174delT","gene":"BRCA2","hgvs":"NM_000059.4:c.5946del","protein":"p.Ser1982ArgfsTer22","truth":"P","note":"Ashkenazi founder; ClinVar Pathogenic, ENIGMA"}
+{"variant_id":"HFE_C282Y","gene":"HFE","hgvs":"NM_000410.4:c.845G>A","protein":"p.Cys282Tyr","truth":"P","note":"Hereditary hemochromatosis; ClinVar Pathogenic/risk, established"}
+{"variant_id":"SERPINA1_PiZ","gene":"SERPINA1","hgvs":"NM_000295.5:c.1096G>A","protein":"p.Glu342Lys","truth":"P","note":"Alpha-1 antitrypsin deficiency (PiZ); ClinVar Pathogenic"}
+{"variant_id":"LDLR_W577X","gene":"LDLR","hgvs":"NM_000527.5:c.1730G>A","protein":"p.Trp577Ter","truth":"P","note":"Familial hypercholesterolemia, nonsense; ClinVar Pathogenic"}
+{"variant_id":"MECP2_R168X","gene":"MECP2","hgvs":"NM_004992.4:c.502C>T","protein":"p.Arg168Ter","truth":"P","note":"Rett syndrome, recurrent nonsense; ClinVar Pathogenic"}
+{"variant_id":"FBN1_C628Y","gene":"FBN1","hgvs":"NM_000138.5:c.1883G>A","protein":"p.Cys628Tyr","truth":"LP","note":"Marfan, cysteine substitution in cbEGF domain; ClinVar Likely pathogenic"}
+{"variant_id":"MTHFR_A222V","gene":"MTHFR","hgvs":"NM_005957.5:c.665C>T","protein":"p.Ala222Val","truth":"B","note":"Common polymorphism (historic 677C>T); ClinVar Benign, not clinically actionable per ACMG"}
+{"variant_id":"MTHFR_E429A","gene":"MTHFR","hgvs":"NM_005957.5:c.1286A>C","protein":"p.Glu429Ala","truth":"B","note":"Common polymorphism (historic 1298A>C); ClinVar Benign"}
+{"variant_id":"TP53_P72R","gene":"TP53","hgvs":"NM_000546.6:c.215C>G","protein":"p.Pro72Arg","truth":"B","note":"Common coding polymorphism rs1042522; ClinVar Benign"}
+{"variant_id":"BRCA2_N372H","gene":"BRCA2","hgvs":"NM_000059.4:c.1114A>C","protein":"p.Asn372His","truth":"B","note":"Common variant; ClinVar Benign, ENIGMA"}
+{"variant_id":"CFTR_M470V","gene":"CFTR","hgvs":"NM_000492.4:c.1408A>G","protein":"p.Met470Val","truth":"B","note":"Common CFTR polymorphism; ClinVar Benign"}
+{"variant_id":"APOE_C130R","gene":"APOE","hgvs":"NM_000041.4:c.388T>C","protein":"p.Cys130Arg","truth":"B","note":"APOE e4 defining variant; ClinVar Benign (risk allele, not a Mendelian pathogenic call)"}
+{"variant_id":"F5_R534Q","gene":"F5","hgvs":"NM_000130.5:c.1601G>A","protein":"p.Arg534Gln","truth":"LP","note":"Factor V Leiden thrombophilia; ClinVar pathogenic/risk (treated as Likely pathogenic actionable here)"}
+{"variant_id":"PAH_R408W","gene":"PAH","hgvs":"NM_000277.3:c.1222C>T","protein":"p.Arg408Trp","truth":"P","note":"Phenylketonuria, most common European PAH allele; ClinVar Pathogenic"}

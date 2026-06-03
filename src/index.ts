@@ -67,6 +67,14 @@ import { reportCommand, ReportOptions } from './commands/report';
 import { createAdminCommand } from './commands/admin';
 import { fuseListCommand, fuseMountCommand, fuseStreamCommand, fuseSampleCommand, FuseOptions } from './commands/fuse';
 import { annotateSubmitCommand, AnnotateSubmitOptions } from './commands/annotate/submit';
+import {
+  workspaceOpenCommand, workspaceReadCommand, workspaceAppendCommand,
+  workspaceCaseCommand, workspaceLeaseCommand, workspaceReplayCommand,
+  workspaceAnchorCommand, workspaceClassifyCommand, workspaceConsensusCommand,
+  workspaceExportCommand, workspaceVerifyCommand, WorkspaceOptions,
+} from './commands/workspace';
+import { duetCommand, DuetOptions } from './commands/duet';
+import { benchmarkCommand, BenchmarkOptions, benchmarkPrepareCommand, PrepareOptions } from './commands/benchmark';
 import { pipelineRunWesCommand, PipelineRunWesOptions } from './commands/pipeline/runWes';
 import { routeCheckCommand, routeHealCommand } from './commands/route';
 import { annotateStatusCommand, AnnotateStatusOptions } from './commands/annotate/status';
@@ -86,6 +94,7 @@ import { waveletConsensusCommand, WaveletConsensusOptions } from './commands/wav
 import { tokenizeSpectrumCommand, TokenizeSpectrumOptions } from './commands/tokenize-spectrum';
 import { inventoryRegisterSqliteCommand, InventoryRegisterSqliteOptions } from './commands/inventory-register-sqlite';
 import { ingestRnaTpmCommand, IngestRnaTpmOptions } from './commands/ingest-rna-tpm';
+import { scoreProteinCommand, ScoreProteinOptions } from './commands/score-protein';
 import { rrmDistributionCommand, RrmDistributionOptions } from './commands/rrm-distribution';
 import { rrmTrainCommand, RrmTrainOptions } from './commands/rrm-train';
 import { cohortTrainCommand, CohortTrainOptions } from './commands/cohort-train';
@@ -741,6 +750,173 @@ annotateCmd
       process.exit(1);
     }
   });
+
+// Workspace commands — the shared intra-LLM case workspace (append-only,
+// hash-chained log that Claude Code + Grok Build co-edit via biofs-node).
+const workspaceCmd = program
+  .command('workspace')
+  .alias('ws')
+  .description('Shared intra-LLM case workspace: append-only, hash-chained, reproducible record');
+
+workspaceCmd
+  .command('open <case_id>')
+  .description('Open or create a case workspace; print header + turns')
+  .option('--title <title>', 'Case title (on create)')
+  .option('--biocid <biocid...>', 'Biocid(s) under discussion (on create)')
+  .option('--node <url>', 'biofs-node base override (BIOFS_NODE_URL)')
+  .option('--json', 'Output as JSON')
+  .action(async (caseId: string, options: WorkspaceOptions) => { await workspaceOpenCommand(caseId, options); });
+
+workspaceCmd
+  .command('read <case_id>')
+  .description('Read turns with seq > since_seq (how each agent sees new turns)')
+  .option('--since-seq <n>', 'Only turns after this seq', '0')
+  .option('--limit <n>', 'Max turns', '500')
+  .option('--node <url>', 'biofs-node base override')
+  .option('--json', 'Output as JSON')
+  .action(async (caseId: string, options: WorkspaceOptions) => { await workspaceReadCommand(caseId, options); });
+
+workspaceCmd
+  .command('append <case_id>')
+  .description('Append one turn (append-only). Default agent_id "operator"; use --as')
+  .option('--as <agent_id>', 'Author id (e.g. operator, claude-code, grok-build)', 'operator')
+  .option('--role <role>', 'Turn role', 'message')
+  .option('--content <text>', 'Turn content')
+  .option('--ref <biocid:hash:kind...>', 'Data refs, each biocid:content_hash:kind')
+  .option('--node <url>', 'biofs-node base override')
+  .option('--json', 'Output as JSON')
+  .action(async (caseId: string, options: WorkspaceOptions) => { await workspaceAppendCommand(caseId, options); });
+
+workspaceCmd
+  .command('case <case_id>')
+  .description('Update the shared case header with optimistic CAS (needs --expected-version)')
+  .option('--title <title>', 'New title')
+  .option('--status <status>', 'New status')
+  .option('--active-editor <agent_id>', 'Advisory active editor')
+  .option('--biocid <biocid...>', 'Replace biocids')
+  .option('--expected-version <n>', 'Expected current _version', '0')
+  .option('--node <url>', 'biofs-node base override')
+  .option('--json', 'Output as JSON')
+  .action(async (caseId: string, options: WorkspaceOptions) => { await workspaceCaseCommand(caseId, options); });
+
+workspaceCmd
+  .command('lease <resource>')
+  .description('Advisory turn-taking lease (claim by default; --release to release)')
+  .option('--holder <agent_id>', 'Lease holder', 'operator')
+  .option('--ttl <seconds>', 'Lease TTL seconds', '60')
+  .option('--release', 'Release instead of claim')
+  .option('--node <url>', 'biofs-node base override')
+  .option('--json', 'Output as JSON')
+  .action(async (resource: string, options: WorkspaceOptions) => { await workspaceLeaseCommand(resource, options); });
+
+workspaceCmd
+  .command('replay <case_id>')
+  .description('Print the ordered log and verify the hash chain (the audit record)')
+  .option('--node <url>', 'biofs-node base override')
+  .option('--json', 'Output as JSON')
+  .action(async (caseId: string, options: WorkspaceOptions) => { await workspaceReplayCommand(caseId, options); });
+
+workspaceCmd
+  .command('anchor <case_id>')
+  .description('Record a turn-log segment digest for on-chain anchoring (stage B)')
+  .option('--up-to-seq <n>', 'Anchor up to this seq (default: all)')
+  .option('--node <url>', 'biofs-node base override')
+  .option('--json', 'Output as JSON')
+  .action(async (caseId: string, options: WorkspaceOptions) => { await workspaceAnchorCommand(caseId, options); });
+
+workspaceCmd
+  .command('classify <case_id>')
+  .description('Record a structured ACMG-style classification claim (for consensus)')
+  .requiredOption('--subject <s>', 'What is classified (HGVS, gene:variant, or biocid)')
+  .requiredOption('--classification <c>', 'Verdict (Pathogenic|Likely pathogenic|VUS|Likely benign|Benign)')
+  .option('--criteria <list>', 'ACMG criteria, comma-separated (e.g. PVS1,PM2)')
+  .option('--strength <s>', 'Combined-strength note')
+  .option('--confidence <n>', 'Confidence 0-1')
+  .option('--rationale <text>', 'Justification (turn content)')
+  .option('--as <agent_id>', 'Author id', 'operator')
+  .option('--ref <biocid:hash:kind...>', 'Data refs')
+  .option('--node <url>', 'biofs-node base override')
+  .option('--json', 'Output as JSON')
+  .action(async (caseId: string, options: WorkspaceOptions) => { await workspaceClassifyCommand(caseId, options); });
+
+workspaceCmd
+  .command('consensus <case_id>')
+  .description('Compute cross-agent consensus from classification claims (agreement, disagreements)')
+  .option('--node <url>', 'biofs-node base override')
+  .option('--json', 'Output as JSON')
+  .action(async (caseId: string, options: WorkspaceOptions) => { await workspaceConsensusCommand(caseId, options); });
+
+workspaceCmd
+  .command('export <case_id>')
+  .description('Export the chain-verified turn log as portable JSON (for the verifier / archival)')
+  .option('--out <file>', 'Write to file (default: stdout)')
+  .option('--node <url>', 'biofs-node base override')
+  .option('--quiet', 'Suppress status line')
+  .action(async (caseId: string, options: WorkspaceOptions) => { await workspaceExportCommand(caseId, options); });
+
+workspaceCmd
+  .command('verify <file>')
+  .description('Independently verify an exported turn log offline (zero-trust reproducibility check)')
+  .option('--offline', 'Verify the hash chain locally without contacting any server (default behavior)')
+  .option('--json', 'Output as JSON')
+  .action(async (file: string, options: WorkspaceOptions) => { await workspaceVerifyCommand(file, options); });
+
+// Duet — conductor that drives Claude Code + Grok Build headless on subscriptions.
+program
+  .command('duet <case_id>')
+  .description('Orchestrate Claude Code + Grok Build (subscription CLIs, headless) on one case')
+  .option('--task <text>', 'The shared goal/question for the two models')
+  .option('--biocid <biocid>', 'The biocid (annotated VCF / data) under discussion')
+  .option('--rounds <n>', 'Number of rounds', '3')
+  .option('--mode <mode>', 'alternate | parallel | consensus', 'alternate')
+  .option('--models <csv>', 'Models in order (claude,grok,gemini)', 'claude,grok')
+  .option('--node <url>', 'biofs-node base override (BIOFS_NODE_URL)')
+  .option('--biorouter <url>', 'biorouter base for the biofs MCP')
+  .option('--mcp-dist <path>', 'Path to mcp-bio-context dist/index.js')
+  .option('--claude-bin <bin>', 'Claude Code binary', 'claude')
+  .option('--grok-bin <bin>', 'Grok Build binary', 'grok')
+  .option('--gemini-bin <bin>', 'Gemini CLI binary', 'gemini')
+  .option('--gemini-model <model>', 'Gemini model id', 'gemini-3-flash-preview')
+  .option('--mock', 'Do not spawn the CLIs; simulate each turn (test the loop)')
+  .option('--referee <model>', 'After rounds, this model adjudicates disagreements into a final call')
+  .option('--timeout <seconds>', 'Per-CLI-invocation timeout (grok startup is slow)', '300')
+  .option('--dry-run', 'Preflight checks only, then exit')
+  .option('--json', 'Output as JSON')
+  .action(async (caseId: string, options: DuetOptions) => { await duetCommand(caseId, options); });
+
+// Benchmark — the ACMG evaluation harness (single vs same-model vs cross-vendor).
+program
+  .command('benchmark <dataset>')
+  .description('Run the ACMG benchmark: single-model vs same-model debate vs cross-vendor debate, scored vs truth')
+  .option('--arms <csv>', 'Arms to run', 'single,same-model,cross-vendor')
+  .option('--models <csv>', 'Model panel', 'claude,grok,gemini')
+  .option('--rounds <n>', 'Debate rounds for debate arms', '2')
+  .option('--same-model <model>', 'Model used for the same-model-debate arm')
+  .option('--mock', 'Deterministic mock (validate the harness without spawning CLIs)')
+  .option('--mock-error <pct>', 'Per-model error rate in mock mode', '22')
+  .option('--limit <n>', 'Only the first N variants')
+  .option('--out <dir>', 'Results output directory')
+  .option('--node <url>', 'biofs-node base override (BIOFS_NODE_URL)')
+  .option('--biorouter <url>', 'biorouter base for the biofs MCP')
+  .option('--mcp-dist <path>', 'Path to mcp-bio-context dist/index.js')
+  .option('--gemini-model <model>', 'Gemini model id', 'gemini-3-flash-preview')
+  .option('--timeout <seconds>', 'Per-CLI-invocation timeout', '300')
+  .option('--json', 'Output summary as JSON')
+  .action(async (dataset: string, options: BenchmarkOptions) => { await benchmarkCommand(dataset, options); });
+
+// benchmark-prepare — build the publication dataset from a ClinVar export.
+program
+  .command('benchmark-prepare <clinvar_variant_summary>')
+  .description('Build a stratified benchmark dataset from a ClinVar variant_summary.txt[.gz] export')
+  .option('--out <file>', 'Output JSONL path', 'bench/clinvar.jsonl')
+  .option('--min-stars <n>', 'Minimum ClinVar review stars (2 = multiple submitters, no conflicts)', '2')
+  .option('--per-tier <n>', 'Max variants sampled per ACMG tier', '100')
+  .option('--max <n>', 'Hard cap on total variants')
+  .option('--tiers <csv>', 'Restrict to tiers (e.g. P,LP,VUS,LB,B)')
+  .option('--genes <csv>', 'Restrict to genes')
+  .option('--assembly <asm>', 'Genome assembly to keep', 'GRCh38')
+  .option('--json', 'Output summary as JSON')
+  .action(async (file: string, options: PrepareOptions) => { await benchmarkPrepareCommand(file, options); });
 
 // Payment commands (x402 Protocol - Avalanche C-Chain)
 const paymentCmd = program
@@ -1593,6 +1769,31 @@ program
       await waveletConsensusCommand(gene, options);
     } catch (error: any) {
       Logger.error(`wavelet-consensus failed: ${error?.message || error}`);
+      process.exit(1);
+    }
+  });
+
+// Score-protein — the Super-SCDS Phase A.2 canonical scoring verb. For one
+// UniProt accession, fetch FASTA, load cached RRM/PSM consensuses, compute
+// the SCDS family per missense variant, upsert into MongoDB collections
+// scds_consensuses + scds_variants via /api_scds/upsert_protein on prod.
+program
+  .command('score-protein <uniprot>')
+  .description('Super-SCDS Phase A.2: score one UniProt protein and upsert into scds_consensuses + scds_variants')
+  .option('--gene-symbol <symbol>', 'Gene symbol (e.g., BRCA1) used as a fallback consensus-cache key')
+  .option('--source <family|orthologs|trembl>', 'Family source for consensus (default: family)', 'family')
+  .option('--taxonomy <id>', 'NCBI taxonomy id (default 7742 = Vertebrata)', '7742')
+  .option('--pfam <id>', 'Override Pfam family')
+  .option('--api-base <url>', 'GenoBank API base (default https://genobank.app)')
+  .option('--dry-run', 'Compute and emit the payload, do not POST')
+  .option('--skip-mongo-upsert', 'Compute the full payload but skip the API call (alias for --dry-run + no stdout)')
+  .option('--output <path>', 'Write the payload to a JSON file')
+  .option('--quiet', 'Suppress progress')
+  .action(async (uniprot: string, options: ScoreProteinOptions) => {
+    try {
+      await scoreProteinCommand(uniprot, options);
+    } catch (error: any) {
+      Logger.error(`score-protein failed: ${error?.message || error}`);
       process.exit(1);
     }
   });
