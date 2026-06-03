@@ -1,0 +1,400 @@
+{"variant_id":"IFT140_c31411GT","gene":"IFT140","hgvs":"NM_014714.4:c.3141+1G>T","protein":"","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA2_c40924093insAA","gene":"BRCA2","hgvs":"NM_000059.4:c.4092_4093insAA","protein":"p.Cys1365fs","truth":"P","note":"ClinVar Pathogenic (reviewed by expert panel)"}
+{"variant_id":"P3H1_c640CT","gene":"P3H1","hgvs":"NM_022356.4:c.640C>T","protein":"p.Arg214Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BCKDHA_c741dup","gene":"BCKDHA","hgvs":"NM_000709.4:c.741dup","protein":"p.Ala248fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DMD_c2968CT","gene":"DMD","hgvs":"NM_004006.3:c.2968C>T","protein":"p.Gln990Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA2_c72117212del","gene":"BRCA2","hgvs":"NM_000059.4:c.7211_7212del","protein":"p.Lys2404fs","truth":"P","note":"ClinVar Pathogenic (reviewed by expert panel)"}
+{"variant_id":"VWF_c3917GA","gene":"VWF","hgvs":"NM_000552.5:c.3917G>A","protein":"p.Arg1306Gln","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"RB1_c1306CT","gene":"RB1","hgvs":"NM_000321.3:c.1306C>T","protein":"p.Gln436Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"POGZ_c2092CT","gene":"POGZ","hgvs":"NM_015100.4:c.2092C>T","protein":"p.Arg698Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FBN2_c3467GT","gene":"FBN2","hgvs":"NM_001999.4:c.3467G>T","protein":"p.Cys1156Phe","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA1_c4054GT","gene":"BRCA1","hgvs":"NM_007294.4:c.4054G>T","protein":"p.Glu1352Ter","truth":"P","note":"ClinVar Pathogenic (reviewed by expert panel)"}
+{"variant_id":"PDCD10_c2681GA","gene":"PDCD10","hgvs":"NM_007217.4:c.268+1G>A","protein":"","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MSH6_c988dup","gene":"MSH6","hgvs":"NM_000179.3:c.988dup","protein":"p.Ser330fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"STAT1_c800CT","gene":"STAT1","hgvs":"NM_007315.4:c.800C>T","protein":"p.Ala267Val","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"APC_c47604767dup","gene":"APC","hgvs":"NM_000038.6:c.4760_4767dup","protein":"p.Lys1590fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA1_c493494del","gene":"BRCA1","hgvs":"NM_007294.4:c.493_494del","protein":"p.Leu165fs","truth":"P","note":"ClinVar Pathogenic (reviewed by expert panel)"}
+{"variant_id":"HEXA_c568569del","gene":"HEXA","hgvs":"NM_000520.6:c.568_569del","protein":"p.Leu190fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PPT1_c776dup","gene":"PPT1","hgvs":"NM_000310.4:c.776dup","protein":"p.Glu260fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MYO15A_c8222TC","gene":"MYO15A","hgvs":"NM_016239.4:c.8222T>C","protein":"p.Phe2741Ser","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"EYS_c7822CT","gene":"EYS","hgvs":"NM_001142800.2:c.7822C>T","protein":"p.Gln2608Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MSH2_c380del","gene":"MSH2","hgvs":"NM_000251.3:c.380del","protein":"p.Asn127fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CACNA1A_c5452CT","gene":"CACNA1A","hgvs":"NM_001127222.2:c.5452C>T","protein":"p.Arg1818Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA1_c97GT","gene":"BRCA1","hgvs":"NM_007294.4:c.97G>T","protein":"p.Glu33Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA2_c13081309del","gene":"BRCA2","hgvs":"NM_000059.4:c.1308_1309del","protein":"p.Lys437fs","truth":"P","note":"ClinVar Pathogenic (reviewed by expert panel)"}
+{"variant_id":"SCN1A_c1492AT","gene":"SCN1A","hgvs":"NM_001165963.4:c.1492A>T","protein":"p.Arg498Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"AHDC1_c2365CT","gene":"AHDC1","hgvs":"NM_001371928.1:c.2365C>T","protein":"p.Arg789Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"TRIP11_c19381941del","gene":"TRIP11","hgvs":"NM_004239.4:c.1938_1941del","protein":"p.Arg647fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SKI_c100GT","gene":"SKI","hgvs":"NM_003036.4:c.100G>T","protein":"p.Gly34Cys","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"COL1A2_c2943129432del","gene":"COL1A2","hgvs":"NM_000089.4:c.2943+1_2943+2del","protein":"","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"APC_c453del","gene":"APC","hgvs":"NM_000038.6:c.453del","protein":"p.Glu152fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MBD5_c3971GA","gene":"MBD5","hgvs":"NM_001378120.1:c.397+1G>A","protein":"","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ITGA2B_c2994GA","gene":"ITGA2B","hgvs":"NM_000419.5:c.2994G>A","protein":"p.Trp998Ter","truth":"P","note":"ClinVar Pathogenic (reviewed by expert panel)"}
+{"variant_id":"RB1_c17261729del","gene":"RB1","hgvs":"NM_000321.3:c.1726_1729del","protein":"p.Ser576fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ADGRV1_c6856CT","gene":"ADGRV1","hgvs":"NM_032119.4:c.6856C>T","protein":"p.Arg2286Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BARD1_c1111AT","gene":"BARD1","hgvs":"NM_000465.4:c.1111A>T","protein":"p.Lys371Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SLC4A11_c425433delinsC","gene":"SLC4A11","hgvs":"NM_001174089.2:c.425_433delinsC","protein":"p.Arg142fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MSH2_c2096CA","gene":"MSH2","hgvs":"NM_000251.3:c.2096C>A","protein":"p.Ser699Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA2_c1833del","gene":"BRCA2","hgvs":"NM_000059.4:c.1833del","protein":"p.Glu612fs","truth":"P","note":"ClinVar Pathogenic (reviewed by expert panel)"}
+{"variant_id":"NF1_c6540del","gene":"NF1","hgvs":"NM_001042492.3:c.6540del","protein":"p.Ser2181fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"KCNJ2_c245GA","gene":"KCNJ2","hgvs":"NM_000891.3:c.245G>A","protein":"p.Arg82Gln","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PALB2_c886dup","gene":"PALB2","hgvs":"NM_024675.4:c.886dup","protein":"p.Met296fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"IPO8_c1420CT","gene":"IPO8","hgvs":"NM_006390.4:c.1420C>T","protein":"p.Arg474Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"KMT2D_c1301del","gene":"KMT2D","hgvs":"NM_003482.4:c.1301del","protein":"p.Leu434fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MERTK_c20702074del","gene":"MERTK","hgvs":"NM_006343.3:c.2070_2074del","protein":"p.Gly691fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SCN1A_c249CA","gene":"SCN1A","hgvs":"NM_001165963.4:c.249C>A","protein":"p.Tyr83Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ATM_c5610del","gene":"ATM","hgvs":"NM_000051.4:c.5610del","protein":"p.Phe1870fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DMD_c10367del","gene":"DMD","hgvs":"NM_004006.3:c.10367del","protein":"p.Asn3456fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"APC_c31643165del","gene":"APC","hgvs":"NM_000038.6:c.3164_3165del","protein":"p.Ile1055fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CFTR_c236GA","gene":"CFTR","hgvs":"NM_000492.4:c.236G>A","protein":"p.Trp79Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MSH6_c3957del","gene":"MSH6","hgvs":"NM_000179.3:c.3957del","protein":"p.Ala1320fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BMPR1A_c455del","gene":"BMPR1A","hgvs":"NM_004329.3:c.455del","protein":"p.Arg152fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"TK2_c547CT","gene":"TK2","hgvs":"NM_004614.5:c.547C>T","protein":"p.Arg183Trp","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ALPL_c6481GA","gene":"ALPL","hgvs":"NM_000478.6:c.648+1G>A","protein":"","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ATM_c5784dup","gene":"ATM","hgvs":"NM_000051.4:c.5784dup","protein":"p.Asn1929Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PPFIA3_c2332CT","gene":"PPFIA3","hgvs":"NM_003660.4:c.2332C>T","protein":"p.Arg778Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"EDNRB_c601CT","gene":"EDNRB","hgvs":"NM_001122659.3:c.601C>T","protein":"p.Arg201Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"GAA_c19621964del","gene":"GAA","hgvs":"NM_000152.5:c.1962_1964del","protein":"p.Glu656del","truth":"P","note":"ClinVar Pathogenic (reviewed by expert panel)"}
+{"variant_id":"PMS2_c986CG","gene":"PMS2","hgvs":"NM_000535.7:c.986C>G","protein":"p.Ser329Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MLH1_c1310del","gene":"MLH1","hgvs":"NM_000249.4:c.1310del","protein":"p.Pro437fs","truth":"P","note":"ClinVar Pathogenic (reviewed by expert panel)"}
+{"variant_id":"DMD_c9100CT","gene":"DMD","hgvs":"NM_004006.3:c.9100C>T","protein":"p.Arg3034Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BMPR1A_c405dup","gene":"BMPR1A","hgvs":"NM_004329.3:c.405dup","protein":"p.Pro136fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"APC_c1600AT","gene":"APC","hgvs":"NM_000038.6:c.1600A>T","protein":"p.Lys534Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"RAD51D_c351TA","gene":"RAD51D","hgvs":"NM_002878.4:c.351T>A","protein":"p.Cys117Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PALB2_c21452146del","gene":"PALB2","hgvs":"NM_024675.4:c.2145_2146del","protein":"p.Asp715fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"NSD1_c5332CT","gene":"NSD1","hgvs":"NM_022455.5:c.5332C>T","protein":"p.Arg1778Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SLC4A11_c62CA","gene":"SLC4A11","hgvs":"NM_001174089.2:c.62C>A","protein":"p.Ser21Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"NF1_c6993TA","gene":"NF1","hgvs":"NM_001042492.3:c.6993T>A","protein":"p.Tyr2331Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PKD1L1_c7663CT","gene":"PKD1L1","hgvs":"NM_138295.5:c.7663C>T","protein":"p.Arg2555Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SPG11_c4421GC","gene":"SPG11","hgvs":"NM_025137.4:c.442+1G>C","protein":"","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CYP27A1_c380GA","gene":"CYP27A1","hgvs":"NM_000784.4:c.380G>A","protein":"p.Arg127Gln","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA2_c15111512del","gene":"BRCA2","hgvs":"NM_000059.4:c.1511_1512del","protein":"p.Ser504fs","truth":"P","note":"ClinVar Pathogenic (reviewed by expert panel)"}
+{"variant_id":"BRCA1_c24852486insAA","gene":"BRCA1","hgvs":"NM_007294.4:c.2485_2486insAA","protein":"p.Phe829Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA2_c8760TG","gene":"BRCA2","hgvs":"NM_000059.4:c.8760T>G","protein":"p.Tyr2920Ter","truth":"P","note":"ClinVar Pathogenic (reviewed by expert panel)"}
+{"variant_id":"KRIT1_c1775del","gene":"KRIT1","hgvs":"NM_194454.3:c.1775del","protein":"p.Ser592fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BMPR1A_c634CT","gene":"BMPR1A","hgvs":"NM_004329.3:c.634C>T","protein":"p.Gln212Ter","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA1_c14831498del","gene":"BRCA1","hgvs":"NM_007294.4:c.1483_1498del","protein":"p.Glu495fs","truth":"P","note":"ClinVar Pathogenic (reviewed by expert panel)"}
+{"variant_id":"GAA_c2242dup","gene":"GAA","hgvs":"NM_000152.5:c.2242dup","protein":"p.Glu748fs","truth":"P","note":"ClinVar Pathogenic (reviewed by expert panel)"}
+{"variant_id":"MSH2_c759del","gene":"MSH2","hgvs":"NM_000251.3:c.759del","protein":"p.Met253fs","truth":"P","note":"ClinVar Pathogenic (reviewed by expert panel)"}
+{"variant_id":"SLC6A8_c1456CT","gene":"SLC6A8","hgvs":"NM_005629.4:c.1456C>T","protein":"p.Gln486Ter","truth":"P","note":"ClinVar Pathogenic (reviewed by expert panel)"}
+{"variant_id":"RPL11_c143144del","gene":"RPL11","hgvs":"NM_000975.5:c.143_144del","protein":"p.Pro48fs","truth":"P","note":"ClinVar Pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"NF1_c81132TG","gene":"NF1","hgvs":"NM_001042492.3:c.8113+2T>G","protein":"","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SI_c27371GC","gene":"SI","hgvs":"NM_001041.4:c.2737-1G>C","protein":"","truth":"LP","note":"ClinVar Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"UGT1A1_c8641GA","gene":"UGT1A1","hgvs":"NM_000463.3:c.864+1G>A","protein":"","truth":"LP","note":"ClinVar Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SLC24A1_c11321133del","gene":"SLC24A1","hgvs":"NM_004727.3:c.1132_1133del","protein":"p.Ser378fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FREM2_c3151CT","gene":"FREM2","hgvs":"NM_207361.6:c.3151C>T","protein":"p.Gln1051Ter","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ABCA12_c2785CT","gene":"ABCA12","hgvs":"NM_173076.3:c.2785C>T","protein":"p.Arg929Cys","truth":"LP","note":"ClinVar Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FECH_c286CT","gene":"FECH","hgvs":"NM_000140.5:c.286C>T","protein":"p.Arg96Ter","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CERKL_c450451del","gene":"CERKL","hgvs":"NM_201548.5:c.450_451del","protein":"p.Ile150fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DMD_c3917dup","gene":"DMD","hgvs":"NM_004006.3:c.3917dup","protein":"p.Asp1307fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"NEB_c19519AT","gene":"NEB","hgvs":"NM_001164508.2:c.19519A>T","protein":"p.Lys6507Ter","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ECHS1_c476AG","gene":"ECHS1","hgvs":"NM_004092.4:c.476A>G","protein":"p.Gln159Arg","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FBN1_c4955GA","gene":"FBN1","hgvs":"NM_000138.5:c.4955G>A","protein":"p.Cys1652Tyr","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"COL7A1_c8324GA","gene":"COL7A1","hgvs":"NM_000094.4:c.8324G>A","protein":"p.Gly2775Asp","truth":"LP","note":"ClinVar Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FLVCR1_c1500GA","gene":"FLVCR1","hgvs":"NM_014053.4:c.1500G>A","protein":"p.Trp500Ter","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PKP2_c962del","gene":"PKP2","hgvs":"NM_001005242.3:c.962del","protein":"p.Val321fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"TUBB4A_c286GA","gene":"TUBB4A","hgvs":"NM_006087.4:c.286G>A","protein":"p.Gly96Arg","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BCKDHB_c9511GA","gene":"BCKDHB","hgvs":"NM_183050.4:c.951+1G>A","protein":"","truth":"LP","note":"ClinVar Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PCCA_c2311GC","gene":"PCCA","hgvs":"NM_000282.4:c.231+1G>C","protein":"","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ACADSB_c621GA","gene":"ACADSB","hgvs":"NM_001609.4:c.621G>A","protein":"p.Trp207Ter","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA1_c5511GT","gene":"BRCA1","hgvs":"NM_007294.4:c.5511G>T","protein":"p.Trp1837Cys","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PTEN_c500CA","gene":"PTEN","hgvs":"NM_000314.8:c.500C>A","protein":"p.Thr167Asn","truth":"LP","note":"ClinVar Likely pathogenic (reviewed by expert panel)"}
+{"variant_id":"MCCC1_c1905del","gene":"MCCC1","hgvs":"NM_020166.5:c.1905del","protein":"p.Lys635fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ATM_c44362TC","gene":"ATM","hgvs":"NM_000051.4:c.4436+2T>C","protein":"","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"AARS1_c37CT","gene":"AARS1","hgvs":"NM_001605.3:c.37C>T","protein":"p.Arg13Ter","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DPYD_c127134del","gene":"DPYD","hgvs":"NM_000110.4:c.127_134del","protein":"p.Lys42_Arg43insTer","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SNAP25_c589CT","gene":"SNAP25","hgvs":"NM_130811.4:c.589C>T","protein":"p.Gln197Ter","truth":"LP","note":"ClinVar Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SLC17A5_c409del","gene":"SLC17A5","hgvs":"NM_012434.5:c.409del","protein":"p.Met137fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"LAMA2_c87031GA","gene":"LAMA2","hgvs":"NM_000426.4:c.8703+1G>A","protein":"","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA2_c68411GT","gene":"BRCA2","hgvs":"NM_000059.4:c.6841+1G>T","protein":"","truth":"LP","note":"ClinVar Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DMD_c3457AT","gene":"DMD","hgvs":"NM_004006.3:c.3457A>T","protein":"p.Lys1153Ter","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CRB1_c1136CG","gene":"CRB1","hgvs":"NM_201253.3:c.1136C>G","protein":"p.Ser379Ter","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"COA8_c41dup","gene":"COA8","hgvs":"NM_001370595.2:c.41dup","protein":"p.Leu15fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"XPC_c7791GT","gene":"XPC","hgvs":"NM_004628.5:c.779+1G>T","protein":"","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CTCF_c1024CT","gene":"CTCF","hgvs":"NM_006565.4:c.1024C>T","protein":"p.Arg342Cys","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"WDR35_c524del","gene":"WDR35","hgvs":"NM_020779.4:c.524del","protein":"p.Met175fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"COL4A5_c4106del","gene":"COL4A5","hgvs":"NM_033380.3:c.4106del","protein":"p.Gly1369fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PALB2_c801802dup","gene":"PALB2","hgvs":"NM_024675.4:c.801_802dup","protein":"p.Lys268fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"HNF1B_c1258dup","gene":"HNF1B","hgvs":"NM_000458.4:c.1258dup","protein":"p.His420fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MMUT_c545TG","gene":"MMUT","hgvs":"NM_000255.4:c.545T>G","protein":"p.Met182Arg","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FOXN1_c1367TA","gene":"FOXN1","hgvs":"NM_001369369.1:c.1367T>A","protein":"p.Leu456Ter","truth":"LP","note":"ClinVar Likely pathogenic (reviewed by expert panel)"}
+{"variant_id":"SACS_c6186dup","gene":"SACS","hgvs":"NM_014363.6:c.6186dup","protein":"p.Pro2063fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ABCA4_c1906CA","gene":"ABCA4","hgvs":"NM_000350.3:c.1906C>A","protein":"p.Gln636Lys","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CHEK2_c6832TG","gene":"CHEK2","hgvs":"NM_007194.4:c.683+2T>G","protein":"","truth":"LP","note":"ClinVar Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"GALC_c10342AG","gene":"GALC","hgvs":"NM_000153.4:c.1034-2A>G","protein":"","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"WFS1_c2146GA","gene":"WFS1","hgvs":"NM_006005.3:c.2146G>A","protein":"p.Ala716Thr","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"COL4A3_c833dup","gene":"COL4A3","hgvs":"NM_000091.5:c.833dup","protein":"p.Pro279fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CACNA1C_c1553GA","gene":"CACNA1C","hgvs":"NM_000719.7:c.1553G>A","protein":"p.Arg518His","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CUBN_c8463GA","gene":"CUBN","hgvs":"NM_001081.4:c.8463G>A","protein":"p.Trp2821Ter","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SOX9_c508CA","gene":"SOX9","hgvs":"NM_000346.4:c.508C>A","protein":"p.Pro170Thr","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PTEN_c4921GA","gene":"PTEN","hgvs":"NM_000314.8:c.492+1G>A","protein":"","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PAH_c974AG","gene":"PAH","hgvs":"NM_000277.3:c.974A>G","protein":"p.Tyr325Cys","truth":"LP","note":"ClinVar Likely pathogenic (reviewed by expert panel)"}
+{"variant_id":"NBN_c8389del","gene":"NBN","hgvs":"NM_002485.5:c.83_89del","protein":"p.Arg28fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FMO3_c859GT","gene":"FMO3","hgvs":"NM_001002294.3:c.859G>T","protein":"p.Glu287Ter","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA2_c24372438del","gene":"BRCA2","hgvs":"NM_000059.4:c.2437_2438del","protein":"p.Ile813fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FBN1_c2873GA","gene":"FBN1","hgvs":"NM_000138.5:c.2873G>A","protein":"p.Cys958Tyr","truth":"LP","note":"ClinVar Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"EYS_c85658568del","gene":"EYS","hgvs":"NM_001142800.2:c.8565_8568del","protein":"p.Asn2855fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MSH6_c3037AAG1","gene":"MSH6","hgvs":"NM_000179.3:c.3037AAG[1]","protein":"p.Lys1014del","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"LZTR1_c1794CA","gene":"LZTR1","hgvs":"NM_006767.4:c.1794C>A","protein":"p.Cys598Ter","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"GCDH_c12441GA","gene":"GCDH","hgvs":"NM_000159.4:c.1244-1G>A","protein":"","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FBN1_c3623GT","gene":"FBN1","hgvs":"NM_000138.5:c.3623G>T","protein":"p.Cys1208Phe","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ROBO1_c769772del","gene":"ROBO1","hgvs":"NM_002941.4:c.769_772del","protein":"p.Thr257fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FBN1_c4331GA","gene":"FBN1","hgvs":"NM_000138.5:c.4331G>A","protein":"p.Cys1444Tyr","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"NDUFB11_c361GA","gene":"NDUFB11","hgvs":"NM_001135998.3:c.361G>A","protein":"p.Glu121Lys","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DNAAF11_c436GC","gene":"DNAAF11","hgvs":"NM_012472.6:c.436G>C","protein":"p.Asp146His","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BMPR1A_c1480CT","gene":"BMPR1A","hgvs":"NM_004329.3:c.1480C>T","protein":"p.Arg494Ter","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"COL4A5_c4821GA","gene":"COL4A5","hgvs":"NM_033380.3:c.4821G>A","protein":"p.Met1607Ile","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FBN1_c1606CT","gene":"FBN1","hgvs":"NM_000138.5:c.1606C>T","protein":"p.Gln536Ter","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"TAT_c889CT","gene":"TAT","hgvs":"NM_000353.3:c.889C>T","protein":"p.Arg297Ter","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DSG2_c52315232del","gene":"DSG2","hgvs":"NM_001943.5:c.523+1_523+2del","protein":"","truth":"LP","note":"ClinVar Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SGCA_c10251026del","gene":"SGCA","hgvs":"NM_000023.4:c.1025_1026del","protein":"p.Glu342fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA1_c5467GA","gene":"BRCA1","hgvs":"NM_007294.4:c.5467G>A","protein":"p.Ala1823Thr","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"OCA2_c21772181del","gene":"OCA2","hgvs":"NM_000275.3:c.2177_2181del","protein":"p.Val726fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"THOC6_c739CT","gene":"THOC6","hgvs":"NM_024339.5:c.739C>T","protein":"p.Arg247Ter","truth":"LP","note":"ClinVar Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"GCK_c1398AG","gene":"GCK","hgvs":"NM_000162.5:c.1398A>G","protein":"p.Ter466Trp","truth":"LP","note":"ClinVar Likely pathogenic (reviewed by expert panel)"}
+{"variant_id":"NF1_c47252AG","gene":"NF1","hgvs":"NM_001042492.3:c.4725-2A>G","protein":"","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MSH3_c873876del","gene":"MSH3","hgvs":"NM_002439.5:c.873_876del","protein":"p.Val292fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PKD1_c14181419del","gene":"PKD1","hgvs":"NM_001009944.3:c.1418_1419del","protein":"p.Val473fs","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FBN1_c5783GA","gene":"FBN1","hgvs":"NM_000138.5:c.5783G>A","protein":"p.Cys1928Tyr","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FBN1_c461GC","gene":"FBN1","hgvs":"NM_000138.5:c.461G>C","protein":"p.Cys154Ser","truth":"LP","note":"ClinVar Pathogenic/Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"TTN_c97588dup","gene":"TTN","hgvs":"NM_001267550.2:c.97588dup","protein":"p.Gln32530fs","truth":"LP","note":"ClinVar Likely pathogenic (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"TTN_c67648CT","gene":"TTN","hgvs":"NM_001267550.2:c.67648C>T","protein":"p.Leu22550Phe","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MSH2_c16821685inv","gene":"MSH2","hgvs":"NM_000251.3:c.1682_1685inv","protein":"p.Glu561_Glu562delinsValLeu","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ACOX2_c439AT","gene":"ACOX2","hgvs":"NM_003500.4:c.439A>T","protein":"p.Ile147Phe","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ALPK3_c3344TC","gene":"ALPK3","hgvs":"NM_020778.5:c.3344T>C","protein":"p.Leu1115Pro","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SLC6A9_c31731AC","gene":"SLC6A9","hgvs":"NM_001024845.3:c.31-731A>C","protein":"","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PCLO_c10552GA","gene":"PCLO","hgvs":"NM_033026.6:c.10552G>A","protein":"p.Val3518Ile","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CTRC_c22GA","gene":"CTRC","hgvs":"NM_007272.3:c.22G>A","protein":"p.Ala8Thr","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CEP250_c1243GT","gene":"CEP250","hgvs":"NM_007186.6:c.1243G>T","protein":"p.Ala415Ser","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"KCNQ3_c1939AG","gene":"KCNQ3","hgvs":"NM_004519.4:c.1939A>G","protein":"p.Met647Val","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CDKN2A_c344TA","gene":"CDKN2A","hgvs":"NM_000077.5:c.344T>A","protein":"p.Val115Glu","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"EPAS1_c1387GA","gene":"EPAS1","hgvs":"NM_001430.5:c.1387G>A","protein":"p.Ala463Thr","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"RYR2_c12972GT","gene":"RYR2","hgvs":"NM_001035.3:c.12972G>T","protein":"p.Lys4324Asn","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"NBN_c458TC","gene":"NBN","hgvs":"NM_002485.5:c.458T>C","protein":"p.Val153Ala","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"GALK1_c104CT","gene":"GALK1","hgvs":"NM_000154.2:c.104C>T","protein":"p.Pro35Leu","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"HSPB1_c264CG","gene":"HSPB1","hgvs":"NM_001540.5:c.264C>G","protein":"p.Ile88Met","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DSP_c1738AT","gene":"DSP","hgvs":"NM_004415.4:c.1738A>T","protein":"p.Ile580Leu","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"F2_c1463CT","gene":"F2","hgvs":"NM_000506.5:c.1463C>T","protein":"p.Thr488Met","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SCN5A_c3339CA","gene":"SCN5A","hgvs":"NM_000335.5:c.3339C>A","protein":"p.Asp1113Glu","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ADAMTS13_c2465CG","gene":"ADAMTS13","hgvs":"NM_139027.6:c.2465C>G","protein":"p.Ala822Gly","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CCDC141_c860GA","gene":"CCDC141","hgvs":"NM_173648.4:c.860G>A","protein":"p.Arg287Gln","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DICER1_c866AG","gene":"DICER1","hgvs":"NM_177438.3:c.866A>G","protein":"p.His289Arg","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CA4_c409AC","gene":"CA4","hgvs":"NM_000717.5:c.409A>C","protein":"p.Met137Leu","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"RAD51D_c425CT","gene":"RAD51D","hgvs":"NM_002878.4:c.425C>T","protein":"p.Thr142Ile","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"APC_c1973AT","gene":"APC","hgvs":"NM_000038.6:c.1973A>T","protein":"p.Glu658Val","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"LRP5_c2344GA","gene":"LRP5","hgvs":"NM_002335.4:c.2344G>A","protein":"p.Gly782Ser","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"NTRK1_c875CT","gene":"NTRK1","hgvs":"NM_002529.4:c.875C>T","protein":"p.Thr292Met","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CFTR_c2433GT","gene":"CFTR","hgvs":"NM_000492.4:c.2433G>T","protein":"p.Arg811Ser","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PTPN11_c1232CT","gene":"PTPN11","hgvs":"NM_002834.5:c.1232C>T","protein":"p.Thr411Met","truth":"VUS","note":"ClinVar Uncertain significance (reviewed by expert panel)"}
+{"variant_id":"FAM149B1_c1388CT","gene":"FAM149B1","hgvs":"NM_173348.2:c.1388C>T","protein":"p.Pro463Leu","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ALPK3_c4682AG","gene":"ALPK3","hgvs":"NM_020778.5:c.4682A>G","protein":"p.Tyr1561Cys","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"RANGRF_c249GC","gene":"RANGRF","hgvs":"NM_016492.5:c.249G>C","protein":"p.Glu83Asp","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FANCM_c2109AG","gene":"FANCM","hgvs":"NM_020937.4:c.2109A>G","protein":"p.Ile703Met","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PLG_c1212GA","gene":"PLG","hgvs":"NM_000301.5:c.1212G>A","protein":"p.Met404Ile","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"RYR2_c4294AG","gene":"RYR2","hgvs":"NM_001035.3:c.4294A>G","protein":"p.Ile1432Val","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"HEXB_c176TC","gene":"HEXB","hgvs":"NM_000521.4:c.176T>C","protein":"p.Leu59Pro","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"TMPRSS15_c1391AG","gene":"TMPRSS15","hgvs":"NM_002772.3:c.1391A>G","protein":"p.Tyr464Cys","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SPEG_c2021CG","gene":"SPEG","hgvs":"NM_005876.5:c.2021C>G","protein":"p.Pro674Arg","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"GABBR2_c539AG","gene":"GABBR2","hgvs":"NM_005458.8:c.539A>G","protein":"p.Asn180Ser","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CLCN6_c1715AG","gene":"CLCN6","hgvs":"NM_001286.5:c.1715A>G","protein":"p.Asn572Ser","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BLM_c2489CT","gene":"BLM","hgvs":"NM_000057.4:c.2489C>T","protein":"p.Thr830Met","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"TCF20_c3017CT","gene":"TCF20","hgvs":"NM_001378418.1:c.3017C>T","protein":"p.Pro1006Leu","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DRAM2_c134AG","gene":"DRAM2","hgvs":"NM_001349884.2:c.134A>G","protein":"p.Asp45Gly","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SYNE1_c6117AC","gene":"SYNE1","hgvs":"NM_182961.4:c.6117A>C","protein":"p.Lys2039Asn","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SCN2A_c5066TC","gene":"SCN2A","hgvs":"NM_001040142.2:c.5066T>C","protein":"p.Val1689Ala","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"POLD1_c3128AG","gene":"POLD1","hgvs":"NM_002691.4:c.3128A>G","protein":"p.His1043Arg","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MTOR_c3466AG","gene":"MTOR","hgvs":"NM_004958.4:c.3466A>G","protein":"p.Ile1156Val","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"IFIH1_c1792CT","gene":"IFIH1","hgvs":"NM_022168.4:c.1792C>T","protein":"p.Arg598Cys","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PSMA3_c257GA","gene":"PSMA3","hgvs":"NM_002788.4:c.257G>A","protein":"p.Arg86His","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"VCL_c2848GA","gene":"VCL","hgvs":"NM_014000.3:c.2848G>A","protein":"p.Glu950Lys","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FBN2_c3387TG","gene":"FBN2","hgvs":"NM_001999.4:c.338-7T>G","protein":"","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DSG2_c697AG","gene":"DSG2","hgvs":"NM_001943.5:c.697A>G","protein":"p.Ser233Gly","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FLNC_c1129AG","gene":"FLNC","hgvs":"NM_001458.5:c.1129A>G","protein":"p.Lys377Glu","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PDGFRA_c2689CT","gene":"PDGFRA","hgvs":"NM_006206.6:c.2689C>T","protein":"p.Pro897Ser","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"WAS_c1247CT","gene":"WAS","hgvs":"NM_000377.3:c.1247C>T","protein":"p.Pro416Leu","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MED25_c1677GA","gene":"MED25","hgvs":"NM_030973.4:c.1677G>A","protein":"p.Met559Ile","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"COL4A2_c2001GC","gene":"COL4A2","hgvs":"NM_001846.4:c.2001G>C","protein":"p.Arg667Ser","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CSGALNACT1_c6345GC","gene":"CSGALNACT1","hgvs":"NM_001354483.2:c.634+5G>C","protein":"","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"APC_c5810CT","gene":"APC","hgvs":"NM_000038.6:c.5810C>T","protein":"p.Ser1937Phe","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DNAH17_c11092GA","gene":"DNAH17","hgvs":"NM_173628.4:c.11092G>A","protein":"p.Glu3698Lys","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DICER1_c2110AG","gene":"DICER1","hgvs":"NM_177438.3:c.2110A>G","protein":"p.Lys704Glu","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MYH14_c4219CT","gene":"MYH14","hgvs":"NM_001145809.2:c.4219C>T","protein":"p.Arg1407Cys","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CNGA3_c386GC","gene":"CNGA3","hgvs":"NM_001298.3:c.386G>C","protein":"p.Arg129Thr","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ATM_c6155AG","gene":"ATM","hgvs":"NM_000051.4:c.6155A>G","protein":"p.Glu2052Gly","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ASPM_c2254TG","gene":"ASPM","hgvs":"NM_018136.5:c.2254T>G","protein":"p.Ser752Ala","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PCARE_c1892CT","gene":"PCARE","hgvs":"NM_001029883.3:c.1892C>T","protein":"p.Ala631Val","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PTPN11_c1144GA","gene":"PTPN11","hgvs":"NM_002834.5:c.1144G>A","protein":"p.Val382Ile","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"GUCY2C_c248TC","gene":"GUCY2C","hgvs":"NM_004963.4:c.248T>C","protein":"p.Met83Thr","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CDH23_c1276CT","gene":"CDH23","hgvs":"NM_022124.6:c.1276C>T","protein":"p.Arg426Cys","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CACNA1S_c4385CA","gene":"CACNA1S","hgvs":"NM_000069.3:c.4385C>A","protein":"p.Thr1462Asn","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PTCH1_c3161GA","gene":"PTCH1","hgvs":"NM_000264.5:c.3161G>A","protein":"p.Gly1054Glu","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"IRF8_c673GA","gene":"IRF8","hgvs":"NM_002163.4:c.673G>A","protein":"p.Glu225Lys","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"WDR36_c1121GA","gene":"WDR36","hgvs":"NM_139281.3:c.1121G>A","protein":"p.Arg374His","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"KATNIP_c3893CT","gene":"KATNIP","hgvs":"NM_015202.5:c.3893C>T","protein":"p.Thr1298Met","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SCN4A_c4864GA","gene":"SCN4A","hgvs":"NM_000334.4:c.4864G>A","protein":"p.Glu1622Lys","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"HOXD13_c65CT","gene":"HOXD13","hgvs":"NM_000523.4:c.65C>T","protein":"p.Ala22Val","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"POLE_c47AT","gene":"POLE","hgvs":"NM_006231.4:c.47A>T","protein":"p.Asp16Val","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SURF1_c1066GA","gene":"SURF1","hgvs":"NM_003172.4:c.106+6G>A","protein":"","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SDHAF2_c314AG","gene":"SDHAF2","hgvs":"NM_017841.4:c.314A>G","protein":"p.Tyr105Cys","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CEP57_c1301AC","gene":"CEP57","hgvs":"NM_014679.5:c.1301A>C","protein":"p.Lys434Thr","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"TSC2_c32293258dup","gene":"TSC2","hgvs":"NM_000548.5:c.3229_3258dup","protein":"p.Thr1077_Gly1086dup","truth":"VUS","note":"ClinVar Uncertain significance (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SOX9_c42GA","gene":"SOX9","hgvs":"NM_000346.4:c.42G>A","protein":"p.Gln14=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"NHLRC1_c138CT","gene":"NHLRC1","hgvs":"NM_198586.3:c.138C>T","protein":"p.Cys46=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"APOB_c7104CT","gene":"APOB","hgvs":"NM_000384.3:c.7104C>T","protein":"p.Tyr2368=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PALB2_c978AG","gene":"PALB2","hgvs":"NM_024675.4:c.978A>G","protein":"p.Ser326=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"RYR1_c9216CA","gene":"RYR1","hgvs":"NM_000540.3:c.9216C>A","protein":"p.Ala3072=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PIEZO1_c7368CT","gene":"PIEZO1","hgvs":"NM_001142864.4:c.7368C>T","protein":"p.Arg2456=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ALG13_c135GA","gene":"ALG13","hgvs":"NM_001099922.3:c.135G>A","protein":"p.Thr45=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DSP_c5706CT","gene":"DSP","hgvs":"NM_004415.4:c.5706C>T","protein":"p.Leu1902=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DICER1_c4488AG","gene":"DICER1","hgvs":"NM_177438.3:c.4488A>G","protein":"p.Ser1496=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ARID1A_c4081AG","gene":"ARID1A","hgvs":"NM_006015.6:c.4081A>G","protein":"p.Met1361Val","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ALMS1_c429GA","gene":"ALMS1","hgvs":"NM_001378454.1:c.429G>A","protein":"p.Gln143=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"AXIN2_c1089CT","gene":"AXIN2","hgvs":"NM_004655.4:c.1089C>T","protein":"p.Thr363=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ITPR1_c1302GA","gene":"ITPR1","hgvs":"NM_001378452.1:c.1302G>A","protein":"p.Pro434=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PFKM_c59418TA","gene":"PFKM","hgvs":"NM_000289.6:c.594-18T>A","protein":"","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"GNAS_c958GA","gene":"GNAS","hgvs":"NM_080425.4:c.958G>A","protein":"p.Asp320Asn","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"COL7A1_c5132CT","gene":"COL7A1","hgvs":"NM_000094.4:c.5132C>T","protein":"p.Thr1711Ile","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ALK_c771TC","gene":"ALK","hgvs":"NM_004304.5:c.771T>C","protein":"p.Ser257=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BLM_c1167TC","gene":"BLM","hgvs":"NM_000057.4:c.1167T>C","protein":"p.Asp389=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ITCH_c1032GA","gene":"ITCH","hgvs":"NM_031483.7:c.1032G>A","protein":"p.Thr344=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"GPD1L_c95911CT","gene":"GPD1L","hgvs":"NM_015141.4:c.959+11C>T","protein":"","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FANCA_c1968AC","gene":"FANCA","hgvs":"NM_000135.4:c.1968A>C","protein":"p.Ala656=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"APOB_c3309GA","gene":"APOB","hgvs":"NM_000384.3:c.3309G>A","protein":"p.Glu1103=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"OPA1_c381GA","gene":"OPA1","hgvs":"NM_130837.3:c.381G>A","protein":"p.Pro127=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"COL18A1_c3264CT","gene":"COL18A1","hgvs":"NM_001379500.1:c.3264C>T","protein":"p.Ala1088=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"NEB_c5718CT","gene":"NEB","hgvs":"NM_001164508.2:c.5718C>T","protein":"p.Ala1906=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA1_c2457CG","gene":"BRCA1","hgvs":"NM_007294.4:c.2457C>G","protein":"p.Ser819=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FLNC_c799015del","gene":"FLNC","hgvs":"NM_001458.5:c.7990+15del","protein":"","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA2_c8742AT","gene":"BRCA2","hgvs":"NM_000059.4:c.8742A>T","protein":"p.Pro2914=","truth":"LB","note":"ClinVar Likely benign (reviewed by expert panel)"}
+{"variant_id":"KCNE5_c396GC","gene":"KCNE5","hgvs":"NM_012282.4:c.396G>C","protein":"p.Leu132=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PTCH1_c3724GA","gene":"PTCH1","hgvs":"NM_000264.5:c.3724G>A","protein":"p.Glu1242Lys","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PALB2_c2682AC","gene":"PALB2","hgvs":"NM_024675.4:c.2682A>C","protein":"p.Val894=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"RAD51_c567AG","gene":"RAD51","hgvs":"NM_002875.5:c.567A>G","protein":"p.Val189=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"AMER1_c2175TG","gene":"AMER1","hgvs":"NM_152424.4:c.2175T>G","protein":"p.Asp725Glu","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MYO7A_c675CT","gene":"MYO7A","hgvs":"NM_000260.4:c.675C>T","protein":"p.Gly225=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"NTRK1_c927GA","gene":"NTRK1","hgvs":"NM_002529.4:c.927G>A","protein":"p.Pro309=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CFTR_c27311CT","gene":"CFTR","hgvs":"NM_000492.4:c.273+11C>T","protein":"","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"LRRK2_c1092GA","gene":"LRRK2","hgvs":"NM_198578.4:c.1092G>A","protein":"p.Lys364=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ALK_c438CG","gene":"ALK","hgvs":"NM_004304.5:c.438C>G","protein":"p.Gly146=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SDHA_c831GA","gene":"SDHA","hgvs":"NM_004168.4:c.831G>A","protein":"p.Thr277=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"KMT2B_c8123AG","gene":"KMT2B","hgvs":"NM_014727.3:c.8123A>G","protein":"p.Lys2708Arg","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"VWF_c1596CT","gene":"VWF","hgvs":"NM_000552.5:c.1596C>T","protein":"p.Gly532=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"F5_c4189CT","gene":"F5","hgvs":"NM_000130.5:c.4189C>T","protein":"p.Leu1397Phe","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SMARCA4_c4893TC","gene":"SMARCA4","hgvs":"NM_003072.5:c.4893T>C","protein":"p.Ser1631=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SMAD6_c375CT","gene":"SMAD6","hgvs":"NM_005585.5:c.375C>T","protein":"p.Thr125=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"KMT2B_c1269TCC1","gene":"KMT2B","hgvs":"NM_014727.3:c.1269TCC[1]","protein":"p.Pro427del","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"GPSM2_c95311CT","gene":"GPSM2","hgvs":"NM_013296.5:c.953+11C>T","protein":"","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ASH1L_c3594CT","gene":"ASH1L","hgvs":"NM_018489.3:c.3594C>T","protein":"p.Pro1198=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ZNF335_c3187CA","gene":"ZNF335","hgvs":"NM_022095.4:c.3187C>A","protein":"p.Arg1063=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PRRT2_c30TC","gene":"PRRT2","hgvs":"NM_145239.3:c.-30T>C","protein":"","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SCN10A_c4296CT","gene":"SCN10A","hgvs":"NM_006514.4:c.4296C>T","protein":"p.Asp1432=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MEN1_c1602GA","gene":"MEN1","hgvs":"NM_001370259.2:c.1602G>A","protein":"p.Thr534=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CDH1_c2331CT","gene":"CDH1","hgvs":"NM_004360.5:c.2331C>T","protein":"p.Asp777=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"RAD51C_c237TC","gene":"RAD51C","hgvs":"NM_058216.3:c.237T>C","protein":"p.Ser79=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MLH1_c351GA","gene":"MLH1","hgvs":"NM_000249.4:c.351G>A","protein":"p.Thr117=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"INTS1_c2022GA","gene":"INTS1","hgvs":"NM_001080453.3:c.2022G>A","protein":"p.Glu674=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FLAD1_c1184GA","gene":"FLAD1","hgvs":"NM_025207.5:c.1184G>A","protein":"p.Ser395Asn","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MYH6_c397913CA","gene":"MYH6","hgvs":"NM_002471.4:c.3979-13C>A","protein":"","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"STK11_c360AG","gene":"STK11","hgvs":"NM_000455.5:c.360A>G","protein":"p.Glu120=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"TSC2_c35GA","gene":"TSC2","hgvs":"NM_000548.5:c.*35G>A","protein":"","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SGSH_c641CA","gene":"SGSH","hgvs":"NM_000199.5:c.641C>A","protein":"p.Ala214Asp","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SYNE1_c22887GA","gene":"SYNE1","hgvs":"NM_182961.4:c.22887G>A","protein":"p.Lys7629=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ANKRD11_c3927GA","gene":"ANKRD11","hgvs":"NM_013275.6:c.3927G>A","protein":"p.Thr1309=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"TYMP_c1071CT","gene":"TYMP","hgvs":"NM_001953.5:c.1071C>T","protein":"p.Ala357=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"HOXB13_c99GC","gene":"HOXB13","hgvs":"NM_006361.6:c.99G>C","protein":"p.Leu33=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MACF1_c1916GT","gene":"MACF1","hgvs":"NM_001394062.1:c.1916G>T","protein":"p.Gly639Val","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ELN_c528GA","gene":"ELN","hgvs":"NM_000501.4:c.528G>A","protein":"p.Lys176=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BMPR1A_c116615GT","gene":"BMPR1A","hgvs":"NM_004329.3:c.1166+15G>T","protein":"","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"NRXN2_c2883CT","gene":"NRXN2","hgvs":"NM_015080.4:c.2883C>T","protein":"p.Asn961=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CACNA1D_c1023CT","gene":"CACNA1D","hgvs":"NM_001128840.3:c.1023C>T","protein":"p.Asn341=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PMS2_c591CA","gene":"PMS2","hgvs":"NM_000535.7:c.591C>A","protein":"p.Gly197=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SPAST_c149318GT","gene":"SPAST","hgvs":"NM_014946.4:c.1493+18G>T","protein":"","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FBN2_c4962CT","gene":"FBN2","hgvs":"NM_001999.4:c.4962C>T","protein":"p.Cys1654=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FLNC_c23906CT","gene":"FLNC","hgvs":"NM_001458.5:c.2390-6C>T","protein":"","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BPI_c997GA","gene":"BPI","hgvs":"NM_001725.3:c.997G>A","protein":"p.Ala333Thr","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PRDM5_c1770AC","gene":"PRDM5","hgvs":"NM_018699.4:c.1770A>C","protein":"p.Arg590=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"AEBP1_c267GA","gene":"AEBP1","hgvs":"NM_001129.5:c.267G>A","protein":"p.Lys89=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DICER1_c7357GT","gene":"DICER1","hgvs":"NM_177438.3:c.735-7G>T","protein":"","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"VLDLR_c471CT","gene":"VLDLR","hgvs":"NM_003383.5:c.471C>T","protein":"p.Asp157=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PMS2_c1437CT","gene":"PMS2","hgvs":"NM_000535.7:c.1437C>T","protein":"p.His479=","truth":"LB","note":"ClinVar Benign/Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"GFI1_c669CG","gene":"GFI1","hgvs":"NM_005263.5:c.669C>G","protein":"p.Pro223=","truth":"LB","note":"ClinVar Likely benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FYCO1_c2406GA","gene":"FYCO1","hgvs":"NM_024513.4:c.*2406G>A","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SLITRK6_c39TA","gene":"SLITRK6","hgvs":"NM_032229.3:c.39T>A","protein":"p.Leu13=","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PAX6_c1141TC","gene":"PAX6","hgvs":"NM_001368894.2:c.11-41T>C","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"NBN_c112491CA","gene":"NBN","hgvs":"NM_002485.5:c.1124+91C>A","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PIEZO2_c3036AG","gene":"PIEZO2","hgvs":"NM_001378183.1:c.3036A>G","protein":"p.Thr1012=","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FOXF1_c645CT","gene":"FOXF1","hgvs":"NM_001451.3:c.645C>T","protein":"p.His215=","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CRAT_c1335CT","gene":"CRAT","hgvs":"NM_000755.5:c.1335C>T","protein":"p.Tyr445=","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"USP14_c105GA","gene":"USP14","hgvs":"NM_005151.4:c.105G>A","protein":"p.Ala35=","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"LPP_c1410155CT","gene":"LPP","hgvs":"NM_001375462.1:c.1410+155C>T","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ADAMTS10_c215967GA","gene":"ADAMTS10","hgvs":"NM_030957.4:c.2159-67G>A","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PBRM1_c465485CT","gene":"PBRM1","hgvs":"NM_001405607.1:c.4654+85C>T","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ISCU_c115246GT","gene":"ISCU","hgvs":"NM_213595.4:c.115-246G>T","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PDGFRA_c2387TG","gene":"PDGFRA","hgvs":"NM_006206.6:c.*2387T>G","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FLNC_c2551113GA","gene":"FLNC","hgvs":"NM_001458.5:c.2551-113G>A","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"NDUFS7_c455197AG","gene":"NDUFS7","hgvs":"NM_024407.5:c.455+197A>G","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DEGS1_c54AG","gene":"DEGS1","hgvs":"NM_003676.4:c.*54A>G","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PCYT1A_c48657AG","gene":"PCYT1A","hgvs":"NM_001312673.2:c.486+57A>G","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"KCND3_c15194GT","gene":"KCND3","hgvs":"NM_001378969.1:c.1519-4G>T","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ARHGAP31_c3256GA","gene":"ARHGAP31","hgvs":"NM_020754.4:c.3256G>A","protein":"p.Ala1086Thr","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FLCN_c1063316AG","gene":"FLCN","hgvs":"NM_144997.7:c.1063-316A>G","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"TTN_c62058TC","gene":"TTN","hgvs":"NM_001267550.2:c.62058T>C","protein":"p.Tyr20686=","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PAH_c1065156TG","gene":"PAH","hgvs":"NM_000277.3:c.1065+156T>G","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SLC7A7_c498TC","gene":"SLC7A7","hgvs":"NM_003982.4:c.498T>C","protein":"p.Ile166=","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ABCA1_c459326GC","gene":"ABCA1","hgvs":"NM_005502.4:c.4593-26G>C","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SHH_c563171GC","gene":"SHH","hgvs":"NM_000193.4:c.563-171G>C","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA1_c548721CG","gene":"BRCA1","hgvs":"NM_007294.4:c.548-721C>G","protein":"","truth":"B","note":"ClinVar Benign (reviewed by expert panel)"}
+{"variant_id":"LMBR1_c36CT","gene":"LMBR1","hgvs":"NM_022458.4:c.*36C>T","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CLCNKA_c78236GC","gene":"CLCNKA","hgvs":"NM_004070.4:c.782-36G>C","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MTPAP_c55573GA","gene":"MTPAP","hgvs":"NM_018109.4:c.555+73G>A","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FAM120A_c141824GA","gene":"FAM120A","hgvs":"NM_014612.5:c.1418+24G>A","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CHMP7_c891CT","gene":"CHMP7","hgvs":"NM_152272.5:c.891C>T","protein":"p.Ala297=","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"HSPD1_c15CT","gene":"HSPD1","hgvs":"NM_002156.5:c.-15C>T","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"NTRK2_c1296165GA","gene":"NTRK2","hgvs":"NM_006180.6:c.1296+165G>A","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CDC73_c1155122CG","gene":"CDC73","hgvs":"NM_024529.5:c.1155-122C>G","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRCA1_c5467482CT","gene":"BRCA1","hgvs":"NM_007294.4:c.5467+482C>T","protein":"","truth":"B","note":"ClinVar Benign (reviewed by expert panel)"}
+{"variant_id":"PLCE1_c664GC","gene":"PLCE1","hgvs":"NM_016341.4:c.664G>C","protein":"p.Gly222Arg","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"KRT83_c65564GA","gene":"KRT83","hgvs":"NM_002282.3:c.655-64G>A","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"OGG1_c9495TC","gene":"OGG1","hgvs":"NM_002542.6:c.949-5T>C","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ADNP_c50AC","gene":"ADNP","hgvs":"NM_001282531.3:c.*50A>C","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DIABLO_c690GA","gene":"DIABLO","hgvs":"NM_001371333.1:c.690G>A","protein":"p.Ser230=","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SCN3A_c96852AG","gene":"SCN3A","hgvs":"NM_006922.4:c.968-52A>G","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"VARS2_c14809TC","gene":"VARS2","hgvs":"NM_020442.6:c.1480-9T>C","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PHKA2_c24CT","gene":"PHKA2","hgvs":"NM_000292.3:c.-24C>T","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"IFIH1_c2528AG","gene":"IFIH1","hgvs":"NM_022168.4:c.2528A>G","protein":"p.His843Arg","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MAN2B1_c91073AG","gene":"MAN2B1","hgvs":"NM_000528.4:c.910-73A>G","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"RTTN_c5824139GA","gene":"RTTN","hgvs":"NM_173630.4:c.5824-139G>A","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"USH1C_c294CT","gene":"USH1C","hgvs":"NM_153676.4:c.294C>T","protein":"p.Leu98=","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"AQP2_c1684TC","gene":"AQP2","hgvs":"NM_000486.6:c.*1684T>C","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SCNN1G_c117614AG","gene":"SCNN1G","hgvs":"NM_001039.4:c.1176+14A>G","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"KCNA1_c1524AG","gene":"KCNA1","hgvs":"NM_000217.3:c.*1524A>G","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CTNNA2_c2190190AG","gene":"CTNNA2","hgvs":"NM_001282597.3:c.2190-190A>G","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FANCI_c1112154GC","gene":"FANCI","hgvs":"NM_001113378.2:c.1112+154G>C","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"GGA3_c1966TC","gene":"GGA3","hgvs":"NM_138619.4:c.1966T>C","protein":"p.Leu656=","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FBN1_c267775AG","gene":"FBN1","hgvs":"NM_000138.5:c.2677+75A>G","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"LGALS9_c905GA","gene":"LGALS9","hgvs":"NM_009587.3:c.905G>A","protein":"p.Arg302His","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BARD1_c137138dup","gene":"BARD1","hgvs":"NM_000465.4:c.*137_*138dup","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"BRAF_c504142GA","gene":"BRAF","hgvs":"NM_004333.6:c.504+142G>A","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"EYS_c202415del","gene":"EYS","hgvs":"NM_001142800.2:c.2024-15del","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"FASN_c616312CT","gene":"FASN","hgvs":"NM_004104.5:c.6163+12C>T","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"DSG2_c2002135AG","gene":"DSG2","hgvs":"NM_001943.5:c.2002-135A>G","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"COL3A1_c166295TC","gene":"COL3A1","hgvs":"NM_000090.4:c.1662+95T>C","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SC5D_c81AC","gene":"SC5D","hgvs":"NM_006918.5:c.*81A>C","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"COL6A1_c2667GA","gene":"COL6A1","hgvs":"NM_001848.3:c.2667G>A","protein":"p.Ala889=","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CNOT1_c5829TC","gene":"CNOT1","hgvs":"NM_016284.5:c.5829T>C","protein":"p.Ile1943=","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"EGFR_c228460TC","gene":"EGFR","hgvs":"NM_005228.5:c.2284-60T>C","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MMP2_c1861GC","gene":"MMP2","hgvs":"NM_004530.6:c.1861G>C","protein":"p.Val621Leu","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SGSH_c8823CG","gene":"SGSH","hgvs":"NM_000199.5:c.88+23C>G","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"HIVEP3_c105CA","gene":"HIVEP3","hgvs":"NM_024503.5:c.105C>A","protein":"p.Val35=","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PRMT7_c708CT","gene":"PRMT7","hgvs":"NM_019023.5:c.708C>T","protein":"p.Ala236=","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CSF3R_c1474125CT","gene":"CSF3R","hgvs":"NM_000760.4:c.1474+125C>T","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"SLC26A1_c274GA","gene":"SLC26A1","hgvs":"NM_022042.4:c.*274G>A","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"ANO3_c129019del","gene":"ANO3","hgvs":"NM_031418.4:c.1290-19del","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"PAX8_c25197GT","gene":"PAX8","hgvs":"NM_003466.4:c.25+197G>T","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MRAP_c234CG","gene":"MRAP","hgvs":"NM_001379228.1:c.234C>G","protein":"p.Cys78Trp","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"CHMP4B_c61052TC","gene":"CHMP4B","hgvs":"NM_176812.5:c.610+52T>C","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"EPG5_c338520CT","gene":"EPG5","hgvs":"NM_020964.3:c.3385-20C>T","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"GALNT11_c451CT","gene":"GALNT11","hgvs":"NM_022087.4:c.451C>T","protein":"p.Pro151Ser","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"EP300_c238015TC","gene":"EP300","hgvs":"NM_001429.4:c.2380-15T>C","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}
+{"variant_id":"MSH6_c364691TC","gene":"MSH6","hgvs":"NM_000179.3:c.3646+91T>C","protein":"","truth":"B","note":"ClinVar Benign (reviewed by expert panel)"}
+{"variant_id":"GIPC3_c593102GA","gene":"GIPC3","hgvs":"NM_133261.3:c.593-102G>A","protein":"","truth":"B","note":"ClinVar Benign (criteria provided, multiple submitters, no conflicts)"}

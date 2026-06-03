@@ -1,0 +1,20 @@
+{
+  "dataset": "bench/clinvar.jsonl",
+  "description": "Frozen ACMG benchmark set sampled from ClinVar for the Intra-LLM BioFilesystem evaluation.",
+  "source": "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz",
+  "clinvar_snapshot": "2026-05-31 (HTTP Last-Modified 2026-05-31T04:25:26Z)",
+  "built_with": "biofs benchmark-prepare",
+  "filters": {
+    "min_review_stars": 2,
+    "review_status_kept": "criteria provided, multiple submitters, no conflicts; reviewed by expert panel; practice guideline",
+    "assembly": "GRCh38",
+    "excluded": "conflicting interpretations; non-tier significances (drug response, risk factor, etc.)"
+  },
+  "sampling": { "method": "deterministic per-tier reservoir (sha256-seeded)", "per_tier": 80 },
+  "rows_scanned": 8982609,
+  "variants": 400,
+  "by_tier": { "P": 80, "LP": 80, "VUS": 80, "LB": 80, "B": 80 },
+  "prepare_command": "biofs benchmark-prepare variant_summary.txt.gz --out bench/clinvar.jsonl --min-stars 2 --per-tier 80 --assembly GRCh38",
+  "scoring_note": "The truth label is used only for scoring and is never shown to an agent; agents receive gene, hgvs, and protein only.",
+  "run_command": "biofs benchmark bench/clinvar.jsonl --models claude,grok,gemini --rounds 2 --out bench/run1"
+}
