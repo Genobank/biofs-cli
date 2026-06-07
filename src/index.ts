@@ -67,6 +67,26 @@ import { reportCommand, ReportOptions } from './commands/report';
 import { createAdminCommand } from './commands/admin';
 import { fuseListCommand, fuseMountCommand, fuseStreamCommand, fuseSampleCommand, FuseOptions } from './commands/fuse';
 import { annotateSubmitCommand, AnnotateSubmitOptions } from './commands/annotate/submit';
+import { methylSubmitCommand, MethylSubmitOptions } from './commands/methyl/submit';
+import { methylExecCommand, MethylExecOptions } from './commands/methyl/exec';
+import { alignShardSubmitCommand, AlignShardSubmitOptions } from './commands/align-shard/submit';
+import { alignShardExecCommand, AlignShardExecOptions } from './commands/align-shard/exec';
+import { comethylSubmitCommand, ComethylSubmitOptions } from './commands/comethyl/submit';
+import { comethylExecCommand, ComethylExecOptions } from './commands/comethyl/exec';
+import { svCallSubmitCommand, SvCallSubmitOptions } from './commands/sv-call/submit';
+import { svCallExecCommand, SvCallExecOptions } from './commands/sv-call/exec';
+import { ontVariantsSubmitCommand, OntVariantsSubmitOptions } from './commands/ont-variants/submit';
+import { ontVariantsExecCommand, OntVariantsExecOptions } from './commands/ont-variants/exec';
+import { hifiAlignSubmitCommand, HifiAlignSubmitOptions } from './commands/hifi-align/submit';
+import { hifiAlignExecCommand, HifiAlignExecOptions } from './commands/hifi-align/exec';
+import { pbsvSubmitCommand, PbsvSubmitOptions } from './commands/pbsv/submit';
+import { pbsvExecCommand, PbsvExecOptions } from './commands/pbsv/exec';
+import { repeatGenotypeSubmitCommand, RepeatGenotypeSubmitOptions } from './commands/repeat-genotype/submit';
+import { repeatGenotypeExecCommand, RepeatGenotypeExecOptions } from './commands/repeat-genotype/exec';
+import { phaseSubmitCommand, PhaseSubmitOptions } from './commands/phase/submit';
+import { phaseExecCommand, PhaseExecOptions } from './commands/phase/exec';
+import { hifiMethylSubmitCommand, HifiMethylSubmitOptions } from './commands/hifi-methyl/submit';
+import { hifiMethylExecCommand, HifiMethylExecOptions } from './commands/hifi-methyl/exec';
 import {
   workspaceOpenCommand, workspaceReadCommand, workspaceAppendCommand,
   workspaceCaseCommand, workspaceLeaseCommand, workspaceReplayCommand,
@@ -150,7 +170,7 @@ process.on('unhandledRejection', (reason) => {
 program
   .name('biofs')
   .description('BioFS by GenoBank.io - BioNFT-Gated S3 CLI for genomic data')
-  .version('3.6.0')
+  .version('3.12.0')
   .option('--debug', 'Enable debug output')
   .hook('preAction', (thisCommand) => {
     // Set global debug flag if --debug is passed
@@ -655,6 +675,8 @@ program
   .option('--serial <id>', 'Single sample serial')
   .option('--serials <csv>', 'Comma-separated sample serials')
   .option('--filetypes <csv>', 'Filter to filetype list (e.g. vcf,gvcf)')
+  .option('--bucket <name>', 'Scope to a single GCS bucket')
+  .option('--prefix <path>', 'Scope to an object-name prefix (use with --bucket)')
   .option('--include-superseded', 'Also fingerprint SUPERSEDED rows')
   .option('--limit <n>', 'Max rows to process per job', '50')
   .option('--dry-run', 'Show eligible rows without submitting')
@@ -1409,6 +1431,330 @@ contextCmd
   });
 
 // Job management commands (BioOS)
+// Methyl command group — Oxford Nanopore 5mCG/5hmCG methylation pipeline
+const methylCmd = program
+  .command('methyl')
+  .description('Oxford Nanopore 5mCG/5hmCG methylation: submit (client) + exec (VM runner)');
+
+// methyl submit (DEFAULT) — `biofs methyl <serial>` and `biofs methyl submit <serial>`
+methylCmd
+  .command('submit <serial>', { isDefault: true })
+  .description('Submit an ONT methylation job to biofs-node (modkit 5mCG/5hmCG bedMethyl)')
+  .requiredOption('--bams <csv>', 'CSV of gs:// ONT Dorado BAM URIs (carry MM/ML tags)')
+  .option('--ref <build>', 'Reference: GRCh38 | auto', 'auto')
+  .option('--parent-ip-id <id>', 'Parent BioIP / IP asset id')
+  .option('--json', 'Output as JSON')
+  .action(async (serial: string, options: MethylSubmitOptions) => {
+    try {
+      await methylSubmitCommand(serial, options);
+    } catch (error) {
+      Logger.error(`Methyl submit failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// methyl exec — the VM-side executor (biofs-node spawns: biofs methyl exec --flags)
+methylCmd
+  .command('exec')
+  .description('VM-side executor: minimap2 align + samtools merge + modkit pileup, stream bedMethyl to GCS')
+  .requiredOption('--sample <serial>', 'Biosample serial / SAMPLE')
+  .requiredOption('--bams <csv>', 'CSV of gs:// ONT BAM URIs')
+  .option('--ref <build>', 'Reference build', 'auto')
+  .option('--job-id <id>', 'Job id (for OUT/LOG GCS pathing)')
+  .option('--batch-id <id>', 'Batch id')
+  .option('--creator <wallet>', 'Creator wallet (lowercased for LOG_GCS path)')
+  .option('--out-bucket <name>', 'Output bucket', 'genobank-parabricks-output')
+  .option('--ref-bucket <name>', 'Reference bucket', 'genobank-references')
+  .action(async (options: MethylExecOptions) => {
+    try {
+      await methylExecCommand(options);
+    } catch (error) {
+      Logger.error(`Methyl exec failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Align-shard command group — sharded ONT long-read alignment (dorado, MM/ML-native)
+const alignShardCmd = program
+  .command('align-shard')
+  .description('Sharded ONT long-read alignment (dorado aligner, MM/ML preserved): submit (client) + exec (VM runner)');
+
+// align-shard submit (DEFAULT) — `biofs align-shard <serial>` and `biofs align-shard submit <serial>`
+alignShardCmd
+  .command('submit <serial>', { isDefault: true })
+  .description('Submit a sharded ONT alignment job to biofs-node (dorado aligner, persists merged aligned modBAM)')
+  .requiredOption('--bams <csv>', 'CSV of gs:// ONT Dorado modBAM URIs (carry MM/ML tags)')
+  .option('--shards <n>', 'Concurrent aligner workers (default: auto from nproc)')
+  .option('--ref <build>', 'Reference: GRCh38 | auto', 'auto')
+  .option('--modkit', 'Also produce the 5mCG/5hmCG bedMethyl pileup (with QC gates)')
+  .option('--parent-ip-id <id>', 'Parent BioIP / IP asset id')
+  .option('--json', 'Output as JSON')
+  .action(async (serial: string, options: AlignShardSubmitOptions) => {
+    try {
+      await alignShardSubmitCommand(serial, options);
+    } catch (error) {
+      Logger.error(`Align-shard submit failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// align-shard exec — the VM-side executor (biofs-node spawns: biofs align-shard exec --flags)
+alignShardCmd
+  .command('exec')
+  .description('VM-side executor: W concurrent dorado aligner workers + merge, persist aligned modBAM to GCS')
+  .requiredOption('--sample <serial>', 'Biosample serial / SAMPLE')
+  .requiredOption('--bams <csv>', 'CSV of gs:// ONT modBAM URIs')
+  .option('--ref <build>', 'Reference build', 'auto')
+  .option('--workers <n>', 'Concurrent aligner workers (default: auto from nproc)')
+  .option('--modkit', 'Also run modkit pileup (5mCG/5hmCG bedMethyl) with QC gates')
+  .option('--job-id <id>', 'Job id (for OUT/LOG GCS pathing)')
+  .option('--batch-id <id>', 'Batch id')
+  .option('--creator <wallet>', 'Creator wallet (lowercased for LOG_GCS path)')
+  .option('--out-bucket <name>', 'Output bucket', 'genobank-parabricks-output')
+  .option('--ref-bucket <name>', 'Reference bucket', 'genobank-references')
+  .action(async (options: AlignShardExecOptions) => {
+    try {
+      await alignShardExecCommand(options);
+    } catch (error) {
+      Logger.error(`Align-shard exec failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Comethyl command group — single-molecule co-methylation analysis (gated, pre-registered)
+const comethylCmd = program
+  .command('comethyl')
+  .description('Single-molecule co-methylation analysis (imprinting floor, lambda, nulls): submit (client) + exec (VM runner)');
+
+comethylCmd
+  .command('submit <serial>', { isDefault: true })
+  .description('Submit a comethyl analysis job to biofs-node (gate=floor: imprinting/ASM allele-split)')
+  .requiredOption('--modbam <gs>', 'gs:// merged aligned ONT modBAM (MM/ML), the comethyl input')
+  .requiredOption('--hifi-vcf <gs>', 'gs:// HiFi het-SNP VCF (phased on the VM if unphased)')
+  .requiredOption('--hifi-bam <csv>', 'CSV of gs:// HiFi BAM URIs (for whatshap phase)')
+  .option('--gate <g>', 'floor | lambda | null-a', 'floor')
+  .option('--ref <build>', 'Reference: GRCh38 | auto', 'auto')
+  .option('--json', 'Output as JSON')
+  .action(async (serial: string, options: ComethylSubmitOptions) => {
+    try { await comethylSubmitCommand(serial, options); }
+    catch (error) { Logger.error(`Comethyl submit failed: ${error}`); process.exit(1); }
+  });
+
+comethylCmd
+  .command('exec')
+  .description('VM-side executor: phase ONT reads by HiFi het SNPs + per-haplotype modkit at imprinted DMRs')
+  .requiredOption('--sample <serial>', 'Biosample serial / SAMPLE')
+  .requiredOption('--modbam <gs>', 'gs:// merged ONT modBAM')
+  .requiredOption('--hifi-vcf <gs>', 'gs:// HiFi het-SNP VCF')
+  .requiredOption('--hifi-bams <csv>', 'CSV of gs:// HiFi BAM URIs')
+  .option('--gate <g>', 'floor', 'floor')
+  .option('--ref <build>', 'Reference build', 'auto')
+  .option('--job-id <id>', 'Job id')
+  .option('--batch-id <id>', 'Batch id')
+  .option('--creator <wallet>', 'Creator wallet (lowercased for GCS path)')
+  .option('--out-bucket <name>', 'Output bucket', 'genobank-parabricks-output')
+  .option('--ref-bucket <name>', 'Reference bucket', 'genobank-references')
+  .action(async (options: ComethylExecOptions) => {
+    try { await comethylExecCommand(options); }
+    catch (error) { Logger.error(`Comethyl exec failed: ${error}`); process.exit(1); }
+  });
+
+// SV-call command group — ONT structural-variant calling (Sniffles2)
+const svCallCmd = program
+  .command('sv-call')
+  .description('ONT structural-variant calling (Sniffles2): submit (client) + exec (VM runner)');
+
+svCallCmd
+  .command('submit <serial>', { isDefault: true })
+  .description('Submit an ONT SV-calling job to biofs-node (Sniffles2 over the aligned modBAM)')
+  .requiredOption('--modbam <gs>', 'gs:// merged aligned ONT modBAM (the SV-calling input)')
+  .option('--ref <build>', 'Reference: GRCh38 | auto', 'auto')
+  .option('--json', 'Output as JSON')
+  .action(async (serial: string, options: SvCallSubmitOptions) => {
+    try { await svCallSubmitCommand(serial, options); }
+    catch (error) { Logger.error(`sv-call submit failed: ${error}`); process.exit(1); }
+  });
+
+svCallCmd
+  .command('exec')
+  .description('VM-side executor: Sniffles2 over the gcsfuse-mounted modBAM, persist SV VCF to GCS')
+  .requiredOption('--sample <serial>', 'Biosample serial / SAMPLE')
+  .requiredOption('--modbam <gs>', 'gs:// merged ONT modBAM')
+  .option('--ref <build>', 'Reference build', 'auto')
+  .option('--job-id <id>', 'Job id')
+  .option('--batch-id <id>', 'Batch id')
+  .option('--creator <wallet>', 'Creator wallet (lowercased for GCS path)')
+  .option('--out-bucket <name>', 'Output bucket', 'genobank-parabricks-output')
+  .option('--ref-bucket <name>', 'Reference bucket', 'genobank-references')
+  .action(async (options: SvCallExecOptions) => {
+    try { await svCallExecCommand(options); }
+    catch (error) { Logger.error(`sv-call exec failed: ${error}`); process.exit(1); }
+  });
+
+// ONT-variants command group — ONT small-variant calling (Clair3)
+const ontVariantsCmd = program
+  .command('ont-variants')
+  .description('ONT small-variant calling (Clair3, R10.4.1 sup): submit (client) + exec (VM runner)');
+
+ontVariantsCmd
+  .command('submit <serial>', { isDefault: true })
+  .description('Submit an ONT SNV/indel job to biofs-node (Clair3 over the aligned modBAM)')
+  .requiredOption('--modbam <gs>', 'gs:// merged aligned ONT modBAM (the SNV/indel-calling input)')
+  .option('--model <name>', 'Clair3 model name (default: auto-pick R10.4.1 sup from the image)')
+  .option('--ref <build>', 'Reference: GRCh38 | auto', 'auto')
+  .option('--json', 'Output as JSON')
+  .action(async (serial: string, options: OntVariantsSubmitOptions) => {
+    try { await ontVariantsSubmitCommand(serial, options); }
+    catch (error) { Logger.error(`ont-variants submit failed: ${error}`); process.exit(1); }
+  });
+
+ontVariantsCmd
+  .command('exec')
+  .description('VM-side executor: Clair3 (ONT) over the gcsfuse-mounted modBAM, persist SNV/indel VCF to GCS')
+  .requiredOption('--sample <serial>', 'Biosample serial / SAMPLE')
+  .requiredOption('--modbam <gs>', 'gs:// merged ONT modBAM')
+  .option('--model <name>', 'Clair3 model name (auto-picked if empty)')
+  .option('--ref <build>', 'Reference build', 'auto')
+  .option('--job-id <id>', 'Job id')
+  .option('--batch-id <id>', 'Batch id')
+  .option('--creator <wallet>', 'Creator wallet (lowercased for GCS path)')
+  .option('--out-bucket <name>', 'Output bucket', 'genobank-parabricks-output')
+  .option('--ref-bucket <name>', 'Reference bucket', 'genobank-references')
+  .action(async (options: OntVariantsExecOptions) => {
+    try { await ontVariantsExecCommand(options); }
+    catch (error) { Logger.error(`ont-variants exec failed: ${error}`); process.exit(1); }
+  });
+
+// HiFi-align command group — PacBio HiFi read alignment (pbmm2, MM/ML preserved) — the keystone
+const hifiAlignCmd = program
+  .command('hifi-align')
+  .description('PacBio HiFi read alignment (pbmm2 HIFI, 5mC tags preserved): submit (client) + exec (VM runner)');
+
+hifiAlignCmd
+  .command('submit <serial>', { isDefault: true })
+  .description('Submit a HiFi alignment job to biofs-node (pbmm2 per-cell + merge, persist aligned BAM)')
+  .requiredOption('--bams <csv>', 'CSV of gs:// unaligned HiFi BAM URIs (carry MM/ML 5mC tags)')
+  .option('--ref <build>', 'Reference: GRCh38 | auto', 'auto')
+  .option('--json', 'Output as JSON')
+  .action(async (serial: string, options: HifiAlignSubmitOptions) => {
+    try { await hifiAlignSubmitCommand(serial, options); }
+    catch (error) { Logger.error(`hifi-align submit failed: ${error}`); process.exit(1); }
+  });
+
+hifiAlignCmd
+  .command('exec')
+  .description('VM-side executor: pbmm2 align each HiFi cell (HIFI preset) + merge, persist aligned BAM to GCS')
+  .requiredOption('--sample <serial>', 'Biosample serial / SAMPLE')
+  .requiredOption('--bams <csv>', 'CSV of gs:// unaligned HiFi BAM URIs')
+  .option('--ref <build>', 'Reference build', 'auto')
+  .option('--job-id <id>', 'Job id')
+  .option('--batch-id <id>', 'Batch id')
+  .option('--creator <wallet>', 'Creator wallet (lowercased for GCS path)')
+  .option('--out-bucket <name>', 'Output bucket', 'genobank-parabricks-output')
+  .option('--ref-bucket <name>', 'Reference bucket', 'genobank-references')
+  .action(async (options: HifiAlignExecOptions) => {
+    try { await hifiAlignExecCommand(options); }
+    catch (error) { Logger.error(`hifi-align exec failed: ${error}`); process.exit(1); }
+  });
+
+// ---- downstream verbs the hifi-align keystone unblocks (M3/M4/M5/M9) ----
+
+// pbsv — HiFi read-based structural variants
+const pbsvCmd = program.command('pbsv').description('HiFi read-based structural-variant calling (pbsv): submit (client) + exec (VM runner)');
+pbsvCmd.command('submit <serial>', { isDefault: true })
+  .description('Submit a HiFi pbsv SV-calling job to biofs-node (pbsv over the aligned HiFi BAM)')
+  .requiredOption('--bam <gs>', 'gs:// aligned HiFi BAM (the pbsv-calling input)')
+  .option('--ref <build>', 'Reference: GRCh38 | auto', 'auto')
+  .option('--json', 'Output as JSON')
+  .action(async (serial: string, options: PbsvSubmitOptions) => {
+    try { await pbsvSubmitCommand(serial, options); } catch (error) { Logger.error(`pbsv submit failed: ${error}`); process.exit(1); }
+  });
+pbsvCmd.command('exec')
+  .description('VM-side executor: pbsv discover+call over the gcsfuse-mounted HiFi BAM, persist SV VCF to GCS')
+  .requiredOption('--sample <serial>', 'Biosample serial / SAMPLE')
+  .requiredOption('--bam <gs>', 'gs:// aligned HiFi BAM')
+  .option('--ref <build>', 'Reference build', 'auto')
+  .option('--job-id <id>', 'Job id').option('--batch-id <id>', 'Batch id')
+  .option('--creator <wallet>', 'Creator wallet (lowercased for GCS path)')
+  .option('--out-bucket <name>', 'Output bucket', 'genobank-parabricks-output')
+  .option('--ref-bucket <name>', 'Reference bucket', 'genobank-references')
+  .action(async (options: PbsvExecOptions) => {
+    try { await pbsvExecCommand(options); } catch (error) { Logger.error(`pbsv exec failed: ${error}`); process.exit(1); }
+  });
+
+// repeat-genotype — tandem-repeat / repeat-expansion genotyping (TRGT)
+const repeatCmd = program.command('repeat-genotype').description('Tandem-repeat / repeat-expansion genotyping (TRGT): submit (client) + exec (VM runner)');
+repeatCmd.command('submit <serial>', { isDefault: true })
+  .description('Submit a TRGT repeat-genotyping job to biofs-node (aligned HiFi BAM + repeat catalog)')
+  .requiredOption('--bam <gs>', 'gs:// aligned HiFi BAM (the genotyping input)')
+  .requiredOption('--catalog <gs>', 'gs:// repeat catalog BED (repeat definitions)')
+  .option('--ref <build>', 'Reference: GRCh38 | auto', 'auto')
+  .option('--json', 'Output as JSON')
+  .action(async (serial: string, options: RepeatGenotypeSubmitOptions) => {
+    try { await repeatGenotypeSubmitCommand(serial, options); } catch (error) { Logger.error(`repeat-genotype submit failed: ${error}`); process.exit(1); }
+  });
+repeatCmd.command('exec')
+  .description('VM-side executor: TRGT genotype over the gcsfuse-mounted HiFi BAM + catalog, persist repeat VCF')
+  .requiredOption('--sample <serial>', 'Biosample serial / SAMPLE')
+  .requiredOption('--bam <gs>', 'gs:// aligned HiFi BAM')
+  .requiredOption('--catalog <gs>', 'gs:// repeat catalog BED')
+  .option('--ref <build>', 'Reference build', 'auto')
+  .option('--job-id <id>', 'Job id').option('--batch-id <id>', 'Batch id')
+  .option('--creator <wallet>', 'Creator wallet (lowercased for GCS path)')
+  .option('--out-bucket <name>', 'Output bucket', 'genobank-parabricks-output')
+  .option('--ref-bucket <name>', 'Reference bucket', 'genobank-references')
+  .action(async (options: RepeatGenotypeExecOptions) => {
+    try { await repeatGenotypeExecCommand(options); } catch (error) { Logger.error(`repeat-genotype exec failed: ${error}`); process.exit(1); }
+  });
+
+// phase — genome-wide read-backed phasing (HiPhase)
+const phaseCmd = program.command('phase').description('Genome-wide read-backed phasing (HiPhase): submit (client) + exec (VM runner)');
+phaseCmd.command('submit <serial>', { isDefault: true })
+  .description('Submit a HiPhase phasing job to biofs-node (aligned HiFi BAM + small-variant VCF)')
+  .requiredOption('--bam <gs>', 'gs:// aligned HiFi BAM')
+  .requiredOption('--vcf <gs>', 'gs:// small-variant VCF to phase')
+  .option('--ref <build>', 'Reference: GRCh38 | auto', 'auto')
+  .option('--json', 'Output as JSON')
+  .action(async (serial: string, options: PhaseSubmitOptions) => {
+    try { await phaseSubmitCommand(serial, options); } catch (error) { Logger.error(`phase submit failed: ${error}`); process.exit(1); }
+  });
+phaseCmd.command('exec')
+  .description('VM-side executor: HiPhase over the gcsfuse-mounted HiFi BAM + VCF, persist phased VCF + haplotagged BAM')
+  .requiredOption('--sample <serial>', 'Biosample serial / SAMPLE')
+  .requiredOption('--bam <gs>', 'gs:// aligned HiFi BAM')
+  .requiredOption('--vcf <gs>', 'gs:// small-variant VCF')
+  .option('--ref <build>', 'Reference build', 'auto')
+  .option('--job-id <id>', 'Job id').option('--batch-id <id>', 'Batch id')
+  .option('--creator <wallet>', 'Creator wallet (lowercased for GCS path)')
+  .option('--out-bucket <name>', 'Output bucket', 'genobank-parabricks-output')
+  .option('--ref-bucket <name>', 'Reference bucket', 'genobank-references')
+  .action(async (options: PhaseExecOptions) => {
+    try { await phaseExecCommand(options); } catch (error) { Logger.error(`phase exec failed: ${error}`); process.exit(1); }
+  });
+
+// hifi-methyl — orthogonal HiFi 5mC methylome (pb-CpG-tools)
+const hifiMethylCmd = program.command('hifi-methyl').description('Orthogonal HiFi 5mC methylome (pb-CpG-tools): submit (client) + exec (VM runner)');
+hifiMethylCmd.command('submit <serial>', { isDefault: true })
+  .description('Submit a pb-CpG-tools HiFi methylome job to biofs-node (aligned HiFi BAM with MM/ML tags)')
+  .requiredOption('--bam <gs>', 'gs:// aligned HiFi BAM carrying MM/ML 5mC tags')
+  .option('--ref <build>', 'Reference: GRCh38 | auto', 'auto')
+  .option('--json', 'Output as JSON')
+  .action(async (serial: string, options: HifiMethylSubmitOptions) => {
+    try { await hifiMethylSubmitCommand(serial, options); } catch (error) { Logger.error(`hifi-methyl submit failed: ${error}`); process.exit(1); }
+  });
+hifiMethylCmd.command('exec')
+  .description('VM-side executor: pb-CpG-tools over the gcsfuse-mounted HiFi BAM, persist 5mCG bedMethyl')
+  .requiredOption('--sample <serial>', 'Biosample serial / SAMPLE')
+  .requiredOption('--bam <gs>', 'gs:// aligned HiFi BAM')
+  .option('--ref <build>', 'Reference build', 'auto')
+  .option('--job-id <id>', 'Job id').option('--batch-id <id>', 'Batch id')
+  .option('--creator <wallet>', 'Creator wallet (lowercased for GCS path)')
+  .option('--out-bucket <name>', 'Output bucket', 'genobank-parabricks-output')
+  .option('--ref-bucket <name>', 'Reference bucket', 'genobank-references')
+  .action(async (options: HifiMethylExecOptions) => {
+    try { await hifiMethylExecCommand(options); } catch (error) { Logger.error(`hifi-methyl exec failed: ${error}`); process.exit(1); }
+  });
+
 const jobCmd = program
   .command('job')
   .description('Manage research jobs (BioOS)');
