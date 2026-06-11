@@ -1,0 +1,38 @@
+{
+  "cohort_size": 3,
+  "completed": 0,
+  "failed": 3,
+  "skipped": 0,
+  "total_seconds": 3,
+  "concurrency": 1,
+  "started_at": "2026-05-25T03:22:56.136Z",
+  "finished_at": "2026-05-25T03:22:59.327Z",
+  "serials_file": "/tmp/augenomics_cohort_via_biofs.txt",
+  "output_dir": "/Users/danieluribe/Downloads/biofs-cli/cohort_pipeline_runs/2026-05-25T03-22-56-135Z",
+  "results": [
+    {
+      "serial": "08698835419",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x2D0b1BA3aB0BAb1cC3Fe4D3f1a860D19CB7a7368",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "11023804270",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x5ccE38f1f61c2F4b04210c0dD5bDFA23a1Ef38ed",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "23961956432",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0xB29F6321771a3B6d1F78D5985FA8Eaabc7e0c519",
+      "duration_s": 1,
+      "error": ""
+    }
+  ]
+}

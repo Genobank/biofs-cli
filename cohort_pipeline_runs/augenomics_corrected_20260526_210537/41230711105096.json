@@ -1,0 +1,9 @@
+{
+  "serial": "41230711105096",
+  "status": "failed",
+  "wallet_minted": false,
+  "wallet": "0x58406Eb50D676eba0Edd990A32008Fb8bffE8647",
+  "phase_reached": "3:phase_started",
+  "duration_s": 1766,
+  "error": "ning\", \"ip\": \"10.128.0.7\", \"started\": true}}\n{\"event\": \"phase_started\", \"ts\": \"2026-05-27T10:06:09.741301+00:00\", \"phase\": 3, \"name\": \"parabricks\"}\n{\"event\": \"parabricks_started\", \"ts\": \"2026-05-27T10:06:16.187843+00:00\", \"interval_file\": \"agilent_v8\", \"use_wes\": true, \"r1\": \"/gcsmnt/input/41230711105096/41230711105096_R1.fastq.gz\", \"r2\": \"/gcsmnt/input/41230711105096/41230711105096_R2.fastq.gz\"}\n"
+}

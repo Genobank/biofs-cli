@@ -1,0 +1,539 @@
+{
+  "cohort_size": 65,
+  "completed": 3,
+  "failed": 62,
+  "skipped": 0,
+  "total_seconds": 24117,
+  "concurrency": 1,
+  "started_at": "2026-05-27T04:05:38.095Z",
+  "finished_at": "2026-05-27T10:47:34.658Z",
+  "serials_file": "/tmp/cohort_remaining_v2.txt",
+  "output_dir": "/Users/danieluribe/Downloads/biofs-cli/cohort_pipeline_runs/augenomics_corrected_20260526_210537",
+  "results": [
+    {
+      "serial": "41230711105038",
+      "status": "completed",
+      "wallet_minted": false,
+      "wallet": "0xc34B934bE8e56647E66D539cB68CEC493c57d057",
+      "phase_reached": "10:phase_done",
+      "duration_s": 4715
+    },
+    {
+      "serial": "41230711105044",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x1d923Ed445B8AAc102CA50097578a801483aB83d",
+      "phase_reached": "2:phase_failed",
+      "duration_s": 225,
+      "error": "event\": \"phase_started\", \"ts\": \"2026-05-27T05:24:17.273958+00:00\", \"phase\": 2, \"name\": \"wake_gpu\"}\n{\"event\": \"vm_starting\", \"ts\": \"2026-05-27T05:24:35.003333+00:00\", \"instance\": \"parabricks-gpu-spot\"}\n{\"event\": \"phase_failed\", \"ts\": \"2026-05-27T05:27:56.783313+00:00\", \"phase\": 2, \"name\": \"wake_gpu\", \"error\": \"RuntimeError: GPU instance parabricks-gpu-spot did not reach running state within 180s\"}\n"
+    },
+    {
+      "serial": "41230711105045",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0xCfab0aD8bA9975C025629895976168F8A6f33Bfd",
+      "phase_reached": "4:phase_failed",
+      "duration_s": 88,
+      "error": "11105045/41230711105045.deepvariant.agilent_v8.bam\", \"instance\": \"skipped (prior run output)\", \"skipped\": true}}\n{\"event\": \"phase_started\", \"ts\": \"2026-05-27T05:29:24.887105+00:00\", \"phase\": 4, \"name\": \"mint_children\"}\n{\"event\": \"phase_failed\", \"ts\": \"2026-05-27T05:29:24.889786+00:00\", \"phase\": 4, \"name\": \"mint_children\", \"error\": \"TypeError: expected string or bytes-like object, got 'NoneType'\"}\n"
+    },
+    {
+      "serial": "41230711105085",
+      "status": "completed",
+      "wallet_minted": false,
+      "wallet": "0x2CD59C185502be7a83623730A9B72844212380BB",
+      "phase_reached": "10:phase_done",
+      "duration_s": 4360
+    },
+    {
+      "serial": "41230711105086",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x79696fB03940962cBBDcAaaC43Dd156401872885",
+      "phase_reached": "3:phase_failed",
+      "duration_s": 7382,
+      "error": "\": \"/gcsmnt/input/41230711105086/41230711105086_R1.fastq.gz\", \"r2\": \"/gcsmnt/input/41230711105086/41230711105086_R2.fastq.gz\"}\n{\"event\": \"phase_failed\", \"ts\": \"2026-05-27T08:45:06.679290+00:00\", \"phase\": 3, \"name\": \"parabricks\", \"error\": \"RuntimeError: gVCF did not appear in GCS within 2h: gs://genobank-parabricks-output/41230711105086/41230711105086.deepvariant.agilent_v8.20260527_064330.g.vcf\"}\n"
+    },
+    {
+      "serial": "41230711105089",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x016DE6500873aC33971E26e6243e64f228d83B33",
+      "phase_reached": "5.5:phase_failed",
+      "duration_s": 640,
+      "error": "riants\": null, \"sqlite_size\": null}\n{\"event\": \"cravat_poll\", \"ts\": \"2026-05-27T08:55:47.359539+00:00\", \"status\": \"failed\", \"oc_job_id\": \"oc-042a9a15-b55a-4560-918c-e4d3a9b51166\", \"n_variants\": null, \"sqlite_size\": null}\n{\"event\": \"phase_failed\", \"ts\": \"2026-05-27T08:55:47.360640+00:00\", \"phase\": 5.5, \"name\": \"wait_sqlite\", \"error\": \"RuntimeError: OC worker failed (exit_code=1): gsutil cp failed\"}\n"
+    },
+    {
+      "serial": "41230711105091",
+      "status": "completed",
+      "wallet_minted": false,
+      "wallet": "0x6Fe1877AB7dE7344A92A708816440806b153cD98",
+      "phase_reached": "10:phase_done",
+      "duration_s": 4135
+    },
+    {
+      "serial": "41230711105096",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x58406Eb50D676eba0Edd990A32008Fb8bffE8647",
+      "phase_reached": "3:phase_started",
+      "duration_s": 1766,
+      "error": "ning\", \"ip\": \"10.128.0.7\", \"started\": true}}\n{\"event\": \"phase_started\", \"ts\": \"2026-05-27T10:06:09.741301+00:00\", \"phase\": 3, \"name\": \"parabricks\"}\n{\"event\": \"parabricks_started\", \"ts\": \"2026-05-27T10:06:16.187843+00:00\", \"interval_file\": \"agilent_v8\", \"use_wes\": true, \"r1\": \"/gcsmnt/input/41230711105096/41230711105096_R1.fastq.gz\", \"r2\": \"/gcsmnt/input/41230711105096/41230711105096_R2.fastq.gz\"}\n"
+    },
+    {
+      "serial": "41230711105097",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x3cFb4DBB962D2c18822ab0a6d1412bAA4Bf8db2A",
+      "duration_s": 2,
+      "error": ""
+    },
+    {
+      "serial": "41230711105099",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x1Cf574e9674e04D43f66C1E20965bdc129B55f9B",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "41230711105100",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x4633F102841FFb5E111bcc19DD4ac6c536e6930F",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "41230711105101",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0x4473AD490BD0d69eEE15C815Da1FA823AB84269c",
+      "duration_s": 2,
+      "error": ""
+    },
+    {
+      "serial": "41230711105110",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x87072865b6EfC14610c2A7DE9503c4a4F9D47A63",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "41230711105118",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x3f89D77089B80dace8c8b121a1e7C8d30502e07d",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "41230711105129",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x6B34D38dfa2130031e66fD2d8FFf4e8303DE96a5",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "41230711105156",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x701E3b9A1d7525081f2CaAeC44458864f30326B2",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "41230711105169",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x96C7BB896bCD40f1CF5e013fbF506E031bB25998",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "41230711105195",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0xB670B718105813aA5cFecd6B0093E4e2535e3F29",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "41230711105197",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x0caB5814192d0340E1D3E05Dea1530554A33f9d8",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "41230850315820",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0xf8b4b55b92CDBA3d6ED7355C995e509Fa04A790C",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "41230850315831",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x2df32b5A4E41B84f8AcAea7f85Bc2372844224f5",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "41240850222900",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x5FFF5a78d9eCa29a93AAA4B0C457872139323959",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "41240950117136",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0xf286Fb805241Eb2B8AD6f2cbb51424e970aCe833",
+      "duration_s": 2,
+      "error": ""
+    },
+    {
+      "serial": "41240950202685",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0xcC08C3598e382c4c0748bE21afB99ABBE4CE1653",
+      "duration_s": 2,
+      "error": ""
+    },
+    {
+      "serial": "41240950202686",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0xcc0028d66c22DE0D4C3D2A30Dfc10e7DEC140D79",
+      "duration_s": 2,
+      "error": ""
+    },
+    {
+      "serial": "41240950202694",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0xaE1c82FDB1A82C76F2FAC898F576273e151F4803",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "41240950202700",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0xba4d67B95b18ba07dD649Aa6c30E6D258424af2b",
+      "duration_s": 2,
+      "error": ""
+    },
+    {
+      "serial": "41240950202893",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0xAAD2678a7b8a852b7381E62fA9952495c68d7B3e",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "41240950202894",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0xc7934814c2DdbD6a373d8Bc04684b0eB8764B8A9",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "41240950202898",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0x4CD32e82301438B271f794D3cb415E355D72F979",
+      "duration_s": 2,
+      "error": ""
+    },
+    {
+      "serial": "41240950202899",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x993441Ec2cE3b0094cD6ba83ddD7C40941Fcb13C",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "41240950202900",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x142e7e79E3449748a9F43bacBF1d083322097D41",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "485778125975",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0xc55b418BE02C43ea2915790Ff3d7e5608D8dB3B1",
+      "duration_s": 2,
+      "error": ""
+    },
+    {
+      "serial": "55052008713872",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0xE106cdD422026779893F4f1413c32914d2980A27",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "55052008713909",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x3629dd803C15302ac139f9E85da9621F2BD989d2",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "55052008713976",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x6DBa7Ef5dd702af61FF743b8BadC61A35f802f1d",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "55052008713984",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0xb32587040Fe581d8B475c39e170e2897519f856f",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "55052008713992",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x96595d419cb8e976D470F14505E52eF97858d771",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "55052008714000",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0x3fcdd978177d6931103812954C2e02f5B374ee67",
+      "duration_s": 2,
+      "error": ""
+    },
+    {
+      "serial": "55052008714005",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0x097842edE478702a4d5017e85A3f12eA29e480BF",
+      "duration_s": 2,
+      "error": ""
+    },
+    {
+      "serial": "55052008714006",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0xF536FBF2EF150E848caf8325E241e7568947318e",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "55052008714007",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0xd9A9C65223E9285eb3F7247534372856404FcD4B",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "55052008714009",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x1D3A5A46b32dd6547E12B7A2620a9D93Ac717B65",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "55052008714012",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x9859A0F5B096918d1Fac818846C911F885DE158a",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "55052008714013",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x2f29b9AB84a57a2a767896b32ddD617e0e6Cf05C",
+      "duration_s": 1,
+      "error": ""
+    },
+    {
+      "serial": "552721615074",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0x15F74fA98A5FC97Cd3aBfC3b678eD30Dae095599",
+      "duration_s": 32,
+      "error": ""
+    },
+    {
+      "serial": "56102007614144",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x41417e03f7fd7b54feC5484DdD85f7C19E2b6d7a",
+      "duration_s": 32,
+      "error": ""
+    },
+    {
+      "serial": "56102007614179",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0xE5e0E098918Baa04706eda51828d1C265395d895",
+      "duration_s": 31,
+      "error": ""
+    },
+    {
+      "serial": "56102007614180",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0xa238c86e9F4898172689C0fa802880Fe6844f5df",
+      "duration_s": 32,
+      "error": ""
+    },
+    {
+      "serial": "56102007614184",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x8cCA3E58b502dAfDbc9B75e59f34544320543F38",
+      "duration_s": 31,
+      "error": ""
+    },
+    {
+      "serial": "56102007614185",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x1d7c5E6897B9952acf0F09B4f3019a5b12Cd4DdF",
+      "duration_s": 32,
+      "error": ""
+    },
+    {
+      "serial": "56102007614186",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0xBD18a94D8d49E6e5F29DbaA5BEf958566775c550",
+      "duration_s": 32,
+      "error": ""
+    },
+    {
+      "serial": "56102007614188",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x5A00310AB20970B1141dA05d127A15C0362f8373",
+      "duration_s": 32,
+      "error": ""
+    },
+    {
+      "serial": "56102007614194",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x912dfDB2c975Cf67f60049FcDD66E9fC367d2828",
+      "duration_s": 32,
+      "error": ""
+    },
+    {
+      "serial": "56102007614196",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x0EF0273304e67C8D72266aCA795A2fF8D0931565",
+      "duration_s": 32,
+      "error": ""
+    },
+    {
+      "serial": "56102007614197",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x7A0B413CbbAb312308f65c979B443D0a824E026e",
+      "duration_s": 32,
+      "error": ""
+    },
+    {
+      "serial": "56102007614206",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0xf5A74ab73be0c2C0155886a2919D6998308aa953",
+      "duration_s": 32,
+      "error": ""
+    },
+    {
+      "serial": "56102007614212",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0xfB36C1ab1A9335F1FFF4a94972cdf9968daB3f5d",
+      "duration_s": 152,
+      "error": ""
+    },
+    {
+      "serial": "581613765943",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0xD1a16E2eAeb230e981EDc608f403A4D6636C59dE",
+      "duration_s": 32,
+      "error": ""
+    },
+    {
+      "serial": "661342708541",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0xb8d9b9C4C7182719A93132f81c17BE200E2217B1",
+      "duration_s": 32,
+      "error": ""
+    },
+    {
+      "serial": "695940976453",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0x8cECD42902BFd89AaF967067Dc6554410cFe6cb5",
+      "duration_s": 32,
+      "error": ""
+    },
+    {
+      "serial": "996840655416",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0xfca92027A7De1d834a3Ea23Fb3bFDd6158000F73",
+      "duration_s": 32,
+      "error": ""
+    },
+    {
+      "serial": "176248306956",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0x2a3Dd95f825E9FDaE1d3Ef4CfD2934889c771595",
+      "duration_s": 32,
+      "error": ""
+    },
+    {
+      "serial": "276421070219",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0xCeCa139F905B899be1b3E2c2300D125d5e0c5198",
+      "duration_s": 32,
+      "error": ""
+    },
+    {
+      "serial": "438723226408",
+      "status": "failed",
+      "wallet_minted": true,
+      "wallet": "0xD85F5EB2EF05DAC13b72f97f99a44834c416Ff6B",
+      "duration_s": 32,
+      "error": ""
+    }
+  ]
+}

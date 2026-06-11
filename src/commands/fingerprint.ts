@@ -29,6 +29,8 @@ export interface FingerprintOptions {
   serial?: string;
   serials?: string;
   filetypes?: string;
+  bucket?: string;
+  prefix?: string;
   includeSuperseded?: boolean;
   limit?: string;
   dryRun?: boolean;
@@ -71,6 +73,8 @@ export async function fingerprintCommand(options: FingerprintOptions): Promise<v
   if (options.filetypes) {
     body.filetypes = options.filetypes.split(',').map((s) => s.trim()).filter(Boolean);
   }
+  if (options.bucket) body.bucket = options.bucket;
+  if (options.prefix) body.prefix = options.prefix;
   body.limit = parseInt(options.limit || '50', 10);
 
   const targetLimit = parseInt(options.limit || '50', 10);

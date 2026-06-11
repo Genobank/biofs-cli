@@ -1,0 +1,9 @@
+{
+  "serial": "41230711105089",
+  "status": "failed",
+  "wallet_minted": false,
+  "wallet": "0x016DE6500873aC33971E26e6243e64f228d83B33",
+  "phase_reached": "3:phase_started",
+  "duration_s": 10477,
+  "error": "1230711105089.deepvariant.agilent_v8.g.vcf\", \"bam_uri\": \"gs://genobank-parabricks-output/41230711105089/41230711105089.deepvariant.agilent_v8.bam\"}\n{\"event\": \"parabricks_started\", \"ts\": \"2026-05-28T20:16:58.855229+00:00\", \"interval_file\": \"agilent_v8\", \"use_wes\": true, \"r1\": \"/gcsmnt/input/41230711105089/41230711105089_R1.fastq.gz\", \"r2\": \"/gcsmnt/input/41230711105089/41230711105089_R2.fastq.gz\"}\n"
+}

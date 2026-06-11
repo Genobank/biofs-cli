@@ -1,0 +1,9 @@
+{
+  "serial": "41230711105045",
+  "status": "failed",
+  "wallet_minted": false,
+  "wallet": "0xCfab0aD8bA9975C025629895976168F8A6f33Bfd",
+  "phase_reached": "4:phase_failed",
+  "duration_s": 88,
+  "error": "11105045/41230711105045.deepvariant.agilent_v8.bam\", \"instance\": \"skipped (prior run output)\", \"skipped\": true}}\n{\"event\": \"phase_started\", \"ts\": \"2026-05-27T05:29:24.887105+00:00\", \"phase\": 4, \"name\": \"mint_children\"}\n{\"event\": \"phase_failed\", \"ts\": \"2026-05-27T05:29:24.889786+00:00\", \"phase\": 4, \"name\": \"mint_children\", \"error\": \"TypeError: expected string or bytes-like object, got 'NoneType'\"}\n"
+}

@@ -1,0 +1,9 @@
+{
+  "serial": "41230711105085",
+  "status": "failed",
+  "wallet_minted": false,
+  "wallet": "0x2CD59C185502be7a83623730A9B72844212380BB",
+  "phase_reached": "3:phase_failed",
+  "duration_s": 7322,
+  "error": "rval_file\": \"agilent_v8\", \"use_wes\": true, \"r1\": \"/gcsmnt/input/41230711105085_R1.fastq.gz\", \"r2\": \"/gcsmnt/input/41230711105085_R2.fastq.gz\"}\n{\"event\": \"phase_failed\", \"ts\": \"2026-05-26T14:04:49.948337+00:00\", \"phase\": 3, \"name\": \"parabricks\", \"error\": \"RuntimeError: gVCF did not appear in GCS within 2h: gs://genobank-parabricks-output/41230711105085/41230711105085.deepvariant.agilent_v8.g.vcf\"}\n"
+}

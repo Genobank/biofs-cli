@@ -1,196 +1,104 @@
 /**
- * biofs annotate status <job_id>
+ * biofs annotate status <oc_job_id>
  *
- * Check the status of an OpenCRAVAT annotation job.
+ * v3.6 — repointed to biofs-node v0.4 `/agent/cravat_status`. Returns the full
+ * oc_jobs row (status, exit_code, sqlite_size, n_variants, inventory_registered).
  *
- * Resolution priority:
- *   1. If job_id matches OC native format (YYMMDD-HHMMSS), read .status.json
- *      directly from the OC job dir on genobank-production via gcloud IAP.
- *      This is reliable; the GenoBank API and OC HTTP endpoints are flaky.
- *   2. Otherwise try OC HTTP endpoint /submit/jobstatus/<id>.
- *   3. Otherwise try GenoBank API /api_vcf_annotator/get_job_status.
+ * --wait blocks (polls every 15s) until status ∈ {done, failed} or the 90-min
+ * ceiling is hit. Suitable for use in pipeline_run_wes.py Phase 5b.
  */
 
 import chalk from 'chalk';
 import ora from 'ora';
 import axios from 'axios';
-import { spawnSync } from 'child_process';
-import { getCredentials } from '../../lib/auth/credentials';
 import { Logger } from '../../lib/utils/logger';
 
 export interface AnnotateStatusOptions {
-  watch?: boolean;
   json?: boolean;
+  wait?: boolean;
+  watch?: boolean;          // legacy alias for --wait
+  quiet?: boolean;
+  maxWaitMin?: string;
 }
 
-const OPENCRAVAT_URL = 'https://cravat.genobank.app';
-const OC_JOBS_BASE = '/home/ubuntu/Genobank_APIs/open-cravat-production/open-cravat-production/cravat/jobs';
+const BIOFS_NODE_BASE = process.env.BIOFS_NODE_URL
+  || `${process.env.GENOBANK_API_URL || 'https://genobank.app'}/api_biofs_node`;
 
-function isOcNativeId(s: string): boolean {
-  return /^\d{6}-\d{6}$/.test(s);
+interface StatusRow {
+  oc_job_id: string;
+  status: 'queued' | 'running' | 'done' | 'failed';
+  exit_code?: number;
+  sqlite_size_bytes?: number;
+  n_variants?: number;
+  error?: string;
+  inventory_registered?: boolean;
+  sqlite_biocid?: string;
+  dest_gs_uri?: string;
+  customer_biowallet?: string;
+  package?: string;
+  parent_chain_token_id?: number | null;
 }
 
-interface OcStatus {
-  status: string;
-  num_input_var?: number;
-  num_unique_var?: number;
-  num_error_input?: number;
-  annotators?: string[];
-  submission_time?: string;
-  finished_time?: string;
-  viewable?: boolean;
-  message?: string;
-  sqlite_path?: string;
-  source?: 'oc-statusjson' | 'oc-http' | 'genobank-api';
-}
-
-function fetchStatusFromOcJobDir(walletAddr: string, ocJobId: string): OcStatus | null {
-  // Glob expansion happens server-side. Pull the first *.status.json in the job dir.
-  const cmd = [
-    'compute', 'ssh', 'genobank-production',
-    '--zone=us-central1-a', '--tunnel-through-iap',
-    '--command',
-    `cat ${OC_JOBS_BASE}/${walletAddr.toLowerCase()}/${ocJobId}/*.status.json 2>/dev/null | head -200`,
-  ];
-  const res = spawnSync('gcloud', cmd, { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 });
-  if (res.status !== 0 || !res.stdout.trim()) return null;
-  try {
-    const obj = JSON.parse(res.stdout);
-    return { ...obj, source: 'oc-statusjson' };
-  } catch {
-    return null;
-  }
+async function fetchStatus(ocJobId: string): Promise<StatusRow | null> {
+  const r = await axios.get<StatusRow>(`${BIOFS_NODE_BASE}/cravat_status`, {
+    params: { oc_job_id: ocJobId },
+    timeout: 30_000,
+    validateStatus: (s) => s < 500,
+  });
+  return r.status === 200 ? r.data : null;
 }
 
 export async function annotateStatusCommand(
-  jobId: string,
+  ocJobId: string,
   options: AnnotateStatusOptions = {}
 ): Promise<void> {
-  const spinner = ora('Checking annotation job status...').start();
-
+  const wait = options.wait || options.watch;
   try {
-    const credentials = await getCredentials();
-    if (!credentials) {
-      throw new Error('Not authenticated. Please run "biofs login" first.');
-    }
-
-    const userWallet = credentials.wallet_address;
-    const userSignature = credentials.user_signature;
-
-    const authString = `${userWallet}:${userSignature}`;
-    const authB64 = Buffer.from(authString).toString('base64');
-    const authHeaders = { 'Authorization': `Basic ${authB64}` };
-
-    const checkStatus = async (): Promise<OcStatus> => {
-      if (isOcNativeId(jobId)) {
-        const direct = fetchStatusFromOcJobDir(userWallet, jobId);
-        if (direct) return direct;
+    if (!wait) {
+      const row = await fetchStatus(ocJobId);
+      if (!row) {
+        Logger.error(`oc_job_id=${ocJobId} not found`);
+        process.exit(1);
       }
-      try {
-        const response = await axios.get(
-          `${OPENCRAVAT_URL}/submit/jobstatus/${jobId}`,
-          { headers: authHeaders, timeout: 30000 }
-        );
-        return { ...(response.data || {}), source: 'oc-http' };
-      } catch (e: any) {
-        Logger.debug(`OC HTTP /jobstatus failed: ${e?.message || e}`);
-      }
-      try {
-        const gbResp = await axios.get(
-          `${process.env.GENOBANK_API_URL || 'https://genobank.app'}/api_vcf_annotator/get_job_status`,
-          { params: { user_signature: userSignature }, timeout: 30000 }
-        );
-        const d = gbResp.data?.status_details?.data || gbResp.data;
-        return { ...d, source: 'genobank-api' };
-      } catch (e: any) {
-        Logger.debug(`GenoBank API /get_job_status failed: ${e?.message || e}`);
-      }
-      throw new Error(`Could not determine status for job ${jobId} via any backend`);
-    };
-
-    if (options.watch) {
-      spinner.stop();
-      console.log(chalk.cyan('\n🔄 Watching job status (Ctrl+C to stop)...\n'));
-
-      while (true) {
-        try {
-          const status = await checkStatus();
-          const statusStr = status?.status || 'Unknown';
-          const timestamp = new Date().toLocaleTimeString();
-
-          process.stdout.write(`\r[${timestamp}] Status: ${getStatusEmoji(statusStr)} ${statusStr}     `);
-
-          if (statusStr === 'Finished') {
-            console.log(chalk.green('\n\n✅ Annotation completed!'));
-            console.log(chalk.gray(`   Results: ${OPENCRAVAT_URL}/result/index.html?job_id=${jobId}`));
-            break;
-          } else if (statusStr === 'Error' || statusStr === 'Failed') {
-            console.log(chalk.red(`\n\n❌ Annotation failed: ${status?.message || 'Unknown error'}`));
-            break;
-          }
-
-          await new Promise(resolve => setTimeout(resolve, 5000));
-        } catch (error) {
-          await new Promise(resolve => setTimeout(resolve, 5000));
-        }
-      }
-    } else {
-      const status = await checkStatus();
-      spinner.stop();
-
       if (options.json) {
-        console.log(JSON.stringify(status, null, 2));
-        return;
+        console.log(JSON.stringify(row, null, 2));
+      } else {
+        console.log(`${chalk.bold(ocJobId)}  status=${row.status}`);
+        if (row.n_variants !== undefined) console.log(`  variants annotated: ${row.n_variants}`);
+        if (row.sqlite_size_bytes !== undefined) console.log(`  sqlite size: ${(row.sqlite_size_bytes / 1e6).toFixed(1)} MB`);
+        if (row.inventory_registered) console.log(`  ✓ bioroutes.inventory row written (biocid=${row.sqlite_biocid?.slice(0, 80) || '?'})`);
+        if (row.error) console.log(chalk.red(`  error: ${row.error.slice(0, 200)}`));
+        if (row.dest_gs_uri) console.log(chalk.gray(`  output: ${row.dest_gs_uri}`));
       }
-
-      const statusStr = status?.status || 'Unknown';
-
-      console.log(chalk.cyan('\n📊 OpenCRAVAT Job Status'));
-      console.log(chalk.gray('━'.repeat(50)));
-      console.log(`\n${chalk.cyan('Job ID:')}     ${chalk.white(jobId)}`);
-      console.log(`${chalk.cyan('Status:')}     ${getStatusEmoji(statusStr)} ${chalk.white(statusStr)}`);
-
-      if (status?.num_input_var) {
-        console.log(`${chalk.cyan('Variants:')}   ${chalk.white(status.num_input_var.toLocaleString())}`);
-      }
-
-      if (status?.annotators && status.annotators.length > 0) {
-        console.log(`${chalk.cyan('Annotators:')} ${chalk.white(status.annotators.length)}`);
-      }
-
-      if (statusStr === 'Finished') {
-        console.log(chalk.green('\n✅ Annotation completed!'));
-        console.log(chalk.gray(`   View results: ${OPENCRAVAT_URL}/result/index.html?job_id=${jobId}`));
-      } else if (statusStr === 'Error' || statusStr === 'Failed') {
-        console.log(chalk.red(`\n❌ Annotation failed: ${status?.message || 'Unknown error'}`));
-      } else if (statusStr === 'Running' || statusStr === 'Annotating') {
-        console.log(chalk.yellow('\n⏳ Job is still running...'));
-        console.log(chalk.gray(`   Use --watch to monitor: biofs annotate status ${jobId} --watch`));
-      }
-
-      console.log('');
+      return;
     }
 
-  } catch (error: any) {
-    spinner.fail(chalk.red('Failed to check status'));
-
-    if (error.response?.status === 404) {
-      Logger.error(`Job not found: ${jobId}`);
-    } else {
-      Logger.error(`Error: ${error.message}`);
+    const maxMin = parseInt(options.maxWaitMin || '90', 10);
+    const spinner = options.quiet ? null
+      : ora(`waiting for ${ocJobId} (up to ${maxMin} min)`).start();
+    const deadline = Date.now() + maxMin * 60_000;
+    while (Date.now() < deadline) {
+      const row = await fetchStatus(ocJobId);
+      if (row) {
+        if (row.status === 'done') {
+          spinner?.succeed(`done — ${row.n_variants ?? '?'} variants, ${row.sqlite_size_bytes ?? '?'} bytes${row.inventory_registered ? ', inventory registered' : ''}`);
+          if (options.json) console.log(JSON.stringify(row, null, 2));
+          return;
+        }
+        if (row.status === 'failed') {
+          spinner?.fail(`failed exit_code=${row.exit_code}: ${row.error || 'no detail'}`);
+          if (options.json) console.log(JSON.stringify(row, null, 2));
+          process.exit(2);
+        }
+        if (spinner) spinner.text = `${row.status} (${ocJobId})`;
+      }
+      await new Promise((r) => setTimeout(r, 15_000));
     }
-
-    throw error;
+    spinner?.warn('wait timeout');
+    process.exit(3);
+  } catch (err: any) {
+    const msg = err?.response?.data?.error || err?.message || String(err);
+    Logger.error(`annotate status failed: ${msg}`);
+    process.exit(1);
   }
 }
-
-function getStatusEmoji(status: string): string {
-  const s = status.toLowerCase();
-  if (s === 'finished' || s.startsWith('finished')) return '✅';
-  if (s.startsWith('running') || s.startsWith('annotating') || s.startsWith('aggregat')) return '🔄';
-  if (s === 'queued' || s === 'pending' || s.startsWith('submit')) return '⏳';
-  if (s === 'error' || s === 'failed' || s.startsWith('error') || s.startsWith('fail')) return '❌';
-  return '❓';
-}
-
-

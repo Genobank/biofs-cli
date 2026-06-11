@@ -1,0 +1,9 @@
+{
+  "serial": "41230711105086",
+  "status": "failed",
+  "wallet_minted": false,
+  "wallet": "0x79696fB03940962cBBDcAaaC43Dd156401872885",
+  "phase_reached": "5.5:phase_failed",
+  "duration_s": 755,
+  "error": "riants\": null, \"sqlite_size\": null}\n{\"event\": \"cravat_poll\", \"ts\": \"2026-05-28T20:16:45.296621+00:00\", \"status\": \"failed\", \"oc_job_id\": \"oc-d305116a-f748-4be5-9aa3-318680f9c2f0\", \"n_variants\": null, \"sqlite_size\": null}\n{\"event\": \"phase_failed\", \"ts\": \"2026-05-28T20:16:45.297959+00:00\", \"phase\": 5.5, \"name\": \"wait_sqlite\", \"error\": \"RuntimeError: OC worker failed (exit_code=1): gsutil cp failed\"}\n"
+}
