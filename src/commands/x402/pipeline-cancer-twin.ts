@@ -31,6 +31,7 @@ import {
   CANCER_TWIN_AGENTS, getCancerTwinAgent, agentAddress, totalPipelineCostUsdc, CancerTwinAgentKey,
 } from '../../lib/x402/cancer-twin-agents';
 import { x402SubmitCommand, X402SubmitResult } from './submit';
+import { pipelineRunWesCommand } from '../pipeline/runWes';
 import { Logger } from '../../lib/utils/logger';
 
 const BIOFS_NODE_BASE = process.env.BIOFS_NODE_URL
@@ -48,13 +49,14 @@ export interface PipelineCancerTwinOptions {
   json?: boolean;
 }
 
-interface LineageNode { biocid: string; fileType: string; parent: string | null; agent: string | null; }
+interface LineageNode { biocid: string; fileType: string; parent: string | null; agent: string | null; anchorTx?: string | null; }
 interface StepRecord {
   step: number; agent: string; serviceType: string; priceUsdc: number;
   settlementTx: string; settlementSimulated: boolean;
   proofTx: string | null; paymentId: number | null; agentId: number | null;
   jobId: string | null; status: string;
   inputBiocid: string; outputBiocid: string;
+  anchorTx?: string | null;  // BioRouter on-chain registration tx for the output
 }
 export interface CancerTwinManifest {
   caseId: string; biosample: string; owner: string;
@@ -145,6 +147,26 @@ async function waitForJob(agentKey: CancerTwinAgentKey, jobId: string | null, dr
   return 'timeout';
 }
 
+/** BioRouter FileType this stage's output anchors as (null = not a native type). */
+const STAGE_ANCHOR_FILETYPE: Record<CancerTwinAgentKey, string | null> = {
+  clara: 'vcf', opencravat: 'sqlite', genoclaw: null, // report isn't a BioRouter FileType
+};
+
+/** Anchor a stage output on BioRouter (Sequentia) via biofs-node. Best-effort. */
+async function anchorOutput(
+  agentKey: CancerTwinAgentKey, serial: string, owner: string, biocid: string, dryRun: boolean,
+): Promise<string | null> {
+  const filetype = STAGE_ANCHOR_FILETYPE[agentKey];
+  if (!filetype || dryRun) return null;
+  try {
+    const resp = await axios.post(`${BIOFS_NODE_BASE}/anchor_bioasset`,
+      { serial, filetype, owner, biocid },
+      { timeout: 60_000, validateStatus: (s) => s < 500 });
+    if (resp.status >= 400 || resp.data?.anchored === false) return null;
+    return resp.data?.txHash || (resp.data?.already ? 'already-anchored' : null);
+  } catch { return null; }
+}
+
 /** Derive the canonical output BioCID for a stage (deterministic, lineage-linked). */
 function outputBiocid(agentKey: CancerTwinAgentKey, owner: string, biosample: string): { biocid: string; fileType: string } {
   const w = owner.toLowerCase();
@@ -209,12 +231,18 @@ export async function pipelineCancerTwinCommand(
       const agent = getCancerTwinAgent(key);
       emit({ event: 'stage_started', stage: agent.step, name: agent.name }, jsonOnly);
 
-      // x402: pay + proof + dispatch (single call).
+      // The clara stage runs the proven GPU FASTQ→VCF path (run-wes phases 1-4:
+      // wake_gpu + Parabricks + VCF registration), NOT the /agent/job dev runner.
+      // So we pay+prove via x402 (no dispatch) and invoke run-wes directly.
+      const isClaraGpu = key === 'clara' && !dryRun;
+
+      // x402: pay + proof + dispatch (single call). clara pays only (no dispatch).
       let sub: X402SubmitResult | null = null;
       try {
         sub = await x402SubmitCommand({
           agent: key, biosample, package: options.package,
           dryRun, quiet: true, inputBiocid: prevBiocid, native: options.native,
+          noDispatch: isClaraGpu,
         });
       } catch (e: any) {
         emit({ event: 'stage_failed', stage: agent.step, name: agent.name, error: e?.message || String(e) }, jsonOnly);
@@ -230,17 +258,36 @@ export async function pipelineCancerTwinCommand(
 
       emit({ event: 'stage_paid', stage: agent.step, agent: agent.name, priceUsdc: sub.priceUsdc, settlementTx: sub.settlement.txHash, proofTx: sub.proof.txHash }, jsonOnly);
 
-      // Wait for the agent job to finish (skipped in dry-run).
-      const jobStatus = await waitForJob(key, sub.dispatch?.jobId || null, dryRun);
+      // Run the agent's compute and wait for it.
+      let jobStatus: string;
+      if (isClaraGpu) {
+        // Proven GPU FASTQ→VCF: run-wes phases 1-4 (wake_gpu + Parabricks + VCF
+        // registration in bioroutes.inventory, which the opencravat stage then
+        // resolves). This wakes the spot GPU automatically.
+        emit({ event: 'clara_gpu_started', stage: agent.step, name: agent.name, note: 'wake_gpu + Parabricks FASTQ→VCF (run-wes 1-4)' }, jsonOnly);
+        const rc = await pipelineRunWesCommand(biosample, { phase: '1-4', json: jsonOnly, remote: true });
+        jobStatus = rc === 0 ? 'done' : 'failed';
+        if (rc !== 0) {
+          emit({ event: 'stage_failed', stage: agent.step, name: agent.name, error: `clara FASTQ→VCF (run-wes 1-4) exit ${rc}` }, jsonOnly);
+          throw new Error(`clara FASTQ→VCF failed (run-wes exit ${rc})`);
+        }
+      } else {
+        jobStatus = await waitForJob(key, sub.dispatch?.jobId || null, dryRun);
+      }
 
       const out = outputBiocid(key, owner, biosample);
-      manifest.lineage.push({ biocid: out.biocid, fileType: out.fileType, parent: prevBiocid, agent: agent.name });
+
+      // Anchor this output on BioRouter (Sequentia) so the journey is on-chain.
+      const anchorTx = await anchorOutput(key, biosample, owner, out.biocid, dryRun);
+      if (anchorTx) emit({ event: 'output_anchored', stage: agent.step, fileType: out.fileType, txHash: anchorTx }, jsonOnly);
+
+      manifest.lineage.push({ biocid: out.biocid, fileType: out.fileType, parent: prevBiocid, agent: agent.name, anchorTx });
       manifest.steps.push({
         step: agent.step, agent: agent.name, serviceType: agent.serviceType, priceUsdc: sub.priceUsdc,
         settlementTx: sub.settlement.txHash, settlementSimulated: sub.settlement.simulated,
         proofTx: sub.proof.txHash, paymentId: sub.proof.paymentId, agentId: sub.proof.agentId,
         jobId: sub.dispatch?.jobId || null, status: jobStatus,
-        inputBiocid: prevBiocid, outputBiocid: out.biocid,
+        inputBiocid: prevBiocid, outputBiocid: out.biocid, anchorTx,
       });
       manifest.payments.totalUsdc += sub.priceUsdc;
       manifest.payments.byAgent[agent.name] = sub.priceUsdc;
@@ -253,6 +300,14 @@ export async function pipelineCancerTwinCommand(
 
       emit({ event: 'stage_done', stage: agent.step, name: agent.name, jobId: sub.dispatch?.jobId, outputBiocid: out.biocid, status: jobStatus }, jsonOnly);
       prevBiocid = out.biocid;
+    }
+
+    // If the GPU was woken for the clara stage, stop it now (OC + interpret
+    // don't need it) — run-wes phase 8 = stop_gpu. Best-effort.
+    if (stages.includes('clara') && !dryRun) {
+      emit({ event: 'gpu_stopping', note: 'run-wes phase 8 (stop_gpu)' }, jsonOnly);
+      try { await pipelineRunWesCommand(biosample, { phase: '8', json: jsonOnly, remote: true }); }
+      catch (e: any) { Logger.warn(`GPU stop (non-fatal): ${e?.message || e}`); }
     }
 
     // Anchor: record the pipeline manifest hash on Sequentia (simulated unless live).
