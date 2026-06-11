@@ -80,6 +80,7 @@ function createX402PipelineCommand(): Command {
     .option('--owner <wallet>', 'Patient/owner wallet (defaults to logged-in wallet)')
     .option('--case-id <id>', 'BioContext case id (defaults to biosample serial)')
     .option('--package <pkg>', 'Interpretation package', 'cancer_twin')
+    .option('--native', 'Settle each x402 stage in native Sequentia token instead of seqUSDC')
     .option('--dry-run', 'Simulate the full pipeline deterministically (no chain/compute)')
     .option('--wait', 'Wait for each agent job to complete before proceeding')
     .option('--json', 'Emit raw JSON-line events + final manifest')
