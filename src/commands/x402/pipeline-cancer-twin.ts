@@ -31,7 +31,6 @@ import {
   CANCER_TWIN_AGENTS, getCancerTwinAgent, agentAddress, totalPipelineCostUsdc, CancerTwinAgentKey,
 } from '../../lib/x402/cancer-twin-agents';
 import { x402SubmitCommand, X402SubmitResult } from './submit';
-import { pipelineRunWesCommand } from '../pipeline/runWes';
 import { Logger } from '../../lib/utils/logger';
 
 const BIOFS_NODE_BASE = process.env.BIOFS_NODE_URL
@@ -231,18 +230,14 @@ export async function pipelineCancerTwinCommand(
       const agent = getCancerTwinAgent(key);
       emit({ event: 'stage_started', stage: agent.step, name: agent.name }, jsonOnly);
 
-      // The clara stage runs the proven GPU FASTQ→VCF path (run-wes phases 1-4:
-      // wake_gpu + Parabricks + VCF registration), NOT the /agent/job dev runner.
-      // So we pay+prove via x402 (no dispatch) and invoke run-wes directly.
-      const isClaraGpu = key === 'clara' && !dryRun;
-
-      // x402: pay + proof + dispatch (single call). clara pays only (no dispatch).
+      // x402: pay + proof + dispatch to the agent's biofs-node endpoint (single
+      // call). Every stage — clara, opencravat, genoclaw — dispatches through
+      // biofs-node; the pipeline never invokes server scripts directly.
       let sub: X402SubmitResult | null = null;
       try {
         sub = await x402SubmitCommand({
           agent: key, biosample, package: options.package,
           dryRun, quiet: true, inputBiocid: prevBiocid, native: options.native,
-          noDispatch: isClaraGpu,
         });
       } catch (e: any) {
         emit({ event: 'stage_failed', stage: agent.step, name: agent.name, error: e?.message || String(e) }, jsonOnly);
@@ -258,24 +253,8 @@ export async function pipelineCancerTwinCommand(
 
       emit({ event: 'stage_paid', stage: agent.step, agent: agent.name, priceUsdc: sub.priceUsdc, settlementTx: sub.settlement.txHash, proofTx: sub.proof.txHash }, jsonOnly);
 
-      // Run the agent's compute and wait for it.
-      let jobStatus: string;
-      if (isClaraGpu) {
-        // Proven GPU FASTQ→VCF: run-wes phases 1-4 (wake_gpu + Parabricks + VCF
-        // registration in bioroutes.inventory, which the opencravat stage then
-        // resolves). This wakes the spot GPU automatically.
-        emit({ event: 'clara_gpu_started', stage: agent.step, name: agent.name, note: 'wake_gpu + Parabricks FASTQ→VCF (run-wes 1-4)' }, jsonOnly);
-        // remote: the GPU + current orchestrator live on prod (a dev Mac's local
-        // copy is stale and has no GPU). runWes SSHes via IAP.
-        const rc = await pipelineRunWesCommand(biosample, { phase: '1-4', json: jsonOnly, remote: true });
-        jobStatus = rc === 0 ? 'done' : 'failed';
-        if (rc !== 0) {
-          emit({ event: 'stage_failed', stage: agent.step, name: agent.name, error: `clara FASTQ→VCF (run-wes 1-4) exit ${rc}` }, jsonOnly);
-          throw new Error(`clara FASTQ→VCF failed (run-wes exit ${rc})`);
-        }
-      } else {
-        jobStatus = await waitForJob(key, sub.dispatch?.jobId || null, dryRun);
-      }
+      // Wait for the agent's biofs-node job to finish (skipped in dry-run).
+      const jobStatus = await waitForJob(key, sub.dispatch?.jobId || null, dryRun);
 
       const out = outputBiocid(key, owner, biosample);
 
@@ -302,14 +281,6 @@ export async function pipelineCancerTwinCommand(
 
       emit({ event: 'stage_done', stage: agent.step, name: agent.name, jobId: sub.dispatch?.jobId, outputBiocid: out.biocid, status: jobStatus }, jsonOnly);
       prevBiocid = out.biocid;
-    }
-
-    // If the GPU was woken for the clara stage, stop it now (OC + interpret
-    // don't need it) — run-wes phase 8 = stop_gpu. Best-effort.
-    if (stages.includes('clara') && !dryRun) {
-      emit({ event: 'gpu_stopping', note: 'run-wes phase 8 (stop_gpu)' }, jsonOnly);
-      try { await pipelineRunWesCommand(biosample, { phase: '8', json: jsonOnly, remote: true }); }
-      catch (e: any) { Logger.warn(`GPU stop (non-fatal): ${e?.message || e}`); }
     }
 
     // Anchor: record the pipeline manifest hash on Sequentia (simulated unless live).
