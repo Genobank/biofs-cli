@@ -207,9 +207,13 @@ export async function pipelineRunWesCommand(
   let cmdArgs: string[];
   if (useRemote) {
     // Run on the production host via gcloud compute ssh
-    const remoteCmd = ['sudo', '-u', 'ubuntu', 'python3.12', REMOTE_ORCH, ...argsForPython].join(' ');
+    // -u: unbuffered stdout/stderr so JSON events stream live over SSH pipes
+    // (without -u, Python block-buffers stdout when stdout is a pipe and we'd
+    // see nothing until the process exits or the buffer fills ~4KB).
+    const remoteCmd = ['sudo', '-u', 'ubuntu', 'python3.12', '-u', REMOTE_ORCH, ...argsForPython].join(' ');
     command = 'gcloud';
-    cmdArgs = ['compute', 'ssh', REMOTE_HOST, `--zone=${REMOTE_ZONE}`, '--', remoteCmd];
+    // --tunnel-through-iap: the prod VM is reachable only via IAP (no public SSH).
+    cmdArgs = ['compute', 'ssh', REMOTE_HOST, `--zone=${REMOTE_ZONE}`, '--tunnel-through-iap', '--', remoteCmd];
   } else {
     command = 'python3';
     cmdArgs = [localOrch as string, ...argsForPython];
