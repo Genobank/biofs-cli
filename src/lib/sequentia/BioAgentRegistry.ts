@@ -170,6 +170,43 @@ export class BioAgentRegistry {
     return receipt?.hash || tx.hash;
   }
 
+  /** Highest assigned paymentId (nextPaymentId - 1 = count of proofs submitted). */
+  async paymentCount(): Promise<number> {
+    const next: bigint = await this.contract.nextPaymentId();
+    return Math.max(0, Number(next) - 1);
+  }
+
+  /** Read a payment proof record by id. Read-only. */
+  async getPayment(paymentId: number): Promise<{
+    agentId: number; bioipId: string; paymentTxHash: string; chainId: number;
+    usdcAmount: string; bioipEquivalent: string; timestamp: number; verified: boolean;
+  } | null> {
+    const p = await this.contract.payments(paymentId);
+    if (Number(p.agentId) === 0 && Number(p.timestamp) === 0) return null;
+    return {
+      agentId: Number(p.agentId),
+      bioipId: p.bioipId,
+      paymentTxHash: p.paymentTxHash,
+      chainId: Number(p.chainId),
+      usdcAmount: ethers.formatUnits(p.usdcAmount, 6),
+      bioipEquivalent: ethers.formatUnits(p.bioipEquivalent, 18),
+      timestamp: Number(p.timestamp),
+      verified: p.verified,
+    };
+  }
+
+  /**
+   * Verify a payment proof (onlyOwner): marks it verified and credits the
+   * agent's totalSpent with the BIOIP-equivalent. Requires the registry OWNER
+   * key (the contract deployer/oracle).
+   */
+  async verifyPayment(paymentId: number): Promise<string> {
+    if (!this.signer) throw new Error('verifyPayment requires the registry owner private key');
+    const tx = await this.contract.verifyPayment(paymentId);
+    const receipt = await tx.wait();
+    return receipt?.hash || tx.hash;
+  }
+
   /** Public asset identifier for a BioCID (NOT the salted consent bioipId). */
   static assetIdForBiocid(biocid: string): string {
     return ethers.keccak256(ethers.toUtf8Bytes(biocid));

@@ -3,6 +3,7 @@ import { createPayCommand } from './pay';
 import { createListServicesCommand } from './list-services';
 import { x402SubmitCommand } from './submit';
 import { pipelineCancerTwinCommand } from './pipeline-cancer-twin';
+import { x402VerifyPaymentCommand } from './verify-payment';
 import { Logger } from '../../lib/utils/logger';
 
 /**
@@ -19,9 +20,28 @@ export function createX402Command(): Command {
     .addCommand(createPayCommand())
     .addCommand(createListServicesCommand())
     .addCommand(createX402SubmitCommand())
+    .addCommand(createX402VerifyPaymentCommand())
     .addCommand(createX402PipelineCommand());
 
   return command;
+}
+
+/** biofs x402 verify-payment — owner/oracle confirms ERC-8004 payment proofs. */
+function createX402VerifyPaymentCommand(): Command {
+  return new Command('verify-payment')
+    .description('Owner-verify ERC-8004 payment proofs on BioAgentRegistry (credits agent spend)')
+    .argument('[paymentIds...]', 'Payment id(s) to verify')
+    .option('--all', 'Verify every unverified payment proof')
+    .option('--dry-run', 'Preview without broadcasting (no owner key needed)')
+    .option('--json', 'Emit JSON')
+    .action(async (paymentIds: string[], options) => {
+      try {
+        await x402VerifyPaymentCommand(paymentIds, options);
+      } catch (error: any) {
+        Logger.error(`x402 verify-payment failed: ${error?.message || error}`);
+        process.exit(1);
+      }
+    });
 }
 
 /** biofs x402 submit — pay one ERC-8004 agent and dispatch its job. */
