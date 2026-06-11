@@ -42,6 +42,7 @@ export interface PipelineCancerTwinOptions {
   owner?: string;       // patient wallet override
   caseId?: string;      // BioContext case id (default = biosample serial)
   package?: string;     // interpretation package (cancer_twin)
+  native?: boolean;     // settle each x402 stage in native Sequentia token
   dryRun?: boolean;
   wait?: boolean;
   json?: boolean;
@@ -213,7 +214,7 @@ export async function pipelineCancerTwinCommand(
       try {
         sub = await x402SubmitCommand({
           agent: key, biosample, package: options.package,
-          dryRun, quiet: true, inputBiocid: prevBiocid,
+          dryRun, quiet: true, inputBiocid: prevBiocid, native: options.native,
         });
       } catch (e: any) {
         emit({ event: 'stage_failed', stage: agent.step, name: agent.name, error: e?.message || String(e) }, jsonOnly);
