@@ -265,6 +265,8 @@ export async function pipelineCancerTwinCommand(
         // registration in bioroutes.inventory, which the opencravat stage then
         // resolves). This wakes the spot GPU automatically.
         emit({ event: 'clara_gpu_started', stage: agent.step, name: agent.name, note: 'wake_gpu + Parabricks FASTQ→VCF (run-wes 1-4)' }, jsonOnly);
+        // remote: the GPU + current orchestrator live on prod (a dev Mac's local
+        // copy is stale and has no GPU). runWes SSHes via IAP.
         const rc = await pipelineRunWesCommand(biosample, { phase: '1-4', json: jsonOnly, remote: true });
         jobStatus = rc === 0 ? 'done' : 'failed';
         if (rc !== 0) {
