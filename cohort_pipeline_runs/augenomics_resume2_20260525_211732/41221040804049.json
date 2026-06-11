@@ -1,0 +1,9 @@
+{
+  "serial": "41221040804049",
+  "status": "failed",
+  "wallet_minted": false,
+  "wallet": "0xEE1263B932593dcc22ADCA28E1eb01d357E8A91c",
+  "phase_reached": "5.5:phase_failed",
+  "duration_s": 1132,
+  "error": "\": null, \"sqlite_size\": null}\n{\"event\": \"cravat_poll\", \"ts\": \"2026-05-26T06:09:55.121661+00:00\", \"status\": \"failed\", \"oc_job_id\": \"oc-9223900e-b924-41ed-ba98-1380dec3d4e9\", \"n_variants\": 29550, \"sqlite_size\": null}\n{\"event\": \"phase_failed\", \"ts\": \"2026-05-26T06:09:55.123785+00:00\", \"phase\": 5.5, \"name\": \"wait_sqlite\", \"error\": \"RuntimeError: OC worker failed (exit_code=2): oc produced no sqlite\"}\n"
+}

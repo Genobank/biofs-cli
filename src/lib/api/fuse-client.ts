@@ -65,6 +65,18 @@ export interface FuseVariantsResponse {
   count: number;
   rows: FuseVariantRow[];
   methodology?: string | null;
+  // Genomi -> biofs Campaign B: typed honesty contract, present when the prod
+  // analyzer is envelope-aware. A zero `count` is NOT a clinical negative unless
+  // evidence_envelope.negative_inference_permitted === true.
+  evidence_envelope?: Record<string, unknown> | null;
+}
+
+export interface FuseQuerySubmitResponse {
+  query_job_id?: string;
+  status?: string;
+  joined?: boolean;
+  fallback?: boolean; // set by the client when the prod endpoint is absent (old prod)
+  error?: string;
 }
 
 export interface FuseCohortAcmgPerSerial {
@@ -267,6 +279,106 @@ export class FuseAPIClient {
       if (status === 503) throw new Error(serverMsg || 'Sqlite path not mounted on prod (transient — try again)');
       throw new Error(`variants API failed: ${serverMsg || error.message}`);
     }
+  }
+
+  /**
+   * Genomi -> biofs Campaign A: submit a variants query as a background job.
+   * Returns {query_job_id, status:'in_progress'} in <1s so the cold 462MB-sqlite
+   * scan never blocks a request past Cloudflare's ~100s edge (the 524). If the
+   * prod analyzer lacks the endpoint (404) or the verb is not async yet (501),
+   * returns {fallback:true} so the caller can use the legacy synchronous path.
+   */
+  async querySubmit(
+    biosample: string,
+    wallet: string,
+    signature: string,
+    opts: { gene?: string; region?: string; so?: string; maxAf?: string; clinvar?: string; columns?: string; limit?: number | string; jobId?: string; withAcmg?: boolean } = {}
+  ): Promise<FuseQuerySubmitResponse> {
+    const params: Record<string, string> = { verb: 'variants', biosample, wallet, signature };
+    if (opts.gene) params.gene = opts.gene;
+    if (opts.region) params.region = opts.region;
+    if (opts.so) params.so = opts.so;
+    if (opts.maxAf !== undefined) params.max_af = String(opts.maxAf);
+    if (opts.clinvar) params.clinvar = opts.clinvar;
+    if (opts.columns) params.columns = opts.columns;
+    if (opts.limit !== undefined) params.limit = String(opts.limit);
+    if (opts.jobId) params.job_id = opts.jobId;
+    if (opts.withAcmg) params.with_acmg = 'true';
+    try {
+      const r = await axios.get(`${this.baseUrl}/query_submit`, { params, timeout: 30_000 });
+      return r.data as FuseQuerySubmitResponse;
+    } catch (error: any) {
+      const status = error.response?.status;
+      const serverMsg = error.response?.data?.error;
+      // 404 = endpoint absent (old prod); 501 = verb not async yet -> fall back.
+      if (status === 404 || status === 501) return { fallback: true };
+      if (status === 403) throw new Error(serverMsg || 'BioNFT consent / signature rejected');
+      throw new Error(`query_submit failed: ${serverMsg || error.message}`);
+    }
+  }
+
+  /**
+   * Poll a submitted query job. Fast call; never blocks on the scan. Auth-gated:
+   * the wallet + signature must match the submitter (the job UUID is not a bearer
+   * token), so genomic results never leak to a caller who merely knows the id.
+   */
+  async queryStatus(queryJobId: string, wallet: string, signature: string): Promise<Record<string, any>> {
+    const r = await axios.get(`${this.baseUrl}/query_status`, {
+      params: { query_job_id: queryJobId, wallet, signature },
+      timeout: 30_000,
+    });
+    return r.data;
+  }
+
+  /**
+   * Variants via submit-then-poll (the 524 killer), with automatic fallback to
+   * the legacy synchronous `variants()` when the prod analyzer is not yet
+   * envelope/async-aware. Each network call is fast, so the cold scan can run as
+   * long as it needs without a Cloudflare gateway timeout.
+   */
+  async variantsPolled(
+    biosample: string,
+    wallet: string,
+    signature: string,
+    opts: { gene?: string; region?: string; so?: string; maxAf?: string; clinvar?: string; columns?: string; limit?: number | string; jobId?: string; withAcmg?: boolean } = {},
+    onProgress?: (elapsedSec: number, status: string) => void
+  ): Promise<FuseVariantsResponse> {
+    const sub = await this.querySubmit(biosample, wallet, signature, opts);
+    if (sub.fallback || !sub.query_job_id) {
+      // Old prod (no async endpoint) -> legacy synchronous call, unchanged behavior.
+      return this.variants(biosample, wallet, signature, opts);
+    }
+    const qid = sub.query_job_id;
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const start = Date.now();
+    const MAX_MS = 20 * 60_000;
+    let intervalMs = 5_000; // 5s, then back off to 15s after the first minute
+    // A dedup-joined job may already be done at submit time; check once up front.
+    if (sub.status === 'done') {
+      const st0 = await this.queryStatus(qid, wallet, signature);
+      if (st0.status === 'done') return st0 as FuseVariantsResponse;
+    }
+    while (Date.now() - start < MAX_MS) {
+      await sleep(intervalMs);
+      let st: Record<string, any>;
+      try {
+        st = await this.queryStatus(qid, wallet, signature);
+      } catch (e: any) {
+        // transient poll error: keep polling unless the job id is unknown (404)
+        if (e.response?.status === 404) throw new Error(`query job ${qid} not found`);
+        continue;
+      }
+      const elapsed = Math.round((Date.now() - start) / 1000);
+      if (st.status === 'done') return st as FuseVariantsResponse;
+      if (st.status === 'failed' || st.status === 'failed:stalled') {
+        const env = st.evidence_envelope as Record<string, any> | undefined;
+        const code = env?.guidance_code ? ` [${env.guidance_code}]` : '';
+        throw new Error(`${st.error || 'query failed'}${code}`);
+      }
+      if (onProgress) onProgress(elapsed, String(st.status || 'in_progress'));
+      if (Date.now() - start > 60_000) intervalMs = 15_000;
+    }
+    throw new Error(`variants query timed out after ${Math.round(MAX_MS / 60_000)} min (job ${qid})`);
   }
 
   /**

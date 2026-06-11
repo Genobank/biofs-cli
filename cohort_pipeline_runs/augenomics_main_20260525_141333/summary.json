@@ -1,0 +1,23 @@
+{
+  "cohort_size": 70,
+  "completed": 0,
+  "failed": 1,
+  "skipped": 0,
+  "total_seconds": 1325,
+  "concurrency": 1,
+  "started_at": "2026-05-25T21:13:34.128Z",
+  "finished_at": "2026-05-25T21:35:39.232Z",
+  "serials_file": "/tmp/augenomics_cohort_via_biofs.txt",
+  "output_dir": "/Users/danieluribe/Downloads/biofs-cli/cohort_pipeline_runs/augenomics_main_20260525_141333",
+  "results": [
+    {
+      "serial": "11023804270",
+      "status": "failed",
+      "wallet_minted": false,
+      "wallet": "0x5ccE38f1f61c2F4b04210c0dD5bDFA23a1Ef38ed",
+      "phase_reached": "7:phase_failed",
+      "duration_s": 1325,
+      "error": "\"ingest_vault\", \"error\": \"RuntimeError: ingest_from_opencravat.py failed: stdout= stderr=ns/genoclaw/scripts/ingest_from_opencravat.py\\\", line 25, in <module>\\n    from src.vault.opencravat import ingest_sqlite\\n  File \\\"/home/ubuntu/Genobank_APIs/production_api/plugins/genoclaw/src/vault/opencravat.py\\\", line 37, in <module>\\n    import asyncpg\\nModuleNotFoundError: No module named 'asyncpg'\\n\"}\n"
+    }
+  ]
+}

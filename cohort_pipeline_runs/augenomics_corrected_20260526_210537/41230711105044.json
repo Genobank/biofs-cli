@@ -1,0 +1,9 @@
+{
+  "serial": "41230711105044",
+  "status": "failed",
+  "wallet_minted": false,
+  "wallet": "0x1d923Ed445B8AAc102CA50097578a801483aB83d",
+  "phase_reached": "2:phase_failed",
+  "duration_s": 225,
+  "error": "event\": \"phase_started\", \"ts\": \"2026-05-27T05:24:17.273958+00:00\", \"phase\": 2, \"name\": \"wake_gpu\"}\n{\"event\": \"vm_starting\", \"ts\": \"2026-05-27T05:24:35.003333+00:00\", \"instance\": \"parabricks-gpu-spot\"}\n{\"event\": \"phase_failed\", \"ts\": \"2026-05-27T05:27:56.783313+00:00\", \"phase\": 2, \"name\": \"wake_gpu\", \"error\": \"RuntimeError: GPU instance parabricks-gpu-spot did not reach running state within 180s\"}\n"
+}

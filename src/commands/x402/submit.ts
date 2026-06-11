@@ -105,7 +105,10 @@ async function dispatchJob(
   const routeFor: Record<string, { path: string; body: () => Record<string, unknown>; jobIdField: string }> = {
     clara: {
       path: '/job',
-      body: () => ({ biosampleId: biosample, creatorWallet: wallet, creatorSig: signature }),
+      // inputType:'fastq' tells the front biofs-node to forward this to a GPU
+      // executor (discoverGpuExecutor) for Clara Parabricks variant calling,
+      // rather than running it on the GPU-less front. Explicit > the default.
+      body: () => ({ biosampleId: biosample, creatorWallet: wallet, creatorSig: signature, inputType: 'fastq' }),
       jobIdField: 'jobId',
     },
     opencravat: {

@@ -179,17 +179,25 @@ export async function variantsCommand(serial: string, opts: VariantsOptions): Pr
   const api = new FuseAPIClient();
   let response;
   try {
-    response = await api.variants(serial, creds.wallet_address, creds.user_signature, {
-      gene: opts.gene,
-      region: opts.region,
-      so: opts.so,
-      maxAf: opts.maxAf !== undefined ? opts.maxAf : '0.01',
-      clinvar: opts.clinvar,
-      columns: opts.columns,
-      jobId: opts.jobId,
-      withAcmg: opts.withAcmg,
-      limit: opts.limit,
-    });
+    response = await api.variantsPolled(
+      serial,
+      creds.wallet_address,
+      creds.user_signature,
+      {
+        gene: opts.gene,
+        region: opts.region,
+        so: opts.so,
+        maxAf: opts.maxAf !== undefined ? opts.maxAf : '0.01',
+        clinvar: opts.clinvar,
+        columns: opts.columns,
+        jobId: opts.jobId,
+        withAcmg: opts.withAcmg,
+        limit: opts.limit,
+      },
+      (elapsedSec) => {
+        if (spinner) spinner.text = `Querying NFT-gated sqlite on prod (no local download)… ${elapsedSec}s`;
+      }
+    );
   } catch (e) {
     if (spinner) spinner.fail((e as Error).message);
     throw e;
@@ -197,6 +205,22 @@ export async function variantsCommand(serial: string, opts: VariantsOptions): Pr
   if (spinner) {
     const jt = response.job_id ? ` (job ${response.job_id})` : '';
     spinner.succeed(`${response.count} variants${jt}`);
+  }
+
+  // Genomi -> biofs Campaign B: surface the honesty contract. A zero count is
+  // never narrated as a clinical negative unless the envelope explicitly permits.
+  const env = response.evidence_envelope as Record<string, any> | undefined;
+  if (env && !quiet) {
+    const fs2 = String(env.finding_state || '');
+    if (fs2 === 'empty_consulted_scope') {
+      console.error(chalk.yellow('  ⓘ 0 rows here is NOT a clinical negative: queried + in-scope, but absence is not established (needs callable + covered + genotyped).'));
+    } else if (fs2 === 'materialization_incomplete') {
+      console.error(chalk.yellow(`  ⚠ result incomplete (${env.guidance_code || 'retry'}); source consulted but unavailable. Do not infer a negative; re-run.`));
+    } else if (fs2 === 'true_negative_supported') {
+      console.error(chalk.green('  ✓ supported negative: site is callable, covered, and genotyped.'));
+    } else if (fs2 === 'out_of_scope_for_input') {
+      console.error(chalk.yellow('  ⓘ target is out of scope for this assay/build; do not infer a negative.'));
+    }
   }
 
   const result: QueryResult = {
