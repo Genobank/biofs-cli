@@ -1,0 +1,20 @@
+[
+  "function register(string agentURI, string[] supportedFormats, bool x402Enabled) external returns (uint256)",
+  "function requestBioAssetAccess(bytes32 bioipId, string paymentMethod) external returns (bool)",
+  "function submitPaymentProof(bytes32 bioipId, bytes32 paymentTxHash, uint256 chainId, uint256 usdcAmount) external",
+  "function verifyPayment(uint256 paymentId) external",
+  "function convertUSDCtoBIOIP(uint256 usdcAmount) external view returns (uint256)",
+  "function giveFeedback(uint256 toAgentId, int8 value, bytes32 tag1, bytes32 tag2) external",
+  "function getAgentReputation(uint256 agentId) external view returns (int256)",
+  "function getAgent(uint256 agentId) external view returns (string agentURI, address agentWallet, bool x402Enabled, uint256 totalSpent, int256 reputationScore, bool active)",
+  "function walletToAgent(address wallet) external view returns (uint256)",
+  "function nextAgentId() external view returns (uint256)",
+  "function nextPaymentId() external view returns (uint256)",
+  "function payments(uint256 paymentId) external view returns (uint256 agentId, bytes32 bioipId, bytes32 paymentTxHash, uint256 chainId, uint256 usdcAmount, uint256 bioipEquivalent, uint256 timestamp, bool verified)",
+  "function deactivateAgent(uint256 agentId) external",
+  "event AgentRegistered(uint256 indexed agentId, address indexed wallet, string agentURI)",
+  "event AccessRequested(uint256 indexed agentId, bytes32 indexed bioipId, string paymentMethod)",
+  "event PaymentProofSubmitted(uint256 indexed paymentId, uint256 indexed agentId, bytes32 indexed bioipId)",
+  "event PaymentVerified(uint256 indexed paymentId, uint256 bioipEquivalent)",
+  "event ReputationSubmitted(uint256 indexed fromAgent, uint256 indexed toAgent, int8 value)"
+]

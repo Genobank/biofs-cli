@@ -1,6 +1,6 @@
 {
   "name": "@genobank/biofs",
-  "version": "3.6.0",
+  "version": "3.13.0",
   "description": "BioFS - GenoBank.io BioNFT-Gated Filesystem CLI with Sequentia Protocol (BioCIDRegistry, ConsentManager, BioPIL) - 97% cost savings vs Story Protocol",
   "main": "dist/index.js",
   "bin": {
@@ -23,7 +23,7 @@
   },
   "homepage": "https://genobank.app/biofs",
   "scripts": {
-    "build": "tsc && mkdir -p dist/lib/bionft && cp src/lib/bionft/BioAssetVault.abi.json src/lib/bionft/BioNFTCredentials.abi.json dist/lib/bionft/ && node validate-commands.mjs",
+    "build": "tsc && mkdir -p dist/lib/bionft && cp src/lib/bionft/BioAssetVault.abi.json src/lib/bionft/BioNFTCredentials.abi.json dist/lib/bionft/ && mkdir -p dist/abi && cp -R src/abi/. dist/abi/ && node validate-commands.mjs",
     "dev": "ts-node src/index.ts",
     "test": "jest",
     "validate": "node validate-commands.mjs"
