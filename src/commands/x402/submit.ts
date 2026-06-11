@@ -40,6 +40,7 @@ export interface X402SubmitOptions {
   inputBiocid?: string;  // explicit asset id source
   package?: string;      // forwarded to opencravat/genoclaw
   noDispatch?: boolean;  // settle + proof only, skip the job call
+  native?: boolean;      // settle in native Sequentia token instead of seqUSDC
   dryRun?: boolean;
   json?: boolean;
   quiet?: boolean;
@@ -154,8 +155,8 @@ export async function x402SubmitCommand(options: X402SubmitOptions = {}): Promis
   // 1. Settle payment: patient → agent.
   const patientKey = patientKeyFromEnv();
   const recipient: PayRecipient = { recipient: agent.wallet, amountUsdc: priceUsdc, description: `${agent.name} (${agent.serviceType})` };
-  if (spinner) spinner.text = `settling ${priceUsdc} seqUSDC → ${agent.wallet.slice(0, 10)}…`;
-  const settlement = await payAgentDirect(recipient, patientKey, dryRun);
+  if (spinner) spinner.text = `settling ${priceUsdc} ${options.native ? 'native' : 'seqUSDC'} → ${agent.wallet.slice(0, 10)}…`;
+  const settlement = await payAgentDirect(recipient, patientKey, dryRun, options.native);
 
   // 2. Agent records the ERC-8004 payment proof (agent-keyed).
   let proof = { paymentId: null as number | null, txHash: null as string | null, agentId: null as number | null, simulated: true };
@@ -166,7 +167,11 @@ export async function x402SubmitCommand(options: X402SubmitOptions = {}): Promis
       const agentId = await reg.agentIdOf(reg.walletAddress!);
       if (agentId > 0) {
         if (spinner) spinner.text = 'recording ERC-8004 payment proof…';
-        const pp = await reg.submitPaymentProof(assetId, settlement.txHash, SEQUENTIA_NETWORK.chainId, usdcToUnits(priceUsdc));
+        // submitPaymentProof.usdcAmount is documented 6-decimal USDC (the
+        // contract's convertUSDCtoBIOIP divides by 1e6), independent of the
+        // 18-decimal seqUSDC settlement transfer amount.
+        const proofUsdc6 = BigInt(Math.round(priceUsdc * 1e6));
+        const pp = await reg.submitPaymentProof(assetId, settlement.txHash, SEQUENTIA_NETWORK.chainId, proofUsdc6);
         proof = { paymentId: pp.paymentId, txHash: pp.proofTxHash, agentId, simulated: false };
       } else {
         Logger.warn(`agent ${agent.name} not registered on BioAgentRegistry — run: biofs agent register-sequentia --all`);

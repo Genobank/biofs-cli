@@ -26,7 +26,9 @@ export const SEQ_USDC_ADDRESS =
 export const PAYMENT_ROUTER_ADDRESS =
   process.env.PAYMENT_ROUTER_ADDRESS || '0x4b46D8A0533bc17503349F86a909C2FEcFD04489';
 
-const USDC_DECIMALS = 6;
+// Sequentia seqUSDC (0xD837B344…) uses 18 decimals — NOT the 6 of Ethereum/
+// Avalanche USDC. Override with SEQ_USDC_DECIMALS for a different deployment.
+const USDC_DECIMALS = parseInt(process.env.SEQ_USDC_DECIMALS || '18', 10);
 
 export interface PayRecipient {
   recipient: string;
@@ -70,21 +72,27 @@ function patientAddress(payerKey: string): string {
 }
 
 /**
- * Single-agent direct seqUSDC transfer. Returns the settlement tx hash.
+ * Single-agent direct settlement. Returns the settlement tx hash.
  * In dry-run / no-key mode returns a deterministic simulated result.
+ *
+ * `native=true` settles in the Sequentia native token instead of seqUSDC — used
+ * where the seqUSDC supply isn't held by the payer (the proof still records the
+ * USD-equivalent amount on the ERC-8004 registry).
  */
 export async function payAgentDirect(
   recipient: PayRecipient,
   payerKey: string | null,
   dryRun: boolean,
+  native = false,
 ): Promise<SettlementResult> {
   const recipients = [recipient];
+  const token = native ? 'native' : SEQ_USDC_ADDRESS;
   if (dryRun || !payerKey) {
     const payer = payerKey ? patientAddress(payerKey) : CONFIG.HOME_DIR ? '0x5f5a60EaEf242c0D51A21c703f520347b96Ed19a' : '0x0';
     return {
       simulated: true,
       scheme: 'direct',
-      token: SEQ_USDC_ADDRESS,
+      token,
       totalUsdc: recipient.amountUsdc,
       recipients,
       txHash: simTxHash(payer, recipients, 'direct'),
@@ -93,17 +101,27 @@ export async function payAgentDirect(
   }
   const provider = new ethers.JsonRpcProvider(process.env.SEQUENTIA_RPC_URL || SEQUENTIA_NETWORK.rpc);
   const wallet = new ethers.Wallet(payerKey, provider);
-  const usdcAbi = ['function transfer(address to, uint256 amount) returns (bool)'];
-  const usdc = new ethers.Contract(SEQ_USDC_ADDRESS, usdcAbi, wallet);
-  const tx = await usdc.transfer(ethers.getAddress(recipient.recipient), usdcToUnits(recipient.amountUsdc));
-  const receipt = await tx.wait();
+  // native settlement: 18-decimal value transfer; seqUSDC: ERC20 transfer.
+  const units = usdcToUnits(recipient.amountUsdc);
+  let receipt: ethers.TransactionReceipt | null;
+  let txHash: string;
+  if (native) {
+    const tx = await wallet.sendTransaction({ to: ethers.getAddress(recipient.recipient), value: units });
+    receipt = await tx.wait();
+    txHash = receipt?.hash || tx.hash;
+  } else {
+    const usdc = new ethers.Contract(SEQ_USDC_ADDRESS, ['function transfer(address to, uint256 amount) returns (bool)'], wallet);
+    const tx = await usdc.transfer(ethers.getAddress(recipient.recipient), units);
+    receipt = await tx.wait();
+    txHash = receipt?.hash || tx.hash;
+  }
   return {
     simulated: false,
     scheme: 'direct',
-    token: SEQ_USDC_ADDRESS,
+    token,
     totalUsdc: recipient.amountUsdc,
     recipients,
-    txHash: receipt?.hash || tx.hash,
+    txHash,
     blockNumber: receipt?.blockNumber,
     payer: wallet.address,
   };
