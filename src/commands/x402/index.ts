@@ -34,6 +34,7 @@ function createX402SubmitCommand(): Command {
     .option('--input-biocid <biocid>', 'Explicit input BioCID for the payment asset id')
     .option('--package <pkg>', 'Forwarded package (e.g. wes_default, cancer_twin)')
     .option('--no-dispatch', 'Settle payment + record proof only; do not call the job endpoint')
+    .option('--native', 'Settle in native Sequentia token instead of seqUSDC')
     .option('--dry-run', 'Simulate the full x402 flow (no chain, gas, or live node)')
     .option('--json', 'Emit JSON')
     .action(async (options) => {
