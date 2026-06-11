@@ -39,6 +39,9 @@ export interface X402SubmitOptions {
   amount?: string;       // override price (USDC)
   inputBiocid?: string;  // explicit asset id source
   package?: string;      // forwarded to opencravat/genoclaw
+  // commander maps `--no-dispatch` to `dispatch=false`; `noDispatch` kept for
+  // programmatic callers. Either being false/true(respectively) skips dispatch.
+  dispatch?: boolean;
   noDispatch?: boolean;  // settle + proof only, skip the job call
   native?: boolean;      // settle in native Sequentia token instead of seqUSDC
   dryRun?: boolean;
@@ -193,7 +196,8 @@ export async function x402SubmitCommand(options: X402SubmitOptions = {}): Promis
   });
 
   let dispatch = null as X402SubmitResult['dispatch'];
-  if (!options.noDispatch) {
+  const skipDispatch = options.noDispatch === true || options.dispatch === false;
+  if (!skipDispatch) {
     if (spinner) spinner.text = `dispatching to ${agent.name}…`;
     dispatch = await dispatchJob(agent, options.biosample, wallet, signature, paymentHeader, { package: options.package, dryRun });
   }
