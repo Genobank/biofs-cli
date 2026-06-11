@@ -98,6 +98,11 @@ import { benchmarkCommand, BenchmarkOptions, benchmarkPrepareCommand, PrepareOpt
 import { pipelineRunWesCommand, PipelineRunWesOptions } from './commands/pipeline/runWes';
 import { routeCheckCommand, routeHealCommand } from './commands/route';
 import { annotateStatusCommand, AnnotateStatusOptions } from './commands/annotate/status';
+import { createX402Command } from './commands/x402';
+import { interpretSubmitCommand, InterpretSubmitOptions } from './commands/interpret/submit';
+import { interpretStatusCommand, InterpretStatusOptions } from './commands/interpret/status';
+import { agentRegisterSequentiaCommand, AgentRegisterSequentiaOptions } from './commands/agent/register-sequentia';
+import { agentListSequentiaCommand, AgentListSequentiaOptions } from './commands/agent/list-sequentia';
 import { paymentBalanceCommand, PaymentBalanceOptions } from './commands/payment/balance';
 import { paymentPricingCommand, PaymentPricingOptions } from './commands/payment/pricing';
 import { paymentSetupCommand, PaymentSetupOptions } from './commands/payment/setup';
@@ -244,6 +249,9 @@ program
 
 // Admin command group - Admin operations on Sequentia Network
 program.addCommand(createAdminCommand());
+
+// x402 command group - Sequentia micropayments + agentic Cancer Digital Twin pipeline
+program.addCommand(createX402Command());
 
 // BioFiles command - Comprehensive discovery across all GenoBank data sources
 program
@@ -1082,6 +1090,83 @@ agentCmd
       await agentStatusCommand(options);
     } catch (error) {
       Logger.error(`Agent status check failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// agent register-sequentia - Register ERC-8004 agents on Sequentia BioAgentRegistry
+agentCmd
+  .command('register-sequentia')
+  .description('Register Cancer Digital Twin agents on the Sequentia BioAgentRegistry (ERC-8004)')
+  .option('--all', 'Register all three canonical agents (clara, opencravat, genoclaw)')
+  .option('--agent <name>', 'Register a single canonical agent: clara | opencravat | genoclaw')
+  .option('--name <name>', 'Ad-hoc agent name (requires --uri)')
+  .option('--uri <url>', 'Ad-hoc agent registration file (agentURI)')
+  .option('--formats <list>', 'Ad-hoc supported formats (comma-separated)', 'vcf')
+  .option('--private-key <key>', 'Ad-hoc agent private key (defaults to derived)')
+  .option('--no-x402', 'Register with x402 disabled')
+  .option('--dry-run', 'Plan the registration without broadcasting (no key/gas needed)')
+  .option('--json', 'Emit JSON')
+  .action(async (options: AgentRegisterSequentiaOptions) => {
+    try {
+      await agentRegisterSequentiaCommand(options);
+    } catch (error) {
+      Logger.error(`Sequentia agent registration failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// agent list-sequentia - Query on-chain ERC-8004 agent status
+agentCmd
+  .command('list-sequentia')
+  .description('Query on-chain ERC-8004 status of the Cancer Twin agents (or any wallet/agentId)')
+  .option('--wallet <address>', 'Look up an arbitrary agent wallet')
+  .option('--agent-id <id>', 'Look up an arbitrary agentId')
+  .option('--json', 'Emit JSON')
+  .action(async (options: AgentListSequentiaOptions) => {
+    try {
+      await agentListSequentiaCommand(options);
+    } catch (error) {
+      Logger.error(`Sequentia agent list failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Interpret command group - Agent 3: GenoClaw clinical interpreter (SQLite + context → report)
+const interpretCmd = program
+  .command('interpret')
+  .description('GenoClaw clinical interpreter — Cancer Digital Twin report from annotated context');
+
+interpretCmd
+  .command('submit <biosample_serial>')
+  .description('Submit annotated context to the GenoClaw interpreter agent (produces a Cancer Digital Twin report)')
+  .option('--package <pkg>', 'Interpretation package: cancer_twin | rare_disease | pharmgx', 'cancer_twin')
+  .option('--sqlite-biocid <biocid>', 'Explicit annotated-sqlite BioCID override')
+  .option('--context-biocids <list>', 'Extra context BioCIDs (comma-separated)')
+  .option('--wait', 'Wait for the interpretation to complete')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Emit JSON')
+  .action(async (biosampleSerial: string, options: InterpretSubmitOptions) => {
+    try {
+      await interpretSubmitCommand(biosampleSerial, options);
+    } catch (error) {
+      Logger.error(`Interpretation submission failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+interpretCmd
+  .command('status <interpret_job_id>')
+  .description('Check GenoClaw interpretation job status')
+  .option('--watch', 'Watch mode (poll until done)')
+  .option('--wait', 'Block until the job completes')
+  .option('--max-wait-min <minutes>', 'Max minutes to wait', '30')
+  .option('--json', 'Emit JSON')
+  .action(async (jobId: string, options: InterpretStatusOptions) => {
+    try {
+      await interpretStatusCommand(jobId, options);
+    } catch (error) {
+      Logger.error(`Interpretation status check failed: ${error}`);
       process.exit(1);
     }
   });
