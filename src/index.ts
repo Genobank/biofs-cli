@@ -75,6 +75,8 @@ import { comethylSubmitCommand, ComethylSubmitOptions } from './commands/comethy
 import { comethylExecCommand, ComethylExecOptions } from './commands/comethyl/exec';
 import { svCallSubmitCommand, SvCallSubmitOptions } from './commands/sv-call/submit';
 import { svCallExecCommand, SvCallExecOptions } from './commands/sv-call/exec';
+import { qcSubmitCommand, QcSubmitOptions } from './commands/qc/submit';
+import { qcExecCommand, QcExecOptions } from './commands/qc/exec';
 import { ontVariantsSubmitCommand, OntVariantsSubmitOptions } from './commands/ont-variants/submit';
 import { ontVariantsExecCommand, OntVariantsExecOptions } from './commands/ont-variants/exec';
 import { hifiAlignSubmitCommand, HifiAlignSubmitOptions } from './commands/hifi-align/submit';
@@ -1674,6 +1676,37 @@ svCallCmd
   .action(async (options: SvCallExecOptions) => {
     try { await svCallExecCommand(options); }
     catch (error) { Logger.error(`sv-call exec failed: ${error}`); process.exit(1); }
+  });
+
+// QC command group — long-read read-quality + coverage (verkko-readiness)
+const qcCmd = program
+  .command('qc')
+  .description('Long-read QC (read quality + coverage, verkko-readiness): submit (client) + exec (VM runner)');
+
+qcCmd
+  .command('submit <serial>', { isDefault: true })
+  .description('Submit a long-read QC job to biofs-node (cramino + seqkit + HiFi rq-tag QV over gcsfuse-RO)')
+  .requiredOption('--inputs <gs>', 'CSV of gs:// inputs (BAM/CRAM and/or FASTA/FASTQ.gz)')
+  .option('--genome-size <bp>', 'Haploid genome size for coverage', '3100000000')
+  .option('--json', 'Output as JSON')
+  .action(async (serial: string, options: QcSubmitOptions) => {
+    try { await qcSubmitCommand(serial, options); }
+    catch (error) { Logger.error(`qc submit failed: ${error}`); process.exit(1); }
+  });
+
+qcCmd
+  .command('exec')
+  .description('VM-side executor: cramino/seqkit/rq over gcsfuse-mounted inputs, persist QC manifest to GCS')
+  .requiredOption('--sample <serial>', 'Biosample serial / SAMPLE')
+  .requiredOption('--inputs <gs>', 'CSV of gs:// inputs (BAM/CRAM and/or FASTA/FASTQ.gz)')
+  .option('--genome-size <bp>', 'Haploid genome size for coverage', '3100000000')
+  .option('--job-id <id>', 'Job id')
+  .option('--batch-id <id>', 'Batch id')
+  .option('--creator <wallet>', 'Creator wallet (lowercased for GCS path)')
+  .option('--out-bucket <name>', 'Output bucket', 'genobank-parabricks-output')
+  .action(async (options: QcExecOptions) => {
+    try { await qcExecCommand(options); }
+    catch (error) { Logger.error(`qc exec failed: ${error}`); process.exit(1); }
   });
 
 // ONT-variants command group — ONT small-variant calling (Clair3)
