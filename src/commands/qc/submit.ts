@@ -41,6 +41,11 @@ export async function qcSubmitCommand(serial: string, options: QcSubmitOptions):
 
     const jobId = `qc-${serial}-${Date.now()}`;
     const genomeSize = options.genomeSize || '3100000000';
+    const outputBucket = 'genobank-parabricks-output';
+    const creatorLc = (credentials.wallet_address || '').toLowerCase();
+    // tell biofs-node exactly where the exec persists its manifest (the qc/ biowallet folder),
+    // so the on-chain anchor reads the real manifest instead of the deepvariant clara-jobs path.
+    const manifestUri = `gs://${outputBucket}/biowallet/${creatorLc}/qc/${jobId}/manifest.json`;
 
     spinner.text = `Submitting qc for ${serial} (${inputs.length} inputs) -> biofs-node...`;
     const response = await axios.post(`${apiBase}/api_biofs_node/job`, {
@@ -49,10 +54,11 @@ export async function qcSubmitCommand(serial: string, options: QcSubmitOptions):
       inputType: 'qc',
       qcInputs: inputs,
       genomeSize,
+      manifestUri,
       methylBiocid: '',                // operator-signed => admin-bypass consent
       creatorWallet: credentials.wallet_address,
       creatorSig: credentials.user_signature,
-      outputBucket: 'genobank-parabricks-output',
+      outputBucket,
       batchId: `qc-${new Date().toISOString().slice(0, 10)}`,
     }, { timeout: 300000 });
 
