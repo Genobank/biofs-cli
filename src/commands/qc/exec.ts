@@ -144,7 +144,14 @@ export async function qcExecCommand(opts: QcExecOptions): Promise<void> {
 
     } else if (isBam(gs)) {
       const hdr = captureDocker(IMG_SAMTOOLS, [[mp, '/mnt', 'ro']], 'bash', ['-c', `samtools view -H '/mnt/${rel}' 2>/dev/null | grep -m1 -oE 'PL:[A-Za-z]+' || true`]);
-      m.platform = hdr.replace('PL:', '') || 'unknown';
+      let plat = hdr.replace('PL:', '').trim();
+      // a gcsfuse stall can null even the header read of a 400 GB BAM; infer from the filename so
+      // a HiFi BAM is never misrouted into the ONT bam-stream branch (which streams over gcsfuse).
+      if (!/PACBIO|ONT|OXFORD/i.test(plat)) {
+        plat = /\.hifi_reads\.|hifi|pacbio|revio|^m\d{5}_/i.test(base) ? 'PACBIO'
+             : /ont|ul_|_ul|r1041|dorado|nanopore/i.test(base) ? 'ONT' : 'unknown';
+      }
+      m.platform = plat;
 
       if (/PACBIO/i.test(m.platform)) {
         // HiFi: coverage/N50 from sibling .fa.gz (seqkit), QV from rq head-sample (no full BAM stream)
