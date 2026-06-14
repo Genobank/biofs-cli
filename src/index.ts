@@ -179,7 +179,7 @@ process.on('unhandledRejection', (reason) => {
 program
   .name('biofs')
   .description('BioFS by GenoBank.io - BioNFT-Gated S3 CLI for genomic data')
-  .version('3.12.0')
+  .version('3.14.0')
   .option('--debug', 'Enable debug output')
   .hook('preAction', (thisCommand) => {
     // Set global debug flag if --debug is passed
