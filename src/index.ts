@@ -77,6 +77,8 @@ import { svCallSubmitCommand, SvCallSubmitOptions } from './commands/sv-call/sub
 import { svCallExecCommand, SvCallExecOptions } from './commands/sv-call/exec';
 import { qcSubmitCommand, QcSubmitOptions } from './commands/qc/submit';
 import { qcExecCommand, QcExecOptions } from './commands/qc/exec';
+import { verkkoSubmitCommand, VerkkoSubmitOptions } from './commands/verkko/submit';
+import { verkkoExecCommand, VerkkoExecOptions } from './commands/verkko/exec';
 import { ontVariantsSubmitCommand, OntVariantsSubmitOptions } from './commands/ont-variants/submit';
 import { ontVariantsExecCommand, OntVariantsExecOptions } from './commands/ont-variants/exec';
 import { hifiAlignSubmitCommand, HifiAlignSubmitOptions } from './commands/hifi-align/submit';
@@ -1707,6 +1709,47 @@ qcCmd
   .action(async (options: QcExecOptions) => {
     try { await qcExecCommand(options); }
     catch (error) { Logger.error(`qc exec failed: ${error}`); process.exit(1); }
+  });
+
+// Verkko command group — telomere-to-telomere assembly (verkko 2.3.2), biocid-gated
+const verkkoCmd = program
+  .command('verkko')
+  .description('Verkko T2T assembly (HiFi + ONT-ultralong): submit (client, biocids) + exec (VM runner)');
+
+verkkoCmd
+  .command('submit <serial>', { isDefault: true })
+  .description('Submit a verkko T2T assembly job to biofs-node (inputs are biorouter biocids, NOT gs://)')
+  .requiredOption('--hifi <biocids>', 'CSV of biocid:// HiFi reads (from biorouter)')
+  .requiredOption('--nano <biocids>', 'CSV of biocid:// ONT reads (from biorouter)')
+  .option('--hifi-prop <p>', 'Downsample HiFi to this proportion of reads', '1.0')
+  .option('--ont-minlen <bp>', 'Keep ONT reads >= this length (ultralong)', '100000')
+  .option('--local-memory <gb>', 'verkko --local-memory (GB)', '320')
+  .option('--local-cpus <n>', 'verkko --local-cpus', '80')
+  .option('--json', 'Output as JSON')
+  .action(async (serial: string, options: VerkkoSubmitOptions) => {
+    try { await verkkoSubmitCommand(serial, options); }
+    catch (error) { Logger.error(`verkko submit failed: ${error}`); process.exit(1); }
+  });
+
+verkkoCmd
+  .command('exec')
+  .description('VM-side executor: verkko 2.3.2 over front-resolved gated gs:// inputs, persist assembly to GCS')
+  .requiredOption('--sample <serial>', 'Biosample serial / SAMPLE')
+  .requiredOption('--hifi <gs>', 'CSV of resolved gs:// HiFi reads (gated by biofs-node)')
+  .requiredOption('--nano <gs>', 'CSV of resolved gs:// ONT reads (gated by biofs-node)')
+  .option('--hifi-prop <p>', 'Downsample HiFi proportion', '1.0')
+  .option('--ont-minlen <bp>', 'ONT min length', '100000')
+  .option('--local-memory <gb>', 'verkko --local-memory (GB)', '320')
+  .option('--local-cpus <n>', 'verkko --local-cpus', '80')
+  .option('--ref <build>', 'ignored (appended by the generic biofs-node spawner)')
+  .option('--job-id <id>', 'Job id')
+  .option('--batch-id <id>', 'Batch id')
+  .option('--creator <wallet>', 'Creator wallet (lowercased for GCS path)')
+  .option('--out-bucket <name>', 'Output bucket', 'genobank-parabricks-output')
+  .option('--ref-bucket <name>', 'ignored (appended by the generic biofs-node spawner)')
+  .action(async (options: VerkkoExecOptions) => {
+    try { await verkkoExecCommand(options); }
+    catch (error) { Logger.error(`verkko exec failed: ${error}`); process.exit(1); }
   });
 
 // ONT-variants command group — ONT small-variant calling (Clair3)
