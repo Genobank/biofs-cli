@@ -89,6 +89,10 @@ import { repeatGenotypeSubmitCommand, RepeatGenotypeSubmitOptions } from './comm
 import { repeatGenotypeExecCommand, RepeatGenotypeExecOptions } from './commands/repeat-genotype/exec';
 import { phaseSubmitCommand, PhaseSubmitOptions } from './commands/phase/submit';
 import { phaseExecCommand, PhaseExecOptions } from './commands/phase/exec';
+import { hifiDeepvariantSubmitCommand, HifiDeepvariantSubmitOptions } from './commands/hifi-deepvariant/submit';
+import { hifiDeepvariantExecCommand, HifiDeepvariantExecOptions } from './commands/hifi-deepvariant/exec';
+import { liftoverSubmitCommand, LiftoverSubmitOptions } from './commands/liftover/submit';
+import { liftoverExecCommand, LiftoverExecOptions } from './commands/liftover/exec';
 import { hifiMethylSubmitCommand, HifiMethylSubmitOptions } from './commands/hifi-methyl/submit';
 import { hifiMethylExecCommand, HifiMethylExecOptions } from './commands/hifi-methyl/exec';
 import {
@@ -101,6 +105,7 @@ import { duetCommand, DuetOptions } from './commands/duet';
 import { benchmarkCommand, BenchmarkOptions, benchmarkPrepareCommand, PrepareOptions } from './commands/benchmark';
 import { pipelineRunWesCommand, PipelineRunWesOptions } from './commands/pipeline/runWes';
 import { routeCheckCommand, routeHealCommand } from './commands/route';
+import { routeAnchorCommand, RouteAnchorOptions } from './commands/route/anchor';
 import { annotateStatusCommand, AnnotateStatusOptions } from './commands/annotate/status';
 import { createX402Command } from './commands/x402';
 import { interpretSubmitCommand, InterpretSubmitOptions } from './commands/interpret/submit';
@@ -264,7 +269,8 @@ program
   .alias('ls')
   .description('Discover all your BioFiles from GenoBank ecosystem (Story Protocol, Avalanche, S3, BioIP)')
   .option('--filter <type>', 'Filter by file type (vcf, fastq, bam, pdf, etc.)')
-  .option('--source <source>', 'Filter by source (story, avalanche, s3, biofs)')
+  .option('--source <source>', 'Filter by source (story, avalanche, s3, biofs, biorouter)')
+  .option('--wallet <address>', "Admin: list another wallet's files (e.g. a custodian's). Bypasses cache.")
   .option('--json', 'Output as JSON')
   .option('--update', 'Force refresh from blockchain and S3')
   .option('--verbose', 'Show debug information')
@@ -1786,6 +1792,73 @@ ontVariantsCmd
     catch (error) { Logger.error(`ont-variants exec failed: ${error}`); process.exit(1); }
   });
 
+// hifi-deepvariant command group — HiFi small-variant calling (Parabricks DeepVariant, GPU)
+const hifiDvCmd = program
+  .command('hifi-deepvariant')
+  .description('HiFi small-variant calling (Parabricks DeepVariant --mode pacbio, GPU): submit (client) + exec (GPU runner)');
+
+hifiDvCmd
+  .command('submit <serial>', { isDefault: true })
+  .description('Submit a HiFi DeepVariant job to biofs-node (pbrun deepvariant over the aligned HiFi BAM)')
+  .requiredOption('--bam <gs>', 'gs:// CHM13-aligned HiFi BAM (output of hifi-align --ref CHM13)')
+  .option('--ref <build>', 'Reference: CHM13 | GRCh38 | auto', 'auto')
+  .option('--gvcf', 'Also emit a gVCF (second pbrun pass)')
+  .option('--json', 'Output as JSON')
+  .action(async (serial: string, options: HifiDeepvariantSubmitOptions) => {
+    try { await hifiDeepvariantSubmitCommand(serial, options); }
+    catch (error) { Logger.error(`hifi-deepvariant submit failed: ${error}`); process.exit(1); }
+  });
+
+hifiDvCmd
+  .command('exec')
+  .description('GPU-side executor: pbrun deepvariant (--mode pacbio) over the gcsfuse-mounted HiFi BAM, persist VCF to GCS')
+  .requiredOption('--sample <serial>', 'Biosample serial / SAMPLE')
+  .requiredOption('--bam <gs>', 'gs:// CHM13-aligned HiFi BAM')
+  .option('--ref <build>', 'Reference build', 'auto')
+  .option('--gvcf', 'Also emit a gVCF')
+  .option('--job-id <id>', 'Job id')
+  .option('--batch-id <id>', 'Batch id')
+  .option('--creator <wallet>', 'Creator wallet (lowercased for GCS path)')
+  .option('--out-bucket <name>', 'Output bucket', 'genobank-parabricks-output')
+  .option('--ref-bucket <name>', 'Reference bucket', 'genobank-references')
+  .action(async (options: HifiDeepvariantExecOptions) => {
+    try { await hifiDeepvariantExecCommand(options); }
+    catch (error) { Logger.error(`hifi-deepvariant exec failed: ${error}`); process.exit(1); }
+  });
+
+// liftover command group — cross-reference VCF liftover (CrossMap, CHM13 -> GRCh38)
+const liftoverCmd = program
+  .command('liftover')
+  .description('Cross-reference VCF liftover (CrossMap, CHM13 -> GRCh38): submit (client) + exec (VM runner)');
+
+liftoverCmd
+  .command('submit <serial>', { isDefault: true })
+  .description('Submit a liftover job to biofs-node (CrossMap a CHM13 VCF to GRCh38 for ClinVar annotation)')
+  .requiredOption('--vcf <gs>', 'gs:// CHM13-coordinate VCF to lift')
+  .option('--to <build>', 'Target assembly', 'GRCh38')
+  .option('--json', 'Output as JSON')
+  .action(async (serial: string, options: LiftoverSubmitOptions) => {
+    try { await liftoverSubmitCommand(serial, options); }
+    catch (error) { Logger.error(`liftover submit failed: ${error}`); process.exit(1); }
+  });
+
+liftoverCmd
+  .command('exec')
+  .description('VM-side executor: CrossMap CHM13->GRCh38 over the gcsfuse-mounted VCF, persist lifted VCF + reject to GCS')
+  .requiredOption('--sample <serial>', 'Biosample serial / SAMPLE')
+  .requiredOption('--vcf <gs>', 'gs:// CHM13-coordinate VCF')
+  .option('--to <build>', 'Target assembly', 'GRCh38')
+  .option('--ref-from <build>', 'Source assembly', 'CHM13')
+  .option('--job-id <id>', 'Job id')
+  .option('--batch-id <id>', 'Batch id')
+  .option('--creator <wallet>', 'Creator wallet (lowercased for GCS path)')
+  .option('--out-bucket <name>', 'Output bucket', 'genobank-parabricks-output')
+  .option('--ref-bucket <name>', 'Reference bucket', 'genobank-references')
+  .action(async (options: LiftoverExecOptions) => {
+    try { await liftoverExecCommand(options); }
+    catch (error) { Logger.error(`liftover exec failed: ${error}`); process.exit(1); }
+  });
+
 // HiFi-align command group — PacBio HiFi read alignment (pbmm2, MM/ML preserved) — the keystone
 const hifiAlignCmd = program
   .command('hifi-align')
@@ -2898,6 +2971,22 @@ routeCmd
   .option('--json', 'Emit raw JSON output')
   .action(async (serials: string[], options) => {
     await routeHealCommand(serials, options);
+  });
+
+routeCmd
+  .command('anchor')
+  .description('Instantiate pending bioroutes.inventory rows on Sequentia (BioRoutes registerRoute). Default scope: John.')
+  .option('--wallet <address>', 'Owner wallet to anchor (default: John 0x88110B7e…). Admin only for other wallets.')
+  .option('--serial <serial>', 'Biosample serial / fingerprint scope')
+  .option('--all', 'Anchor every pending row across all wallets (admin)')
+  .option('--writes <csv>', 'On-chain writes: route[,bioasset]', 'route')
+  .option('--filetypes <csv>', 'Limit to these filetypes (e.g. vcf,bam)')
+  .option('--batch <n>', 'Rows registered per request (1-100)', '25')
+  .option('--limit <n>', 'Cap total rows this run (0 = no cap)')
+  .option('--dry-run', 'Preview eligible rows; no chain writes')
+  .option('--json', 'Emit raw JSON output')
+  .action(async (options: RouteAnchorOptions) => {
+    await routeAnchorCommand(options);
   });
 
 // Help command

@@ -92,16 +92,22 @@ export async function pbsvExecCommand(opts: PbsvExecOptions): Promise<void> {
   const bamRel = gsToLocalRel(opts.bam, obkt);
   if (!fs.existsSync(path.join(oMp, bamRel))) { logLine(`[pbsv] BAM not found at mount: ${path.join(oMp, bamRel)}`); uploadAudit(); process.exit(1); }
 
-  // reference: prefer the EXACT assembly the HiFi BAM was aligned to (assembly38, with-alt contigs);
-  // a non-matching reference (no-alt) drops the alt-contig reads from the BAM header.
+  // reference selection honors --ref: 'CHM13'/'T2T' -> T2T-CHM13 v2.0; else GRCh38 (default).
+  const wantsCHM13 = /^(chm13|t2t)/.test((opts.ref || 'auto').toLowerCase());
+  const refCandidates = wantsCHM13
+    ? ['CHM13/chm13v2.0.fasta', 'CHM13/chm13v2.0.fa']
+    : ['hg38/Homo_sapiens_assembly38.fasta', 'GRCh38/Homo_sapiens_assembly38.fasta', 'GRCh38/human_GRCh38_no_alt_analysis_set.fasta'];
   let refRel = '';
-  for (const rel of ['hg38/Homo_sapiens_assembly38.fasta', 'GRCh38/Homo_sapiens_assembly38.fasta', 'GRCh38/human_GRCh38_no_alt_analysis_set.fasta']) {
+  for (const rel of refCandidates) {
     if (fs.existsSync(path.join(rMp, rel)) && fs.existsSync(path.join(rMp, rel + '.fai'))) { refRel = rel; break; }
   }
-  if (!refRel) { logLine('[pbsv] no reference fasta (+.fai) found'); uploadAudit(); process.exit(1); }
-  // optional tandem-repeat bed improves pbsv discover SV calls in repeat regions
+  if (!refRel) { logLine(`[pbsv] no reference fasta (+.fai) for ref=${opts.ref || 'auto'}`); uploadAudit(); process.exit(1); }
+  // optional tandem-repeat bed improves pbsv discover SV calls in repeat regions (reference-specific)
+  const trCandidates = wantsCHM13
+    ? ['CHM13/chm13v2.0.trf.bed', 'CHM13/chm13v2.0_tandem_repeats.bed']
+    : ['hg38/human_GRCh38_no_alt_analysis_set.trf.bed', 'GRCh38/human_GRCh38_no_alt_analysis_set.trf.bed', 'hg38/Homo_sapiens_assembly38.trf.bed'];
   let trArgs = '';
-  for (const tr of ['hg38/human_GRCh38_no_alt_analysis_set.trf.bed', 'GRCh38/human_GRCh38_no_alt_analysis_set.trf.bed', 'hg38/Homo_sapiens_assembly38.trf.bed']) {
+  for (const tr of trCandidates) {
     if (fs.existsSync(path.join(rMp, tr))) { trArgs = ` --tandem-repeats /r/${tr}`; break; }
   }
   logLine(`[pbsv] ref=${refRel} tandem-repeats=${trArgs ? 'yes' : 'none'}`);

@@ -43,9 +43,37 @@ export interface PipelineCancerTwinOptions {
   caseId?: string;      // BioContext case id (default = biosample serial)
   package?: string;     // interpretation package (cancer_twin)
   native?: boolean;     // settle each x402 stage in native Sequentia token
+  // #30 multi-source: aggregate N already-annotated sqlites into one twin. When
+  // present the pipeline starts at genoclaw (sources are pre-annotated) and the
+  // interpreter accumulates every source into the patient's variant landscape.
+  sources?: CancerTwinSource[];
+  sourcesFile?: string; // path to a JSON array of CancerTwinSource (or {sources, expression})
+  expression?: CancerTwinExpression; // #36 RNA expression layer
+  fusions?: CancerTwinFusions;       // #39 gene fusions layer
+  skipPay?: boolean;    // dispatch each stage without settling x402 (processing runs)
   dryRun?: boolean;
   wait?: boolean;
   json?: boolean;
+}
+
+export interface CancerTwinSource {
+  sqlite_gs_uri: string;   // gs:// uri of the OpenCRAVAT-annotated sqlite
+  source_biocid?: string;  // lineage biocid of the source VCF/dataset
+  label?: string;          // human label, e.g. "Caris somatic CDx"
+  lab?: string;            // originating lab, e.g. "Caris"
+}
+
+export interface CancerTwinExpression {
+  gs_uri: string;          // gs:// uri of the gene-expression table (geneTPM / percentile)
+  kind?: string;           // 'percentile' (Caris transformed) | 'tpm'
+  label?: string;
+  lab?: string;
+}
+
+export interface CancerTwinFusions {
+  gs_uri: string;          // gs:// uri of the STAR-Fusion star-fusion.fusion_predictions.tsv
+  label?: string;
+  lab?: string;
 }
 
 interface LineageNode { biocid: string; fileType: string; parent: string | null; agent: string | null; anchorTx?: string | null; }
@@ -186,7 +214,23 @@ export async function pipelineCancerTwinCommand(
   const owner = options.owner || credentials?.wallet_address || '0x5f5a60EaEf242c0D51A21c703f520347b96Ed19a';
   const caseId = options.caseId || biosample;
 
-  const startStage = resolveStartStage(options);
+  // #30 multi-source: gather the annotated sqlites to aggregate. Explicit
+  // --sources file wins; otherwise any programmatic options.sources. When any
+  // are present the twin is multi-source and starts at the interpreter.
+  let sources: CancerTwinSource[] = Array.isArray(options.sources) ? options.sources : [];
+  let expression: CancerTwinExpression | undefined = options.expression;
+  let fusions: CancerTwinFusions | undefined = options.fusions;
+  if (options.sourcesFile) {
+    const fs = require('fs');
+    const raw = JSON.parse(fs.readFileSync(options.sourcesFile, 'utf8'));
+    const arr = Array.isArray(raw) ? raw : (Array.isArray(raw?.sources) ? raw.sources : []);
+    sources = arr.filter((s: any) => s && s.sqlite_gs_uri);
+    if (!Array.isArray(raw) && raw?.expression?.gs_uri) expression = raw.expression;
+    if (!Array.isArray(raw) && raw?.fusions?.gs_uri) fusions = raw.fusions;
+  }
+  const multi = sources.length > 0;
+
+  const startStage = multi ? 'genoclaw' : resolveStartStage(options);
   const stages = STAGE_ORDER.slice(STAGE_ORDER.indexOf(startStage));
 
   const manifest: CancerTwinManifest = {
@@ -208,6 +252,9 @@ export async function pipelineCancerTwinCommand(
     console.log(`  biosample:  ${chalk.white(biosample)}`);
     console.log(`  owner:      ${chalk.white(owner)}`);
     console.log(`  route:      ${chalk.white(manifest.route.from)} → start at ${chalk.white(startStage)} → ${stages.join(' → ')}`);
+    if (multi) console.log(`  sources:    ${chalk.white(sources.length)} annotated (${sources.map((s) => s.lab || '?').join(', ')}) → aggregated twin`);
+    if (expression) console.log(`  expression: ${chalk.white(expression.lab || 'RNA')} ${expression.kind || 'percentile'} layer`);
+    if (fusions) console.log(`  fusions:    ${chalk.white(fusions.lab || 'RNA')} STAR-Fusion layer`);
     console.log(`  cost:       ${chalk.white(stages.reduce((s, k) => s + getCancerTwinAgent(k).priceUsdc, 0))} seqUSDC of ${totalPipelineCostUsdc()} full-pipeline`);
     console.log(`  mode:       ${dryRun ? chalk.yellow('DRY-RUN (no chain/compute)') : chalk.white('LIVE')}`);
     console.log(chalk.gray('─'.repeat(64)) + '\n');
@@ -215,10 +262,22 @@ export async function pipelineCancerTwinCommand(
 
   emit({ event: 'run_started', biosample, owner, route: `${manifest.route.from}→${stages.join('→')}` }, jsonOnly);
 
-  // Seed lineage with the input asset.
+  // Seed lineage with the input asset(s).
   const inputType = startStage === 'clara' ? 'fastq' : startStage === 'opencravat' ? 'vcf' : 'sqlite';
   let prevBiocid = `biocid://input/${owner.toLowerCase()}/${inputType}/${biosample}`;
-  manifest.lineage.push({ biocid: prevBiocid, fileType: inputType, parent: null, agent: null });
+  if (multi) {
+    // Each annotated source is an input leaf feeding the aggregated twin.
+    for (const s of sources) {
+      manifest.lineage.push({
+        biocid: s.source_biocid || s.sqlite_gs_uri, fileType: 'sqlite', parent: null,
+        agent: `${s.lab || 'lab'}:opencravat`,
+      });
+    }
+    prevBiocid = `biocid://aggregate/${owner.toLowerCase()}/${biosample}`;
+    manifest.lineage.push({ biocid: prevBiocid, fileType: 'aggregate', parent: null, agent: 'aggregator' });
+  } else {
+    manifest.lineage.push({ biocid: prevBiocid, fileType: inputType, parent: null, agent: null });
+  }
 
   // Note skipped upstream stages (smart routing transparency).
   for (const k of STAGE_ORDER.slice(0, STAGE_ORDER.indexOf(startStage))) {
@@ -237,7 +296,8 @@ export async function pipelineCancerTwinCommand(
       try {
         sub = await x402SubmitCommand({
           agent: key, biosample, package: options.package,
-          dryRun, quiet: true, inputBiocid: prevBiocid, native: options.native,
+          dryRun, quiet: true, inputBiocid: prevBiocid, native: options.native, skipPay: options.skipPay,
+          ...(key === 'genoclaw' && multi ? { sources, ...(expression ? { expression } : {}), ...(fusions ? { fusions } : {}) } : {}),
         });
       } catch (e: any) {
         emit({ event: 'stage_failed', stage: agent.step, name: agent.name, error: e?.message || String(e) }, jsonOnly);
@@ -276,7 +336,9 @@ export async function pipelineCancerTwinCommand(
       if (key === 'genoclaw') {
         manifest.report.biocid = out.biocid;
         manifest.report.gsUri = `gs://genobank-genoclaw-reports/${owner.toLowerCase()}/${biosample}.cancer-twin.html`;
-        manifest.report.url = `https://genoclaw.genobank.app/cancer-map/${owner}/`;
+        // canonical lowercase URL — biofs-node lowercases the wallet before
+        // genoclaw writes, so the served file lives at the lowercase path.
+        manifest.report.url = `https://genoclaw.genobank.app/cancer-twin/${owner.toLowerCase()}/`;
       }
 
       emit({ event: 'stage_done', stage: agent.step, name: agent.name, jobId: sub.dispatch?.jobId, outputBiocid: out.biocid, status: jobStatus }, jsonOnly);

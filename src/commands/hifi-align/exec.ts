@@ -83,12 +83,17 @@ export async function hifiAlignExecCommand(opts: HifiAlignExecOptions): Promise<
   for (const b of buckets) { const mp = `/mnt/gcsfuse-${b}`; gcsfuseRO(b, mp); mpOf[b] = mp; }
   const rMp = `/mnt/gcsfuse-${refBucket}`; gcsfuseRO(refBucket, rMp);
 
-  // reference: the EXACT assembly the ONT modBAM was aligned to (so HiFi + ONT share coordinates)
+  // reference selection honors --ref: 'CHM13'/'T2T' -> T2T-CHM13 v2.0; anything else -> GRCh38
+  // (default, unchanged). HiFi + ONT must share the same reference so their coordinates align.
+  const wantsCHM13 = /^(chm13|t2t)/.test((opts.ref || 'auto').toLowerCase());
+  const refCandidates = wantsCHM13
+    ? ['CHM13/chm13v2.0.fasta', 'CHM13/chm13v2.0.fa']
+    : ['hg38/Homo_sapiens_assembly38.fasta', 'GRCh38/Homo_sapiens_assembly38.fasta', 'GRCh38/human_GRCh38_no_alt_analysis_set.fasta'];
   let refRel = '';
-  for (const rel of ['hg38/Homo_sapiens_assembly38.fasta', 'GRCh38/Homo_sapiens_assembly38.fasta', 'GRCh38/human_GRCh38_no_alt_analysis_set.fasta']) {
+  for (const rel of refCandidates) {
     if (fs.existsSync(path.join(rMp, rel)) && fs.existsSync(path.join(rMp, rel + '.fai'))) { refRel = rel; break; }
   }
-  if (!refRel) { logLine('[hifi-align] no reference fasta (+.fai) found'); uploadAudit(); process.exit(1); }
+  if (!refRel) { logLine(`[hifi-align] no reference fasta (+.fai) for ref=${opts.ref || 'auto'}`); uploadAudit(); process.exit(1); }
   const threads = capture('nproc', []) || '8';
   logLine(`[hifi-align] ref=${refRel} threads=${threads} aligner=minimap2(map-hifi, kinetics dropped, MM/ML kept)`);
 

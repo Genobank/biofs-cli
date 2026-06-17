@@ -17,7 +17,8 @@ export type StorageSource =
   | 'BioFS'
   | 'IPFS'
   | 'Sequentia'
-  | 'Avalanche';
+  | 'Avalanche'
+  | 'BioRouter';
 
 export interface BioFile {
   filename: string;

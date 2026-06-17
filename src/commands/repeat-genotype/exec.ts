@@ -104,13 +104,17 @@ export async function repeatGenotypeExecCommand(opts: RepeatGenotypeExecOptions)
   const catalogRel = gsToLocalRel(opts.catalog, cbkt);
   if (!fs.existsSync(path.join(cMp, catalogRel))) { logLine(`[repeat-genotype] catalog not found at mount: ${path.join(cMp, catalogRel)}`); uploadAudit(); process.exit(1); }
 
-  // reference: prefer the EXACT assembly the HiFi BAM was aligned to (assembly38, with-alt contigs);
-  // a non-matching reference (no-alt) drops the alt-contig reads from the BAM header.
+  // reference selection honors --ref: 'CHM13'/'T2T' -> T2T-CHM13 v2.0; else GRCh38 (default).
+  // Must be the EXACT assembly the HiFi BAM was aligned to, AND match the --catalog coordinates.
+  const wantsCHM13 = /^(chm13|t2t)/.test((opts.ref || 'auto').toLowerCase());
+  const refCandidates = wantsCHM13
+    ? ['CHM13/chm13v2.0.fasta', 'CHM13/chm13v2.0.fa']
+    : ['hg38/Homo_sapiens_assembly38.fasta', 'GRCh38/Homo_sapiens_assembly38.fasta', 'GRCh38/human_GRCh38_no_alt_analysis_set.fasta'];
   let refRel = '';
-  for (const rel of ['hg38/Homo_sapiens_assembly38.fasta', 'GRCh38/Homo_sapiens_assembly38.fasta', 'GRCh38/human_GRCh38_no_alt_analysis_set.fasta']) {
+  for (const rel of refCandidates) {
     if (fs.existsSync(path.join(rMp, rel)) && fs.existsSync(path.join(rMp, rel + '.fai'))) { refRel = rel; break; }
   }
-  if (!refRel) { logLine('[repeat-genotype] no reference fasta (+.fai) found'); uploadAudit(); process.exit(1); }
+  if (!refRel) { logLine(`[repeat-genotype] no reference fasta (+.fai) for ref=${opts.ref || 'auto'}`); uploadAudit(); process.exit(1); }
   logLine(`[repeat-genotype] ref=${refRel}`);
 
   const threads = capture('nproc', []) || '8';
