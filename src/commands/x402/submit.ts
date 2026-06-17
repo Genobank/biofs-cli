@@ -44,6 +44,21 @@ export interface X402SubmitOptions {
   dispatch?: boolean;
   noDispatch?: boolean;  // settle + proof only, skip the job call
   native?: boolean;      // settle in native Sequentia token instead of seqUSDC
+  mode?: string;         // clara sequencing type: WES | WGS (selects WES model + capture interval)
+  captureKit?: string;   // clara WES capture kit, e.g. agilent_v8 (resolves the interval BED)
+  bamUri?: string;       // clara BAM-input: aligned BAM gs:// uri → pbrun deepvariant --in-bam
+  r1Uri?: string;        // clara FASTQ-input: explicit R1 gs:// uri (e.g. --caller fusion / rna FASTQ)
+  r2Uri?: string;        // clara FASTQ-input: explicit R2 gs:// uri
+  vcfUri?: string;       // opencravat: explicit VCF gs:// uri to annotate (skips inventory resolution)
+  sqliteUri?: string;    // clara --caller biomarkers: annotated sqlite gs:// uri (TMB nonsyn count)
+  panelMb?: string;      // clara --caller biomarkers: panel size in Mb (TMB denominator)
+  originlab?: string;    // opencravat: lab hint for sqlite path allocation (e.g. caris)
+  caller?: string;       // clara caller: deepvariant (germline, default) | mutect (somatic tumor-only)
+  somatic?: boolean;     // shorthand: --somatic ⇒ caller=mutect
+  skipPay?: boolean;     // dispatch the job through biofs-node WITHOUT settling x402 (processing runs; /agent/job is unpaid)
+  sources?: any[];       // genoclaw multi-source twin: [{sqlite_gs_uri, source_biocid, label, lab}]
+  expression?: any;      // genoclaw RNA expression layer: {gs_uri, kind, label, lab}
+  fusions?: any;         // genoclaw gene-fusions layer: {gs_uri (STAR-Fusion tsv), label, lab}
   dryRun?: boolean;
   json?: boolean;
   quiet?: boolean;
@@ -99,26 +114,51 @@ async function dispatchJob(
   wallet: string,
   signature: string,
   paymentHeader: string,
-  opts: { package?: string; dryRun: boolean },
+  opts: { package?: string; dryRun: boolean; mode?: string; captureKit?: string; bamUri?: string; r1Uri?: string; r2Uri?: string; vcfUri?: string; sqliteUri?: string; panelMb?: string; originlab?: string; caller?: string; sources?: any[]; expression?: any; fusions?: any },
 ): Promise<{ endpoint: string; jobId: string | null; status: string; simulated: boolean }> {
   // BIOFS_NODE_BASE maps to biofs-node /agent/* via nginx (/api_biofs_node/X → /agent/X).
   const routeFor: Record<string, { path: string; body: () => Record<string, unknown>; jobIdField: string }> = {
     clara: {
       path: '/job',
       // inputType:'fastq' tells the front biofs-node to forward this to a GPU
-      // executor (discoverGpuExecutor) for Clara Parabricks variant calling,
-      // rather than running it on the GPU-less front. Explicit > the default.
-      body: () => ({ biosampleId: biosample, creatorWallet: wallet, creatorSig: signature, inputType: 'fastq' }),
+      // executor (discoverGpuExecutor) for Clara Parabricks variant calling.
+      // sequencingType/captureKit select the runner's WES recipe (WES model +
+      // capture interval) for exome samples; default WGS when --mode is omitted.
+      body: () => ({
+        biosampleId: biosample, creatorWallet: wallet, creatorSig: signature,
+        // bamUri → the runner runs pbrun deepvariant --in-bam on the aligned BAM
+        // (skip fq2bam); else FASTQ→VCF. inputType drives the front's GPU forward.
+        inputType: opts.bamUri ? 'bam' : 'fastq',
+        ...(opts.bamUri ? { bamUri: opts.bamUri } : {}),
+        ...(opts.r1Uri ? { r1Uri: opts.r1Uri } : {}),
+        ...(opts.r2Uri ? { r2Uri: opts.r2Uri } : {}),
+        ...(opts.vcfUri ? { vcfUri: opts.vcfUri } : {}),
+        ...(opts.sqliteUri ? { sqliteUri: opts.sqliteUri } : {}),
+        ...(opts.panelMb ? { panelMb: opts.panelMb } : {}),
+        ...(opts.caller ? { caller: opts.caller } : {}),
+        ...(opts.mode ? { sequencingType: String(opts.mode).toUpperCase() } : {}),
+        ...(opts.captureKit ? { captureKit: opts.captureKit } : {}),
+      }),
       jobIdField: 'jobId',
     },
     opencravat: {
       path: '/submit_cravat',
-      body: () => ({ biosample_serial: biosample, wallet, signature, package: opts.package || 'wes_default' }),
+      // vcf_gs_uri (when provided) annotates that VCF directly, skipping inventory
+      // resolution; originlab hints the sqlite-path bucket allocation.
+      body: () => ({ biosample_serial: biosample, wallet, signature, package: opts.package || 'wes_default',
+        ...(opts.vcfUri ? { vcf_gs_uri: opts.vcfUri } : {}),
+        ...(opts.originlab ? { originlab: opts.originlab } : {}) }),
       jobIdField: 'oc_job_id',
     },
     genoclaw: {
       path: '/interpret',
-      body: () => ({ biosample_serial: biosample, wallet, signature, package: opts.package || 'cancer_twin' }),
+      // sources (when present) makes this a MULTI-SOURCE twin: biofs-node forwards
+      // the list to genoclaw /interpret, which accumulates every annotated sqlite
+      // into the patient's fhir.variant before synthesizing the aggregated report.
+      body: () => ({ biosample_serial: biosample, wallet, signature, package: opts.package || 'cancer_twin',
+        ...(opts.sources && opts.sources.length ? { sources: opts.sources } : {}),
+        ...(opts.expression ? { expression: opts.expression } : {}),
+        ...(opts.fusions ? { fusions: opts.fusions } : {}) }),
       jobIdField: 'interpret_job_id',
     },
   };
@@ -146,7 +186,9 @@ async function dispatchJob(
 export async function x402SubmitCommand(options: X402SubmitOptions = {}): Promise<X402SubmitResult | null> {
   if (!options.agent) throw new Error('--agent required (clara | opencravat | genoclaw)');
   if (!options.biosample) throw new Error('--biosample required');
+  if (options.somatic && !options.caller) options.caller = 'mutect';
   const dryRun = !!options.dryRun;
+  const skipPay = !!options.skipPay;  // dispatch live, skip x402 settlement (unpaid /agent/job)
   const agent = resolveAgent(options.agent);
   const priceUsdc = options.amount ? parseFloat(options.amount) : agent.priceUsdc;
   const { biocid, assetId } = assetIdFor(agent, options.biosample, options.inputBiocid);
@@ -158,15 +200,23 @@ export async function x402SubmitCommand(options: X402SubmitOptions = {}): Promis
   const spinner = options.json || options.quiet ? null
     : ora(`x402 ${agent.name} — ${priceUsdc} seqUSDC for ${options.biosample}`).start();
 
-  // 1. Settle payment: patient → agent.
-  const patientKey = patientKeyFromEnv();
+  // 1. Settle payment: patient → agent. (--skip-pay dispatches without settling:
+  // the front /agent/job path is unpaid, so processing runs don't need a patient
+  // key or to spend seqUSDC; the job still flows verb → biofs-node → executor.)
   const recipient: PayRecipient = { recipient: agent.wallet, amountUsdc: priceUsdc, description: `${agent.name} (${agent.serviceType})` };
-  if (spinner) spinner.text = `settling ${priceUsdc} ${options.native ? 'native' : 'seqUSDC'} → ${agent.wallet.slice(0, 10)}…`;
-  const settlement = await payAgentDirect(recipient, patientKey, dryRun, options.native);
+  let settlement;
+  if (skipPay) {
+    settlement = { txHash: '0x' + 'ee'.repeat(32), payer: wallet, token: options.native ? 'native' : 'seqUSDC', simulated: true };
+    if (spinner) spinner.text = `dispatch-only (x402 settlement skipped) → ${agent.wallet.slice(0, 10)}…`;
+  } else {
+    const patientKey = patientKeyFromEnv();
+    if (spinner) spinner.text = `settling ${priceUsdc} ${options.native ? 'native' : 'seqUSDC'} → ${agent.wallet.slice(0, 10)}…`;
+    settlement = await payAgentDirect(recipient, patientKey, dryRun, options.native);
+  }
 
   // 2. Agent records the ERC-8004 payment proof (agent-keyed).
   let proof = { paymentId: null as number | null, txHash: null as string | null, agentId: null as number | null, simulated: true };
-  if (!dryRun) {
+  if (!dryRun && !skipPay) {
     try {
       const agentKey = agentPrivateKey(agent.key);
       const reg = new BioAgentRegistry(agentKey);
@@ -202,7 +252,7 @@ export async function x402SubmitCommand(options: X402SubmitOptions = {}): Promis
   const skipDispatch = options.noDispatch === true || options.dispatch === false;
   if (!skipDispatch) {
     if (spinner) spinner.text = `dispatching to ${agent.name}…`;
-    dispatch = await dispatchJob(agent, options.biosample, wallet, signature, paymentHeader, { package: options.package, dryRun });
+    dispatch = await dispatchJob(agent, options.biosample, wallet, signature, paymentHeader, { package: options.package, dryRun, mode: options.mode, captureKit: options.captureKit, bamUri: options.bamUri, r1Uri: options.r1Uri, r2Uri: options.r2Uri, vcfUri: options.vcfUri, sqliteUri: options.sqliteUri, panelMb: options.panelMb, originlab: options.originlab, caller: options.caller, sources: options.sources, expression: options.expression, fusions: options.fusions });
   }
 
   spinner?.succeed(`x402 ${agent.name}: paid ${priceUsdc} seqUSDC${dispatch?.jobId ? `, job ${dispatch.jobId}` : ''}${dryRun ? ' (dry-run)' : ''}`);

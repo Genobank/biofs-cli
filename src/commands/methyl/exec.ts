@@ -135,19 +135,23 @@ function gcsfuseMountRO(bucket: string, mp: string): void {
   run('gcsfuse', ['--implicit-dirs', '--type-cache-max-size-mb=32', '--kernel-list-cache-ttl-secs=60', '-o', 'ro', bucket, mp], `gcsfuse mount ${bucket}`);
 }
 
-function resolveReferenceFasta(refMount: string): string {
-  const candidates = [
-    'GRCh38/human_GRCh38_no_alt_analysis_set.fasta',
-    'human_GRCh38_no_alt_analysis_set.fasta',
-    'GRCh38/Homo_sapiens_assembly38.fasta',
-    'Homo_sapiens_assembly38.fasta',
-    'hg38/Homo_sapiens_assembly38.fasta',
-  ];
+function resolveReferenceFasta(refMount: string, ref?: string): string {
+  // honors --ref: 'CHM13'/'T2T' -> T2T-CHM13 v2.0; anything else -> GRCh38 (default, unchanged).
+  const wantsCHM13 = /^(chm13|t2t)/.test((ref || 'auto').toLowerCase());
+  const candidates = wantsCHM13
+    ? ['CHM13/chm13v2.0.fasta', 'CHM13/chm13v2.0.fa']
+    : [
+      'GRCh38/human_GRCh38_no_alt_analysis_set.fasta',
+      'human_GRCh38_no_alt_analysis_set.fasta',
+      'GRCh38/Homo_sapiens_assembly38.fasta',
+      'Homo_sapiens_assembly38.fasta',
+      'hg38/Homo_sapiens_assembly38.fasta',
+    ];
   for (const rel of candidates) {
     const p = path.join(refMount, rel);
     if (fs.existsSync(p)) { logLine(`[methyl] reference resolved: ${p}`); return p; }
   }
-  logLine(`[methyl] no GRCh38 FASTA found under ${refMount}. Tried: ${candidates.join(', ')}`);
+  logLine(`[methyl] no reference FASTA (ref=${ref || 'auto'}) found under ${refMount}. Tried: ${candidates.join(', ')}`);
   process.exit(1);
 }
 
@@ -222,7 +226,7 @@ export async function methylExecCommand(opts: MethylExecOptions): Promise<void> 
   // 0. reference (gcsfuse RO) + .mmi (map-ont, cached)
   const refMount = `/mnt/gcsfuse-methyl-ref-${refBucket}`;
   gcsfuseMountRO(refBucket, refMount);
-  const refFasta = resolveReferenceFasta(refMount);
+  const refFasta = resolveReferenceFasta(refMount, opts.ref);
   const refDir   = path.dirname(refFasta);
   const refBase  = path.basename(refFasta);
   const mmiName  = `${refBase}.map-ont.mmi`;

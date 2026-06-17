@@ -235,8 +235,12 @@ const NULLA_PY_B64 = 'IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwoiIiIKY29tZXRoeWwgZ2F0ZT1udW
 
 function writePy(b64: string, dest: string): void { fs.writeFileSync(dest, Buffer.from(b64, 'base64')); }
 
-function resolveRefRelFor(rMp: string): string {
-  for (const rel of ['hg38/Homo_sapiens_assembly38.fasta', 'GRCh38/Homo_sapiens_assembly38.fasta', 'GRCh38/human_GRCh38_no_alt_analysis_set.fasta']) {
+function resolveRefRelFor(rMp: string, ref?: string): string {
+  const wantsCHM13 = /^(chm13|t2t)/.test((ref || 'auto').toLowerCase());
+  const cands = wantsCHM13
+    ? ['CHM13/chm13v2.0.fasta', 'CHM13/chm13v2.0.fa']
+    : ['hg38/Homo_sapiens_assembly38.fasta', 'GRCh38/Homo_sapiens_assembly38.fasta', 'GRCh38/human_GRCh38_no_alt_analysis_set.fasta'];
+  for (const rel of cands) {
     if (fs.existsSync(path.join(rMp, rel)) && fs.existsSync(path.join(rMp, rel + '.fai'))) return rel;
   }
   return '';
@@ -293,7 +297,7 @@ async function comethylLambdaGate(opts: ComethylExecOptions): Promise<void> {
   const oMp = `/mnt/gcsfuse-${obkt}`, rMp = `/mnt/gcsfuse-${refBucket}`;
   gcsfuseRO(obkt, oMp); gcsfuseRO(refBucket, rMp);
   const modbamRel = gsToLocalRel(opts.modbam, obkt);
-  const refRel = resolveRefRelFor(rMp);
+  const refRel = resolveRefRelFor(rMp, opts.ref);
   if (!refRel) { logLine('[comethyl] lambda: no reference fasta (+.fai)'); uploadAudit(); process.exit(1); }
 
   ensurePysci();

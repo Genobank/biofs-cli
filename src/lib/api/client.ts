@@ -174,6 +174,27 @@ export class GenoBankAPIClient {
     }
   }
 
+  // BioRouter inventory (bioroutes.inventory) via biofs-node. Lists per-file
+  // rows for a wallet — the protocol's own lineage source of truth. Passing
+  // targetOwner lists that owner's files; biofs-node enforces that only an
+  // admin (the operator) may target a wallet other than the caller's own.
+  async getBioRouterInventory(targetOwner?: string): Promise<any[]> {
+    try {
+      const creds = await this.credManager.loadCredentials();
+      if (!creds) return [];
+      const params: any = { wallet: creds.wallet_address, signature: creds.user_signature };
+      if (targetOwner) params.owner = targetOwner;
+
+      const response = await this.axios.get('/api_biofs_node/list_inventory', { params });
+      const files = response.data?.files || [];
+      Logger.debug(`✅ BioRouter inventory: ${files.length} files`);
+      return files;
+    } catch (error) {
+      Logger.debug(`❌ Error fetching BioRouter inventory: ${error}`);
+      return [];
+    }
+  }
+
   // Avalanche Biosamples
   async getAvalancheBiosamples(): Promise<any[]> {
     try {

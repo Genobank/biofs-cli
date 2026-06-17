@@ -9,6 +9,7 @@ import boxen from 'boxen';
 export interface FilesOptions {
   filter?: string;
   source?: string;
+  wallet?: string;   // Admin: list another wallet's files (target owner)
   json?: boolean;
   update?: boolean;  // Force refresh from API
   verbose?: boolean;
@@ -20,8 +21,13 @@ export async function filesCommand(options: FilesOptions): Promise<void> {
 
   let allFiles: BioFile[] = [];
 
+  // When listing another wallet's files (admin --wallet), never read or write
+  // the caller's own cache — it would show stale data and clobber the
+  // operator's cache. Always fetch fresh for a targeted view.
+  const targetOwner = options.wallet ? options.wallet.toLowerCase() : undefined;
+
   // Check if we should use cache or force update
-  const useCache = !options.update && !cacheManager.needsUpdate();
+  const useCache = !targetOwner && !options.update && !cacheManager.needsUpdate();
 
   if (useCache) {
     // Load from cache
@@ -59,8 +65,8 @@ export async function filesCommand(options: FilesOptions): Promise<void> {
       allFiles = await fetchAndCacheBioFiles(cacheManager, credManager, options.verbose);
     }
   } else {
-    // Force refresh from API
-    allFiles = await fetchAndCacheBioFiles(cacheManager, credManager, options.verbose);
+    // Force refresh from API (also the path for a targeted --wallet view)
+    allFiles = await fetchAndCacheBioFiles(cacheManager, credManager, options.verbose, targetOwner);
   }
 
   // Apply filters
@@ -93,13 +99,22 @@ export async function filesCommand(options: FilesOptions): Promise<void> {
 async function fetchAndCacheBioFiles(
   cacheManager: BioFilesCacheManager,
   credManager: CredentialsManager,
-  verbose: boolean = false
+  verbose: boolean = false,
+  targetOwner?: string
 ): Promise<BioFile[]> {
-  const spinner = Logger.spinner('Discovering BioFiles from all sources...');
+  const spinner = Logger.spinner(
+    targetOwner ? `Discovering BioFiles for ${targetOwner}...` : 'Discovering BioFiles from all sources...'
+  );
 
   try {
     const resolver = new BioCIDResolver();
-    const allFiles = await resolver.discoverAllBioFiles(verbose);
+    const allFiles = await resolver.discoverAllBioFiles(verbose, targetOwner);
+
+    // Targeted (--wallet) views are never cached under the caller's wallet.
+    if (targetOwner) {
+      spinner.succeed(`Discovered ${allFiles.length} BioFiles for ${targetOwner}`);
+      return allFiles;
+    }
 
     // Get wallet address for cache
     const creds = await credManager.loadCredentials();
@@ -201,6 +216,8 @@ function getSourceColor(source: string): string {
       return 'magenta';
     case 'Sequentia':
       return 'green';
+    case 'BioRouter':
+      return 'yellow';  // biorouter inventory (lineage source of truth)
     default:
       return 'gray';
   }
@@ -216,6 +233,8 @@ function getSourceBadge(source: string): string {
       return chalk.bgMagenta.white(` IPFS `);
     case 'Sequentia':
       return chalk.bgGreen.white(` Sequentia `);
+    case 'BioRouter':
+      return chalk.bgYellow.black(` BioRouter 🧭 `);  // biorouter lineage source of truth
     default:
       return chalk.bgGray.white(` ${source} `);
   }

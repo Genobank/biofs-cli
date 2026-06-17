@@ -165,7 +165,7 @@ export class BioCIDResolver {
     throw new Error(`No storage location found for: ${biocidOrFilename}`);
   }
 
-  async discoverAllBioFiles(verbose: boolean = false): Promise<BioFile[]> {
+  async discoverAllBioFiles(verbose: boolean = false, targetOwner?: string): Promise<BioFile[]> {
     const bioFiles: BioFile[] = [];
 
     // The caller's wallet — always known post-login, always a valid fallback
@@ -207,6 +207,10 @@ export class BioCIDResolver {
       return `resolver_err/${reason}`;
     };
 
+    // Data Sources 1-5 are scoped to the CALLER's own signature, so they only
+    // describe the caller's own files. For an admin "--wallet <other>" view we
+    // run ONLY the BioRouter inventory source (6), which can target any owner.
+    if (!targetOwner) {
     // Data Source 1: Sequentia IP Assets (includes BioIP files registered on Sequentia)
     try {
       if (verbose) console.log('🔍 Fetching Sequentia assets...');
@@ -354,6 +358,35 @@ export class BioCIDResolver {
       }
     } catch (error) {
       if (verbose) console.error('❌ Error fetching FUSE files:', error);
+    }
+    } // end caller-own sources (1-5)
+
+    // Data Source 6: BioRouter inventory (bioroutes.inventory) — the protocol's
+    // own lineage source of truth. Surfaces files instantiated in the biorouter
+    // (and now on Sequentia via `biofs route anchor`) even before they're minted
+    // as Story IP assets. With targetOwner set (admin --wallet) it lists that
+    // owner's files; otherwise the caller's. biofs-node enforces the admin gate.
+    try {
+      if (verbose) console.log('🔍 Fetching BioRouter inventory...');
+      const inv = await this.api.getBioRouterInventory(targetOwner);
+      if (verbose) console.log(`✅ Found ${inv.length} BioRouter files`);
+
+      for (const row of inv) {
+        const owner = String(row.owner_wallet || targetOwner || callerWallet || '').toLowerCase();
+        const objName: string = row.object_name || '';
+        const filename = row.biofile || (objName ? objName.split('/').pop() : '') || row.biocid || 'unknown';
+        bioFiles.push({
+          filename,
+          biocid: row.biocid || `biocid://${owner || 'resolver_err/no-owner'}/biorouter/${row.sample_serial || 'na'}`,
+          type: row.filetype || row.file_type_guess || BioCIDParser.detectFileType(filename),
+          source: 'BioRouter',
+          size: row.size_bytes,
+          created_at: row.time_created,
+          owner: owner || undefined,
+        });
+      }
+    } catch (error) {
+      if (verbose) console.error('❌ Error fetching BioRouter inventory:', error);
     }
 
     if (verbose) console.log(`\n📊 Total BioFiles discovered: ${bioFiles.length}`);
