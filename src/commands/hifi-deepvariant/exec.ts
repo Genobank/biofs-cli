@@ -33,6 +33,9 @@ export interface HifiDeepvariantExecOptions {
 }
 
 const IMG_HTSLIB = 'quay.io/biocontainers/htslib:1.19.1--h81da01d_1';
+const IMG_SAMTOOLS = 'quay.io/biocontainers/samtools:1.19.2--h50ea8bc_1';
+// Parabricks is the NVIDIA Clara container (pbrun is the in-container command, not a host binary).
+const IMG_PARABRICKS = process.env.PARABRICKS_IMAGE || 'nvcr.io/nvidia/clara/clara-parabricks:4.7.0-1';
 // primary chromosomes only (CHM13 + GRCh38 are both chr-prefixed); skip chrM + non-primary contigs.
 const PRIMARY_CTGS = Array.from({ length: 22 }, (_, i) => `chr${i + 1}`).concat(['chrX', 'chrY']);
 
@@ -58,7 +61,6 @@ function gcsfuseRO(bucket: string, mp: string): void {
 }
 function gsToLocalRel(gs: string, bucket: string): string { return gs.replace(`gs://${bucket}/`, ''); }
 function bucketOf(gs: string): string { return gs.replace('gs://', '').split('/')[0]; }
-function which(bin: string): string { return capture('sh', ['-c', `command -v ${bin} || true`]); }
 
 export async function hifiDeepvariantExecCommand(opts: HifiDeepvariantExecOptions): Promise<void> {
   const sample = opts.sample;
@@ -80,9 +82,12 @@ export async function hifiDeepvariantExecCommand(opts: HifiDeepvariantExecOption
   logLine(`[hifi-deepvariant] HiFi BAM=${opts.bam}`);
   logLine(`[hifi-deepvariant] biowallet folder: ${BIOWALLET_GCS}`);
 
-  // pbrun (Parabricks) must be present on this GPU executor
-  const pbrun = which('pbrun');
-  if (!pbrun) { logLine('[hifi-deepvariant] pbrun (NVIDIA Parabricks) not on PATH; this verb requires a Parabricks GPU executor'); uploadAudit(); process.exit(1); }
+  // Parabricks runs inside the Clara container; require the image + an NVIDIA GPU on this executor.
+  const haveImg = capture('sh', ['-c', `docker image inspect ${IMG_PARABRICKS} >/dev/null 2>&1 && echo yes || echo no`]) === 'yes';
+  if (!haveImg) { logLine(`[hifi-deepvariant] Parabricks image ${IMG_PARABRICKS} not present; this verb requires a Parabricks GPU executor`); uploadAudit(); process.exit(1); }
+  const gpuName = capture('sh', ['-c', 'nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || true']);
+  if (!gpuName) { logLine('[hifi-deepvariant] no NVIDIA GPU detected (nvidia-smi); cannot run pbrun'); uploadAudit(); process.exit(1); }
+  logLine(`[hifi-deepvariant] parabricks=${IMG_PARABRICKS} gpu=${gpuName}`);
 
   // fuse allow_other (so pbrun reads the ubuntu-owned gcsfuse mount)
   spawnSync('sudo', ['sed', '-i', 's/^#user_allow_other/user_allow_other/', '/etc/fuse.conf'], { stdio: 'ignore' });
@@ -121,15 +126,35 @@ export async function hifiDeepvariantExecCommand(opts: HifiDeepvariantExecOption
     return len ? `${c}\t0\t${len}` : '';
   }).filter(Boolean).join('\n') + '\n');
 
+  // Stage BAM (+ index) and reference to local NVMe — DeepVariant make_examples does heavy
+  // random-access over the BAM; gcsfuse random reads are slow, local NVMe is far faster and
+  // shrinks the GPU host-maintenance exposure window. pbrun then reads everything from /w.
+  // Stage the HiFi BAM to local NVMe AND inject a read group in one pass. minimap2 (hifi-align)
+  // emits NO @RG, so Parabricks cannot derive a sample name and aborts with "Invalid tumor
+  // sample name input". samtools reheader (header-only, fast BGZF copy, no per-read rewrite)
+  // reads the gcsfuse BAM sequentially and writes a local re-headered BAM carrying SM:<sample>.
+  // Idempotent: if an @RG is already present we keep it (no second RG appended).
+  const localBam = path.basename(bamRel).replace(/\.bam$/, '.rg.bam');
+  run('docker', ['run', '--rm', '-v', `${oMp}:/o:ro`, '-v', `${work}:/w:rw`, '--entrypoint', 'bash', IMG_SAMTOOLS, '-c',
+    `set -e; samtools view -H /o/${bamRel} > /w/hdr.sam; ` +
+    `grep -q '^@RG' /w/hdr.sam || printf '@RG\\tID:${sample}\\tSM:${sample}\\tPL:PACBIO\\tLB:hifi\\n' >> /w/hdr.sam; ` +
+    `samtools reheader /w/hdr.sam /o/${bamRel} > /w/${localBam}; samtools index /w/${localBam}`],
+    'stage HiFi BAM to local NVMe + inject @RG SM (Parabricks sample name)');
+  if (!fs.existsSync(path.join(work, localBam))) { logLine('[hifi-deepvariant] reheader/stage produced no local BAM'); uploadAudit(); process.exit(1); }
+  const localRef = path.basename(refRel);
+  run('gcloud', ['storage', 'cp', `gs://${refBucket}/${refRel}`, path.join(work, localRef)], 'stage reference to local NVMe');
+  run('gcloud', ['storage', 'cp', `gs://${refBucket}/${refRel}.fai`, path.join(work, localRef + '.fai')], 'stage reference .fai');
+  spawnSync('sh', ['-c', `gcloud storage cp gs://${refBucket}/${refRel}.dict ${work}/ 2>/dev/null || true`], { stdio: 'ignore' });
+
   const vcfGz = `${sample}.hifi.dv.vcf.gz`;
-  // 1. pbrun DeepVariant (HiFi, GPU). --mode pacbio selects the PacBio model.
-  run('pbrun', ['deepvariant', '--mode', 'pacbio',
-    '--ref', path.join(rMp, refRel),
-    '--in-bam', path.join(oMp, bamRel),
-    '--interval-file', bedPath,
-    '--out-variants', path.join(work, vcfGz),
-    '--num-gpus', '1'],
-    'pbrun DeepVariant HiFi small-variant calling (mode=pacbio)');
+  const pbMounts = ['-v', `${work}:/w:rw`];
+  // 1. pbrun DeepVariant (HiFi, GPU) inside the Clara container. --mode pacbio = PacBio model.
+  //    Paths are container-relative (/o BAM, /r reference, /w workdir). The bed is at /w/primary.bed.
+  run('docker', ['run', '--rm', '--gpus', 'all', ...pbMounts, IMG_PARABRICKS,
+    'pbrun', 'deepvariant', '--mode', 'pacbio',
+    '--ref', `/w/${localRef}`, '--in-bam', `/w/${localBam}`, '--interval-file', '/w/primary.bed',
+    '--out-variants', `/w/${vcfGz}`, '--num-gpus', '1'],
+    'pbrun DeepVariant HiFi small-variant calling (mode=pacbio, GPU container, local NVMe)');
   if (!fs.existsSync(path.join(work, vcfGz))) { logLine('[hifi-deepvariant] pbrun produced no VCF'); uploadAudit(); process.exit(7); }
   spawnSync('sh', ['-c', `[ -f "${work}/${vcfGz}.tbi" ] || docker run --rm -v ${work}:/w:rw --entrypoint bash ${IMG_HTSLIB} -c "tabix -p vcf /w/${vcfGz}"`], { stdio: 'ignore' });
 
@@ -137,12 +162,10 @@ export async function hifiDeepvariantExecCommand(opts: HifiDeepvariantExecOption
   let gvcfGz = '';
   if (opts.gvcf) {
     gvcfGz = `${sample}.hifi.dv.g.vcf.gz`;
-    run('pbrun', ['deepvariant', '--mode', 'pacbio', '--gvcf',
-      '--ref', path.join(rMp, refRel),
-      '--in-bam', path.join(oMp, bamRel),
-      '--interval-file', bedPath,
-      '--out-variants', path.join(work, gvcfGz),
-      '--num-gpus', '1'],
+    run('docker', ['run', '--rm', '--gpus', 'all', ...pbMounts, IMG_PARABRICKS,
+      'pbrun', 'deepvariant', '--mode', 'pacbio', '--gvcf',
+      '--ref', `/w/${localRef}`, '--in-bam', `/w/${localBam}`, '--interval-file', '/w/primary.bed',
+      '--out-variants', `/w/${gvcfGz}`, '--num-gpus', '1'],
       'pbrun DeepVariant gVCF pass');
     spawnSync('sh', ['-c', `[ -f "${work}/${gvcfGz}.tbi" ] || docker run --rm -v ${work}:/w:rw --entrypoint bash ${IMG_HTSLIB} -c "tabix -p vcf /w/${gvcfGz}" 2>/dev/null || true`], { stdio: 'ignore' });
   }
@@ -164,7 +187,7 @@ export async function hifiDeepvariantExecCommand(opts: HifiDeepvariantExecOption
     schema: 'genobank.hifidv.manifest/v1', pipeline: 'hifi-deepvariant-snv',
     jobId, biosampleId: sample, creator: walletLc, status: valid ? 'OK' : 'EMPTY',
     inputs: { bam: opts.bam, reference: refRel, mode: 'pacbio', ctgs: 'primary', gvcf: !!opts.gvcf },
-    tools: { parabricks_deepvariant: pbrun, htslib: IMG_HTSLIB },
+    tools: { parabricks_deepvariant: IMG_PARABRICKS, htslib: IMG_HTSLIB },
     outputs: { snv_indel_vcf: `${BIOWALLET_GCS}/${vcfGz}`, ...(gvcfGz ? { gvcf: `${BIOWALLET_GCS}/${gvcfGz}` } : {}) },
     summary: { total_variants: Number(total), pass_variants: Number(passN) },
     biowalletFolder: BIOWALLET_GCS, commands: COMMANDS, createdAt: new Date().toISOString(),
