@@ -99,6 +99,15 @@ export async function liftoverExecCommand(opts: LiftoverExecOptions): Promise<vo
   if (!tgtRel) { logLine('[liftover] no GRCh38 target FASTA found'); uploadAudit(); process.exit(1); }
   logLine(`[liftover] chain=${chainRel} target=${tgtRel}`);
 
+  // Stage the GRCh38 target FASTA (+ .fai) to local writable scratch. CrossMap/pysam re-validates
+  // the FASTA index and, if it judges the .fai stale by mtime (common on gcsfuse, where the .fai
+  // can appear older than the FASTA), tries to REBUILD it in place — which fails on the read-only
+  // reference mount with "Read-only file system". Copying the FASTA then the .fai (so the .fai
+  // mtime is newest) and pointing CrossMap at /w lets pysam rebuild locally if it ever needs to.
+  const localTgt = path.basename(tgtRel);
+  run('gcloud', ['storage', 'cp', `gs://${refBucket}/${tgtRel}`, path.join(work, localTgt)], 'stage GRCh38 target FASTA to local (writable for faidx)');
+  run('gcloud', ['storage', 'cp', `gs://${refBucket}/${tgtRel}.fai`, path.join(work, localTgt + '.fai')], 'stage GRCh38 target .fai (mtime newest)');
+
   // 1. split multiallelics before liftover so each allele lifts independently (faithful per-allele
   //    rejects). No -f reference needed for splitting; CrossMap re-validates ref alleles vs GRCh38.
   const normVcf = 'norm.vcf.gz';
@@ -107,9 +116,10 @@ export async function liftoverExecCommand(opts: LiftoverExecOptions): Promise<vo
     'bcftools norm -m- (split multiallelics)');
 
   // 2. CrossMap liftover -> GRCh38. CrossMap writes <out> (mapped) + <out>.unmap (rejects).
+  //    Target FASTA + .fai are read from /w (local, writable) so any pysam faidx rebuild stays local.
   const liftedRaw = 'lifted.grch38.vcf';
   run('docker', ['run', '--rm', '-v', `${rMp}:/r:ro`, '-v', `${work}:/w:rw`, '--entrypoint', 'bash', IMG_CROSSMAP, '-c',
-    `set -euo pipefail; CrossMap vcf /r/${chainRel} /w/${normVcf} /r/${tgtRel} /w/${liftedRaw}`],
+    `set -euo pipefail; touch /w/${localTgt}.fai; CrossMap vcf /r/${chainRel} /w/${normVcf} /w/${localTgt} /w/${liftedRaw}`],
     'CrossMap vcf (CHM13 -> GRCh38)');
   if (!fs.existsSync(path.join(work, liftedRaw))) { logLine('[liftover] CrossMap produced no output VCF'); uploadAudit(); process.exit(7); }
 
