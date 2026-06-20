@@ -1849,6 +1849,7 @@ liftoverCmd
   .requiredOption('--vcf <gs>', 'gs:// CHM13-coordinate VCF')
   .option('--to <build>', 'Target assembly', 'GRCh38')
   .option('--ref-from <build>', 'Source assembly', 'CHM13')
+  .option('--ref <build>', 'Reference build (accepted+ignored; liftover uses --to + chain)', 'auto')
   .option('--job-id <id>', 'Job id')
   .option('--batch-id <id>', 'Batch id')
   .option('--creator <wallet>', 'Creator wallet (lowercased for GCS path)')
