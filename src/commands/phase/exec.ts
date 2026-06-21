@@ -123,12 +123,24 @@ export async function phaseExecCommand(opts: PhaseExecOptions): Promise<void> {
     ['-c', `set -euo pipefail; bcftools sort -Oz -o /w/${inVcfGz} "/v/${vcfRel}" && tabix -f -p vcf /w/${inVcfGz}`]),
     'normalize input VCF (sort + bgzip + index)');
 
+  // 1b. HiPhase requires a read group (SM) on the BAM; minimap2 (hifi-align) emits none, so
+  //     HiPhase aborts "BAM file has no read groups (RG) tag". Reheader (header-only, fast BGZF
+  //     copy) the gcsfuse BAM into local scratch with SM:<sample> and phase the local re-headed
+  //     BAM (also far faster for HiPhase's heavy random access). Idempotent if an @RG exists.
+  const localBam = path.basename(bamRel).replace(/\.bam$/, '.rg.bam');
+  run('docker', dk(IMG_ALIGN, [[bMp, '/b', 'ro'], [work, '/w', 'rw']], 'bash',
+    ['-c', `set -e; samtools view -H /b/${bamRel} > /w/hdr.sam; ` +
+      `grep -q '^@RG' /w/hdr.sam || printf '@RG\\tID:${sample}\\tSM:${sample}\\tPL:PACBIO\\tLB:hifi\\n' >> /w/hdr.sam; ` +
+      `samtools reheader /w/hdr.sam /b/${bamRel} > /w/${localBam}; samtools index -@ ${threads} /w/${localBam}`]),
+    'reheader HiFi BAM to local + inject @RG SM (HiPhase requires a read group)');
+
   // 2. HiPhase: read-backed phasing of the small-variant VCF against the aligned HiFi BAM.
-  //    Emits a phased VCF (PS phase-set tags) + a haplotagged BAM (HP tags).
+  //    Emits a phased VCF (PS phase-set tags) + a haplotagged BAM (HP tags). BAM is the local
+  //    re-headed copy in /w; reference from /r.
   const phasedVcfGz = `${sample}.phased.vcf.gz`;
   const haplotaggedBam = `${sample}.haplotagged.bam`;
-  run('docker', dk(IMG_HIPHASE, [[bMp, '/b', 'ro'], [rMp, '/r', 'ro'], [work, '/w', 'rw']], undefined,
-    ['hiphase', '--bam', `/b/${bamRel}`, '--vcf', `/w/${inVcfGz}`, '--output-vcf', `/w/${phasedVcfGz}`,
+  run('docker', dk(IMG_HIPHASE, [[rMp, '/r', 'ro'], [work, '/w', 'rw']], undefined,
+    ['hiphase', '--bam', `/w/${localBam}`, '--vcf', `/w/${inVcfGz}`, '--output-vcf', `/w/${phasedVcfGz}`,
       '--reference', `/r/${refRel}`, '--output-bam', `/w/${haplotaggedBam}`, '--threads', threads]),
     'HiPhase read-backed phasing');
 
