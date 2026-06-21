@@ -145,8 +145,8 @@ function renderTable(result: QueryResult, opts: VariantsOptions): string {
 }
 
 export async function variantsCommand(serial: string, opts: VariantsOptions): Promise<void> {
-  if (!/^[A-Za-z0-9_-]{4,32}$/.test(serial)) {
-    throw new Error(`Invalid biosample serial: ${serial} (expected 4-32 alphanumeric characters)`);
+  if (!/^[A-Za-z0-9_-]{4,32}$/.test(serial) && !/^0x[0-9a-fA-F]{40,64}$/.test(serial)) {
+    throw new Error(`Invalid biosample serial: ${serial} (expected 4-32 alphanumeric chars, or a 0x fingerprint/wallet for long-read samples)`);
   }
 
   if (opts.sqliteUri) {
