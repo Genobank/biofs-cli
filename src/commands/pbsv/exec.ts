@@ -126,12 +126,15 @@ export async function pbsvExecCommand(opts: PbsvExecOptions): Promise<void> {
   // index
   run('docker', dk(IMG_HTSLIB, [[work, '/w', 'rw']], 'bash', ['-c', `set -e; tabix -p vcf /w/${vcfGz} || true`]), 'tabix SV VCF');
 
-  // 3. summarize: SV counts by type
-  const counts = capture('docker', sdk(IMG_HTSLIB, [[work, '/w', 'ro']], 'bash',
-    ['-c', `zcat /w/${vcfGz} | grep -v '^#' | grep -oE 'SVTYPE=[A-Za-z]+' | sort | uniq -c | awk '{print $2"="$1}' | paste -sd, -`]).slice(1) || '');
-  const total = capture('docker', sdk(IMG_HTSLIB, [[work, '/w', 'ro']], 'bash', ['-c', `zcat /w/${vcfGz} | grep -vc '^#'`])).slice(1) || '0';
+  // 3. summarize: SV counts by type.
+  //   FIX: the old `capture('docker', sdk(...)).slice(1)` mis-counted (sdk() prepends 'docker'
+  //   -> `docker docker run ...` -> error -> '' -> total='0'), reporting 0 SVs on a real callset.
+  //   Use the plain ['run', ...] argv (no sdk, no .slice), like hifi-deepvariant/ont-variants.
+  const dockerArgs = (sh: string): string[] => ['run', '--rm', '-v', `${work}:/w:ro`, '--entrypoint', 'bash', IMG_HTSLIB, '-c', sh];
+  const counts = capture('docker', dockerArgs(`zcat /w/${vcfGz} | grep -v '^#' | grep -oE 'SVTYPE=[A-Za-z]+' | sort | uniq -c | awk '{print $2"="$1}' | paste -sd, -`)) || '';
+  const total = capture('docker', dockerArgs(`zcat /w/${vcfGz} | grep -vc '^#'`)) || '0';
   logLine(`[pbsv] pbsv calls: total=${total} byType=[${counts}]`);
-  const valid = Number(total) >= 0 && fs.existsSync(path.join(work, vcfGz));
+  const valid = Number(total) > 0 && fs.existsSync(path.join(work, vcfGz));
 
   // 4. persist VCF (+ index) + manifest
   run('gcloud', ['storage', 'cp', path.join(work, vcfGz), `${BIOWALLET_GCS}/${vcfGz}`], 'upload SV VCF');

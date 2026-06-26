@@ -124,11 +124,17 @@ export async function svCallExecCommand(opts: SvCallExecOptions): Promise<void> 
   run('docker', dk(IMG_HTSLIB, [[work, '/w', 'rw']], 'bash', ['-c', `set -e; tabix -p vcf /w/${vcfGz} || true`]), 'tabix SV VCF');
 
   // 2. summarize: SV counts by type
-  const counts = capture('docker', sdk(IMG_HTSLIB, [[work, '/w', 'ro']], 'bash',
-    ['-c', `zcat /w/${vcfGz} | grep -v '^#' | grep -oE 'SVTYPE=[A-Z]+' | sort | uniq -c | awk '{print $2"="$1}' | paste -sd, -`]).slice(1) || '');
-  const total = capture('docker', sdk(IMG_HTSLIB, [[work, '/w', 'ro']], 'bash', ['-c', `zcat /w/${vcfGz} | grep -vc '^#'`])).slice(1) || '0';
+  //   NOTE: capture(cmd,args) calls spawnSync(cmd,args); the FIRST element of args is argv[1].
+  //   sdk(...) prepends 'docker' to its array, so `capture('docker', sdk(...))` spawned
+  //   `docker docker run ...` -> "'docker' is not a docker command" -> nonzero exit ->
+  //   capture()='' -> ''.slice(1)='' -> total='0'. That is why a VCF with 38,611 real SVs
+  //   was reported as 0. Use the plain `['run', ...]` argv (no sdk wrapper) and no .slice(1),
+  //   exactly like hifi-deepvariant/ont-variants/liftover.
+  const dockerArgs = (sh: string): string[] => ['run', '--rm', '-v', `${work}:/w:ro`, '--entrypoint', 'bash', IMG_HTSLIB, '-c', sh];
+  const counts = capture('docker', dockerArgs(`zcat /w/${vcfGz} | grep -v '^#' | grep -oE 'SVTYPE=[A-Z]+' | sort | uniq -c | awk '{print $2"="$1}' | paste -sd, -`)) || '';
+  const total = capture('docker', dockerArgs(`zcat /w/${vcfGz} | grep -vc '^#'`)) || '0';
   logLine(`[sv-call] Sniffles2 calls: total=${total} byType=[${counts}]`);
-  const valid = Number(total) >= 0 && fs.existsSync(path.join(work, vcfGz));
+  const valid = Number(total) > 0 && fs.existsSync(path.join(work, vcfGz));
 
   // 3. persist VCF (+ index) + manifest
   run('gcloud', ['storage', 'cp', path.join(work, vcfGz), `${BIOWALLET_GCS}/${vcfGz}`], 'upload SV VCF');
