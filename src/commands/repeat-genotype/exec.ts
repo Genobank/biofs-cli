@@ -137,10 +137,14 @@ export async function repeatGenotypeExecCommand(opts: RepeatGenotypeExecOptions)
   // also index the spanning-reads BAM if TRGT produced one
   spawnSync('sh', ['-c', `[ -f ${work}/${spanningBam} ] && docker run --rm -v ${work}:/w:rw --entrypoint bash ${IMG_BCFTOOLS} -c 'samtools index /w/${spanningBam}' 2>/dev/null || true`], { stdio: 'ignore' });
 
-  // 3. summarize: number of loci genotyped
-  const total = capture('docker', sdk(IMG_HTSLIB, [[work, '/w', 'ro']], 'bash', ['-c', `zcat /w/${finalVcfGz} | grep -vc '^#'`])).slice(1) || '0';
+  // 3. summarize: number of loci genotyped.
+  //   FIX: the old `capture('docker', sdk(...)).slice(1)` mis-counted (sdk() prepends 'docker'
+  //   so it spawned `docker docker run ...` -> error -> '' -> total='0'), which made a perfectly
+  //   genotyped callset report 0 loci. Use the plain ['run', ...] argv (no sdk, no .slice), like
+  //   hifi-deepvariant/ont-variants/liftover.
+  const total = capture('docker', ['run', '--rm', '-v', `${work}:/w:ro`, '--entrypoint', 'bash', IMG_HTSLIB, '-c', `zcat /w/${finalVcfGz} | grep -vc '^#'`]) || '0';
   logLine(`[repeat-genotype] TRGT genotyped loci: total=${total}`);
-  const valid = Number(total) >= 0 && fs.existsSync(path.join(work, finalVcfGz));
+  const valid = Number(total) > 0 && fs.existsSync(path.join(work, finalVcfGz));
 
   // 4. persist VCF (+ index, + spanning BAM) + manifest
   run('gcloud', ['storage', 'cp', path.join(work, finalVcfGz), `${BIOWALLET_GCS}/${finalVcfGz}`], 'upload repeat VCF');
