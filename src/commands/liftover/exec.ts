@@ -22,6 +22,7 @@ export interface LiftoverExecOptions {
   vcf: string;           // gs:// source VCF (CHM13 coordinates)
   refFrom?: string;      // source assembly (default CHM13)
   to?: string;           // target assembly (default GRCh38)
+  tool?: string;         // liftover engine: 'crossmap' (default) | 'gatk' (swap-aware, recovers ref-discordant)
   jobId?: string;
   batchId?: string;
   creator?: string;
@@ -32,6 +33,9 @@ export interface LiftoverExecOptions {
 const IMG_BCFTOOLS = 'quay.io/biocontainers/bcftools:1.19--h8b25389_0';
 const IMG_HTSLIB   = 'quay.io/biocontainers/htslib:1.19.1--h81da01d_1';
 const IMG_CROSSMAP = 'quay.io/biocontainers/crossmap:0.7.0--pyhdfd78af_0';
+// GATK/Picard LiftoverVcf — swap-aware: with RECOVER_SWAPPED_REF_ALT it recovers reference-discordant
+// sites (CHM13-ref == GRCh38-alt) that CrossMap silently drops, flipping the genotype. The 'gatk' tool.
+const IMG_GATK     = process.env.GATK_IMAGE || 'broadinstitute/gatk:4.5.0.0';
 
 let LOG_FD: number | null = null;
 const COMMANDS: string[] = [];
@@ -104,31 +108,56 @@ export async function liftoverExecCommand(opts: LiftoverExecOptions): Promise<vo
   // can appear older than the FASTA), tries to REBUILD it in place — which fails on the read-only
   // reference mount with "Read-only file system". Copying the FASTA then the .fai (so the .fai
   // mtime is newest) and pointing CrossMap at /w lets pysam rebuild locally if it ever needs to.
+  const useGatk = /gatk/i.test(opts.tool || 'crossmap');
+  const engine = useGatk ? 'gatk' : 'crossmap';
   const localTgt = path.basename(tgtRel);
   run('gcloud', ['storage', 'cp', `gs://${refBucket}/${tgtRel}`, path.join(work, localTgt)], 'stage GRCh38 target FASTA to local (writable for faidx)');
   run('gcloud', ['storage', 'cp', `gs://${refBucket}/${tgtRel}.fai`, path.join(work, localTgt + '.fai')], 'stage GRCh38 target .fai (mtime newest)');
 
   // 1. split multiallelics before liftover so each allele lifts independently (faithful per-allele
-  //    rejects). No -f reference needed for splitting; CrossMap re-validates ref alleles vs GRCh38.
+  //    rejects). No -f reference needed for splitting; the engine re-validates ref alleles vs GRCh38.
   const normVcf = 'norm.vcf.gz';
   run('docker', ['run', '--rm', '-v', `${vMp}:/v:ro`, '-v', `${work}:/w:rw`, '--entrypoint', 'bash', IMG_BCFTOOLS, '-c',
     `set -euo pipefail; bcftools norm -m- /v/${vcfRel} -Oz -o /w/${normVcf}`],
     'bcftools norm -m- (split multiallelics)');
 
-  // 2. CrossMap liftover -> GRCh38. CrossMap writes <out> (mapped) + <out>.unmap (rejects).
-  //    Target FASTA + .fai are read from /w (local, writable) so any pysam faidx rebuild stays local.
-  const liftedRaw = 'lifted.grch38.vcf';
-  run('docker', ['run', '--rm', '-v', `${rMp}:/r:ro`, '-v', `${work}:/w:rw`, '--entrypoint', 'bash', IMG_CROSSMAP, '-c',
-    `set -euo pipefail; touch /w/${localTgt}.fai; CrossMap vcf /r/${chainRel} /w/${normVcf} /w/${localTgt} /w/${liftedRaw}`],
-    'CrossMap vcf (CHM13 -> GRCh38)');
-  if (!fs.existsSync(path.join(work, liftedRaw))) { logLine('[liftover] CrossMap produced no output VCF'); uploadAudit(); process.exit(7); }
+  // 2. liftover engine -> GRCh38. CrossMap (default) silently drops reference-discordant sites
+  //    (CHM13-ref == GRCh38-alt) as Fail(REF==ALT). GATK/Picard LiftoverVcf with RECOVER_SWAPPED_REF_ALT
+  //    recovers them (flips the genotype), which is the point of the completeness pass.
+  const liftedRaw = useGatk ? 'lifted.gatk.vcf.gz' : 'lifted.grch38.vcf';
+  let rejectRaw: string;
+  logLine(`[liftover] engine=${engine}`);
+  if (useGatk) {
+    // GATK needs the target sequence dictionary (.dict) beside the FASTA + an uncompressed chain.
+    const dictRel = tgtRel.replace(/\.(fasta|fa)$/, '.dict');
+    const localDict = localTgt.replace(/\.(fasta|fa)$/, '.dict');
+    run('gcloud', ['storage', 'cp', `gs://${refBucket}/${dictRel}`, path.join(work, localDict)], 'stage GRCh38 .dict (GATK)');
+    run('docker', ['run', '--rm', '-v', `${rMp}:/r:ro`, '-v', `${work}:/w:rw`, '--entrypoint', 'bash', IMG_HTSLIB, '-c',
+      `set -euo pipefail; { zcat /r/${chainRel} 2>/dev/null || cat /r/${chainRel}; } > /w/liftover.chain`],
+      'decompress liftover chain for GATK');
+    rejectRaw = 'reject.gatk.vcf.gz';
+    run('docker', ['run', '--rm', '-v', `${work}:/w:rw`, '--entrypoint', 'gatk', IMG_GATK,
+      '--java-options', '-Xmx32g', 'LiftoverVcf',
+      '-I', `/w/${normVcf}`, '--CHAIN', '/w/liftover.chain', '-O', `/w/${liftedRaw}`,
+      '--REJECT', `/w/${rejectRaw}`, '-R', `/w/${localTgt}`,
+      '--RECOVER_SWAPPED_REF_ALT', 'true', '--WARN_ON_MISSING_CONTIG', 'true',
+      '--MAX_RECORDS_IN_RAM', '250000', '--TMP_DIR', '/w'],
+      'GATK LiftoverVcf (CHM13 -> GRCh38, swap-aware RECOVER_SWAPPED_REF_ALT)');
+  } else {
+    // Target FASTA + .fai are read from /w (local, writable) so any pysam faidx rebuild stays local.
+    rejectRaw = `${liftedRaw}.unmap`;
+    run('docker', ['run', '--rm', '-v', `${rMp}:/r:ro`, '-v', `${work}:/w:rw`, '--entrypoint', 'bash', IMG_CROSSMAP, '-c',
+      `set -euo pipefail; touch /w/${localTgt}.fai; CrossMap vcf /r/${chainRel} /w/${normVcf} /w/${localTgt} /w/${liftedRaw}`],
+      'CrossMap vcf (CHM13 -> GRCh38)');
+  }
+  if (!fs.existsSync(path.join(work, liftedRaw))) { logLine(`[liftover] ${engine} produced no output VCF`); uploadAudit(); process.exit(7); }
 
   // 3. sort + bgzip + index the lifted VCF; keep the reject (.unmap) first-class.
   const finalVcf = `${sample}.grch38.vcf.gz`;
   const rejectVcf = `${sample}.liftover_reject.vcf`;
   run('docker', ['run', '--rm', '-v', `${rMp}:/r:ro`, '-v', `${work}:/w:rw`, '--entrypoint', 'bash', IMG_BCFTOOLS, '-c',
     `set -euo pipefail; bcftools sort /w/${liftedRaw} -Oz -o /w/${finalVcf} && tabix -p vcf /w/${finalVcf}; ` +
-    `[ -f /w/${liftedRaw}.unmap ] && cp /w/${liftedRaw}.unmap /w/${rejectVcf} || : ; true`],
+    `[ -f /w/${rejectRaw} ] && { zcat /w/${rejectRaw} 2>/dev/null || cat /w/${rejectRaw}; } > /w/${rejectVcf} || : ; true`],
     'sort + bgzip + index lifted VCF; stage reject');
 
   // 4. summarize lift rate
@@ -145,10 +174,10 @@ export async function liftoverExecCommand(opts: LiftoverExecOptions): Promise<vo
   spawnSync('sh', ['-c', `[ -f ${work}/${rejectVcf} ] && gzip -f ${work}/${rejectVcf} && gcloud storage cp ${work}/${rejectVcf}.gz ${BIOWALLET_GCS}/ 2>/dev/null || true`], { stdio: 'ignore' });
 
   const manifest = {
-    schema: 'genobank.liftover.manifest/v1', pipeline: 'liftover-crossmap',
+    schema: 'genobank.liftover.manifest/v1', pipeline: `liftover-${engine}`,
     jobId, biosampleId: sample, creator: walletLc, status: valid ? 'OK' : 'EMPTY',
-    inputs: { vcf: opts.vcf, source: 'CHM13', target, chain: chainRel, target_fasta: tgtRel },
-    tools: { crossmap: IMG_CROSSMAP, bcftools: IMG_BCFTOOLS, htslib: IMG_HTSLIB },
+    inputs: { vcf: opts.vcf, source: 'CHM13', target, chain: chainRel, target_fasta: tgtRel, engine, swap_aware: useGatk },
+    tools: { engine: useGatk ? IMG_GATK : IMG_CROSSMAP, bcftools: IMG_BCFTOOLS, htslib: IMG_HTSLIB },
     outputs: { grch38_vcf: `${BIOWALLET_GCS}/${finalVcf}`, reject_vcf: `${BIOWALLET_GCS}/${rejectVcf}.gz` },
     summary: { lifted: Number(liftedN), rejected: Number(rejectN), lift_rate_pct: Number(liftRate) },
     biowalletFolder: BIOWALLET_GCS, commands: COMMANDS, createdAt: new Date().toISOString(),
