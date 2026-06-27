@@ -93,6 +93,8 @@ import { hifiDeepvariantSubmitCommand, HifiDeepvariantSubmitOptions } from './co
 import { hifiDeepvariantExecCommand, HifiDeepvariantExecOptions } from './commands/hifi-deepvariant/exec';
 import { liftoverSubmitCommand, LiftoverSubmitOptions } from './commands/liftover/submit';
 import { liftoverExecCommand, LiftoverExecOptions } from './commands/liftover/exec';
+import { dipcallSubmitCommand, DipcallSubmitOptions } from './commands/dipcall/submit';
+import { dipcallExecCommand, DipcallExecOptions } from './commands/dipcall/exec';
 import { hifiMethylSubmitCommand, HifiMethylSubmitOptions } from './commands/hifi-methyl/submit';
 import { hifiMethylExecCommand, HifiMethylExecOptions } from './commands/hifi-methyl/exec';
 import {
@@ -1850,6 +1852,7 @@ liftoverCmd
   .option('--to <build>', 'Target assembly', 'GRCh38')
   .option('--ref-from <build>', 'Source assembly', 'CHM13')
   .option('--ref <build>', 'Reference build (accepted+ignored; liftover uses --to + chain)', 'auto')
+  .option('--tool <engine>', 'Liftover engine: crossmap (default) | gatk (swap-aware, recovers ref-discordant)', 'crossmap')
   .option('--job-id <id>', 'Job id')
   .option('--batch-id <id>', 'Batch id')
   .option('--creator <wallet>', 'Creator wallet (lowercased for GCS path)')
@@ -1858,6 +1861,34 @@ liftoverCmd
   .action(async (options: LiftoverExecOptions) => {
     try { await liftoverExecCommand(options); }
     catch (error) { Logger.error(`liftover exec failed: ${error}`); process.exit(1); }
+  });
+
+// Dipcall command group — assembly-based variant calling (dipcall) for Study 2
+const dipcallCmd = program.command('dipcall').description('Assembly-based variant calling (dipcall, phased diploid assembly -> reference): submit (client) + exec (VM runner)');
+dipcallCmd.command('submit <serial>', { isDefault: true })
+  .description('Submit an assembly-based dipcall job to biofs-node (two haplotype FASTAs -> dip VCF + confident BED)')
+  .requiredOption('--hap1 <gs>', 'gs:// haplotype-1 assembly FASTA')
+  .requiredOption('--hap2 <gs>', 'gs:// haplotype-2 assembly FASTA')
+  .option('--ref <build>', 'Reference: CHM13 | GRCh38 | auto', 'auto')
+  .option('--json', 'Output as JSON')
+  .action(async (serial: string, options: DipcallSubmitOptions) => {
+    try { await dipcallSubmitCommand(serial, options); }
+    catch (error) { Logger.error(`dipcall submit failed: ${error}`); process.exit(1); }
+  });
+dipcallCmd.command('exec')
+  .description('VM-side executor: dipcall over the staged diploid assembly + reference, persist dip VCF + confident BED to GCS')
+  .requiredOption('--sample <serial>', 'Biosample serial / SAMPLE')
+  .requiredOption('--hap1 <gs>', 'gs:// haplotype-1 assembly FASTA')
+  .requiredOption('--hap2 <gs>', 'gs:// haplotype-2 assembly FASTA')
+  .option('--ref <build>', 'Reference build', 'auto')
+  .option('--job-id <id>', 'Job id')
+  .option('--batch-id <id>', 'Batch id')
+  .option('--creator <wallet>', 'Creator wallet (lowercased for GCS path)')
+  .option('--out-bucket <name>', 'Output bucket', 'genobank-parabricks-output')
+  .option('--ref-bucket <name>', 'Reference bucket', 'genobank-references')
+  .action(async (options: DipcallExecOptions) => {
+    try { await dipcallExecCommand(options); }
+    catch (error) { Logger.error(`dipcall exec failed: ${error}`); process.exit(1); }
   });
 
 // HiFi-align command group — PacBio HiFi read alignment (pbmm2, MM/ML preserved) — the keystone
