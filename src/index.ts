@@ -3454,11 +3454,10 @@ if (process.argv.length === 2) {
   program.parse(process.argv);
 }
 
-// Handle uncaught errors
-process.on('unhandledRejection', (error) => {
-  Logger.error(`Unexpected error: ${error}`);
-  process.exit(1);
-});
+// Note: the authoritative unhandledRejection/uncaughtException handlers are
+// registered once near the top of this file (they route through reportAndExit
+// for a crash report). A second unhandledRejection listener here would also fire
+// and could process.exit(1) before that async report is sent, so it was removed.
 
 process.on('SIGINT', () => {
   console.log('\n\nInterrupted. Goodbye!');
