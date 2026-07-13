@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { BIOFS_VERSION } from '../version';
 import os from 'os';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -157,7 +158,7 @@ export class ErrorReporter {
 
         try {
             const packageJsonPath = join(__dirname, '../../package.json');
-            let version = '3.0.1';
+            let version = BIOFS_VERSION;
             try {
                 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
                 version = packageJson.version;

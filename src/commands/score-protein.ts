@@ -1,3 +1,4 @@
+import { BIOFS_VERSION } from '../version';
 /**
  * biofs score-protein <uniprot>
  *
@@ -285,14 +286,14 @@ export async function scoreProteinCommand(uniprot: string, opts: ScoreProteinOpt
     rrm_consensus_spectrum: rrmConsensus,
     psm_consensus_spectrum: psmConsensus,
     generated_at: new Date().toISOString(),
-    biofs_version: '3.7.0',
+    biofs_version: BIOFS_VERSION,
   };
 
   const payload = {
     operator: ownerWallet,
     consensus: consensus_doc,
     variants: result.variants,
-    biofs_version: '3.7.0',
+    biofs_version: BIOFS_VERSION,
   };
 
   if (opts.output) {

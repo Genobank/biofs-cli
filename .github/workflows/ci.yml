@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['18', '20']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Build (emits dist + runs validate-commands integrity gate)
+        run: npm run build
+      - name: Version parity (package.json == biofs --version)
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          CLI=$(node dist/index.js --version)
+          echo "package.json=$PKG  cli=$CLI"
+          test "$PKG" = "$CLI"
+      - name: Tests
+        run: npm test --if-present
