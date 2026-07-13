@@ -9,10 +9,13 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/test', '<rootDir>/src'],
   testMatch: ['**/*.test.ts'],
-  // ts-jest transforms the TS suites. Full project typing is enforced separately
-  // by the CI `tsc --noEmit` step, so keep the transform config minimal here.
+  // isolatedModules: transpile each test file (no full type-check) so the suites
+  // run without needing @types/jest wired into tsconfig's `types`. Full project
+  // typing is enforced separately by the CI `tsc --noEmit` step. (ts-jest 29 emits
+  // a deprecation notice for this key; harmless, and it keeps `npm test` green
+  // without touching the shared tsconfig.)
   transform: {
-    '^.+\\.ts$': ['ts-jest', {}],
+    '^.+\\.ts$': ['ts-jest', { isolatedModules: true }],
   },
   moduleFileExtensions: ['ts', 'js', 'json', 'node'],
   clearMocks: true,
