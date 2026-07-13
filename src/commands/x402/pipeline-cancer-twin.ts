@@ -182,12 +182,17 @@ const STAGE_ANCHOR_FILETYPE: Record<CancerTwinAgentKey, string | null> = {
 /** Anchor a stage output on BioRouter (Sequentia) via biofs-node. Best-effort. */
 async function anchorOutput(
   agentKey: CancerTwinAgentKey, serial: string, owner: string, biocid: string, dryRun: boolean,
+  signature?: string,
 ): Promise<string | null> {
   const filetype = STAGE_ANCHOR_FILETYPE[agentKey];
   if (!filetype || dryRun) return null;
   try {
+    // biofs-node /agent/anchor_bioasset now derives the on-chain owner from the
+    // RECOVERED signer (an unsigned request is rejected 401), so the signature is
+    // required. The operator signs as custodian; `owner` names the patient the
+    // asset is anchored for.
     const resp = await axios.post(`${BIOFS_NODE_BASE}/anchor_bioasset`,
-      { serial, filetype, owner, biocid },
+      { serial, filetype, owner, biocid, signature },
       { timeout: 60_000, validateStatus: (s) => s < 500 });
     if (resp.status >= 400 || resp.data?.anchored === false) return null;
     return resp.data?.txHash || (resp.data?.already ? 'already-anchored' : null);
@@ -319,7 +324,7 @@ export async function pipelineCancerTwinCommand(
       const out = outputBiocid(key, owner, biosample);
 
       // Anchor this output on BioRouter (Sequentia) so the journey is on-chain.
-      const anchorTx = await anchorOutput(key, biosample, owner, out.biocid, dryRun);
+      const anchorTx = await anchorOutput(key, biosample, owner, out.biocid, dryRun, credentials?.user_signature);
       if (anchorTx) emit({ event: 'output_anchored', stage: agent.step, fileType: out.fileType, txHash: anchorTx }, jsonOnly);
 
       manifest.lineage.push({ biocid: out.biocid, fileType: out.fileType, parent: prevBiocid, agent: agent.name, anchorTx });

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
+import { BIOFS_VERSION } from './version';
 import chalk from 'chalk';
 import { loginCommand, LoginOptions } from './commands/login';
 import { logoutCommand } from './commands/logout';
@@ -67,6 +68,15 @@ import { reportCommand, ReportOptions } from './commands/report';
 import { createAdminCommand } from './commands/admin';
 import { fuseListCommand, fuseMountCommand, fuseStreamCommand, fuseSampleCommand, FuseOptions } from './commands/fuse';
 import { annotateSubmitCommand, AnnotateSubmitOptions } from './commands/annotate/submit';
+import { imagingPullCommand, ImagingPullOptions } from './commands/imaging/submit';
+import { imagingTwinCommand, ImagingTwinOptions } from './commands/imaging/twin';
+import { imagingAttributeCommand, ImagingAttributeOptions } from './commands/imaging/attribute';
+import { imagingTrajectoryCommand, ImagingTrajectoryOptions } from './commands/imaging/trajectory';
+import { imagingLesionsCommand, ImagingLesionsOptions } from './commands/imaging/lesions';
+import { imagingFindingsCommand, ImagingFindingsOptions } from './commands/imaging/findings';
+import { imagingCharacterizeCommand, ImagingCharacterizeOptions } from './commands/imaging/characterize';
+import { imagingEnrichCommand, ImagingEnrichOptions } from './commands/imaging/enrich';
+import { imagingCompareCommand, ImagingCompareOptions } from './commands/imaging/compare';
 import { methylSubmitCommand, MethylSubmitOptions } from './commands/methyl/submit';
 import { methylExecCommand, MethylExecOptions } from './commands/methyl/exec';
 import { alignShardSubmitCommand, AlignShardSubmitOptions } from './commands/align-shard/submit';
@@ -112,6 +122,14 @@ import { annotateStatusCommand, AnnotateStatusOptions } from './commands/annotat
 import { createX402Command } from './commands/x402';
 import { interpretSubmitCommand, InterpretSubmitOptions } from './commands/interpret/submit';
 import { interpretStatusCommand, InterpretStatusOptions } from './commands/interpret/status';
+import { ancestrySomosCommand, AncestrySomosOptions } from './commands/ancestry/somos';
+import { ancestryStatusCommand, AncestryStatusOptions } from './commands/ancestry/status';
+import { ancestryIngestCommand, AncestryIngestOptions } from './commands/ancestry/ingest';
+import {
+  ancestryShareCommand, AncestryShareOptions,
+  ancestrySharesCommand, AncestrySharesOptions,
+  ancestryRevokeCommand, AncestryRevokeOptions,
+} from './commands/ancestry/share';
 import { agentRegisterSequentiaCommand, AgentRegisterSequentiaOptions } from './commands/agent/register-sequentia';
 import { agentListSequentiaCommand, AgentListSequentiaOptions } from './commands/agent/list-sequentia';
 import { paymentBalanceCommand, PaymentBalanceOptions } from './commands/payment/balance';
@@ -151,6 +169,7 @@ import { inventoryCohortCommand, InventoryCohortOptions } from './commands/inven
 import { jobReconcileCommand, JobReconcileOptions } from './commands/job/reconcile';
 import { cohortPipelineCommand, CohortPipelineOptions } from './commands/cohort-pipeline';
 import { dedupCommand, DedupOptions } from './commands/dedup';
+import { claimCommand, ClaimOptions } from './commands/claim';
 import { fingerprintCommand, FingerprintOptions } from './commands/fingerprint';
 import { researcherRegisterCommand, ResearcherRegisterOptions } from './commands/researcher/register';
 import { researcherStatusCommand, ResearcherStatusOptions } from './commands/researcher/status';
@@ -186,7 +205,7 @@ process.on('unhandledRejection', (reason) => {
 program
   .name('biofs')
   .description('BioFS by GenoBank.io - BioNFT-Gated S3 CLI for genomic data')
-  .version('3.14.0')
+  .version(BIOFS_VERSION)
   .option('--debug', 'Enable debug output')
   .hook('preAction', (thisCommand) => {
     // Set global debug flag if --debug is passed
@@ -730,6 +749,25 @@ program
     }
   });
 
+// Claim command - Reassign mis-owned inventory rows (lab/legacy custodian) to the patient owner
+program
+  .command('claim')
+  .description('Reassign inventory rows under your biorouter path from a lab/legacy custodian to you (admin)')
+  .option('--owner <wallet>', 'Patient EIP-55 wallet to claim files TO (default: your wallet)')
+  .option('--from <csv>', 'Custodian/legacy wallets to claim FROM (default: known legacy+custodian)')
+  .option('--exclude <csv>', 'object_name substrings to skip (e.g. /dtc-genotype/,41221040804049)')
+  .option('--apply', 'Actually reassign ownership (default is dry-run)')
+  .option('--json', 'Output as JSON')
+  .option('--verbose', 'Show debug information')
+  .action(async (options: ClaimOptions) => {
+    try {
+      await claimCommand(options);
+    } catch (error) {
+      Logger.error(`Claim failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
 // Scan command - Walk GCS bucket(s) and register objects in bioroutes.inventory
 // Default scope: full canonical bucket fleet. Lab origin inferred per-file.
 program
@@ -789,6 +827,207 @@ annotateCmd
       await annotateStatusCommand(jobId, options);
     } catch (error) {
       Logger.error(`Status check failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Imaging commands — pull UCSF eUnity DICOM studies into the patient vault via
+// the biofs protocol (DICOM is biodata → biofs job dispatched through biofs-node).
+const imagingCmd = program
+  .command('imaging')
+  .description('DICOM medical-imaging acquisition: pull hospital studies (UCSF eUnity) into the patient vault via biofs-node');
+
+imagingCmd
+  .command('pull', { isDefault: true })
+  .description('Pull a UCSF eUnity DICOM study into the vault (resolve --eunity-url + --cookie + --study-uid with the web3-chrome MCP)')
+  .requiredOption('--eunity-url <url>', 'eUnity downloadDicomStudy URL (resolved browser-side by the MCP)')
+  .requiredOption('--cookie <header>', 'eUnity /e JSESSIONID Cookie header (resolved browser-side by the MCP)')
+  .option('--study-uid <uid>', 'DICOM StudyInstanceUID (enables vault dedupe)')
+  .option('--source <src>', 'Provenance label', 'eunity-mychart')
+  .option('--force', 'Re-pull even if the study is already in the vault (idempotent overwrite)')
+  .option('--wait', 'Wait for the server-side ingest to finish')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Output as JSON')
+  .action(async (options: ImagingPullOptions) => {
+    try {
+      await imagingPullCommand(options);
+    } catch (error) {
+      Logger.error(`imaging pull failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// imaging twin — the "3D Organ TimeMachine": longitudinal CT change map (register
+// two timepoints, segment organs, per-organ/voxel deltas + Jacobian + meshes) as a
+// biofs GPU job. Inputs are biocid-addressed (biofs-node resolves via biorouter).
+imagingCmd
+  .command('twin')
+  .description('3D Organ TimeMachine: longitudinal CT change map across N timepoints of an anatomy (GPU job via biofs-node)')
+  .option('--baseline <ref>', 'baseline biocid (biocid://…/dicom/<studyUID>) or studyUID (2-timepoint mode)')
+  .option('--followup <ref>', 'follow-up biocid or studyUID (2-timepoint mode)')
+  .option('--timepoints <spec>', 'N-timepoint mode: JSON [{label,study,series}] (ordered, first=reference) or "label:study:series,..." — supersedes --baseline/--followup')
+  .option('--anatomy <name>', 'anatomy to register (abdomen | chest)', 'abdomen')
+  .option('--registration <mode>', 'deformable (SyNRA + Jacobian, default) or rigid (strict 6-DOF, spot-faithful organ meshes)', 'deformable')
+  .option('--baseline-series <uid>', 'override the baseline primary CT series UID')
+  .option('--followup-series <uid>', 'override the follow-up primary CT series UID')
+  .option('--wait', 'Wait for the GPU pipeline to finish')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Output as JSON')
+  .action(async (options: ImagingTwinOptions) => {
+    try {
+      await imagingTwinCommand(options);
+    } catch (error) {
+      Logger.error(`imaging twin failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// imaging attribute — organ-attribution cross-join: segment a compare job's reference
+// CT and label each focal change by the organ it sits in (feeds the radiology MCP).
+imagingCmd
+  .command('attribute')
+  .description('Label each focal change in a compare job with its anatomic organ (GPU segmentation via biofs-node)')
+  .requiredOption('--compare <compare_job_id>', 'the compare_job_id from `biofs imaging compare`')
+  .option('--wait', 'Wait for the GPU job to finish')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Output as JSON')
+  .action(async (options: ImagingAttributeOptions) => {
+    try {
+      await imagingAttributeCommand(options);
+    } catch (error) {
+      Logger.error(`imaging attribute failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// imaging trajectory — 3-timepoint per-voxel persistence classifier (persistent
+// progression/regression vs transient motion). CPU via biofs-node; drop-in compare artifact.
+imagingCmd
+  .command('trajectory')
+  .description('3-timepoint per-voxel trajectory classifier: persistent change vs transient motion (CPU via biofs-node)')
+  .requiredOption('--timepoints <spec>', 'oldest→newest: JSON [{label,study,series}] or "label:study[:series],..." (>=3; series auto-resolved if omitted)')
+  .option('--anatomy <name>', 'anatomy (chest | abdomen)', 'chest')
+  .option('--thr-hu <hu>', 'override the per-interval significance threshold (default adaptive max(55, 3·det_sigma))')
+  .option('--wait', 'Wait for the classifier to finish')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Output as JSON')
+  .action(async (options: ImagingTrajectoryOptions) => {
+    try {
+      await imagingTrajectoryCommand(options);
+    } catch (error) {
+      Logger.error(`imaging trajectory failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// imaging lesions — per-lesion volumetric tracking: independent VISTA-3D lesion seg per
+// timepoint, cross-timepoint linking, RECIST 1.1 response (CR/PR/SD/PD, flagged candidate)
+// + volume doubling time + iso-attenuating catch. GPU via biofs-node; drop-in artifact.
+imagingCmd
+  .command('lesions')
+  .description('Per-lesion volumetric tracking: VISTA-3D per timepoint -> RECIST response + doubling time (GPU via biofs-node)')
+  .requiredOption('--timepoints <spec>', 'oldest→newest: JSON [{label,study,series}] or "label:study[:series],..." (>=2; series auto-resolved if omitted)')
+  .option('--anatomy <name>', 'anatomy (chest | abdomen)', 'chest')
+  .option('--treatment <ctx>', 'treatment context (naive | post_chemo | post_radiation | post_immunotherapy | post_surgery | unknown); non-naive forces human review', 'unknown')
+  .option('--wait', 'Wait for the GPU pipeline to finish')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Output as JSON')
+  .action(async (options: ImagingLesionsOptions) => {
+    try {
+      await imagingLesionsCommand(options);
+    } catch (error) {
+      Logger.error(`imaging lesions failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// imaging findings — longitudinal CT pathogenic-findings read (no volumes): pairwise
+// baseline-forward rigid lock -> VISTA-3D auto-detect -> LesionLocator track -> RECIST
+// 1.1 on long-axis diameters. GPU via biofs-node. Decision-support, not a diagnosis.
+imagingCmd
+  .command('findings')
+  .description('Longitudinal pathogenic-findings read: rigid pairwise lock -> VISTA-3D detect -> LesionLocator track -> RECIST 1.1 (no volumes; GPU via biofs-node)')
+  .requiredOption('--timepoints <spec>', 'oldest→newest: JSON [{label,study,series}] or "label:study[:series],..." (>=2; series auto-resolved if omitted)')
+  .option('--treatment <ctx>', 'treatment context (naive | post_chemo | post_radiation | post_immunotherapy | post_surgery | unknown); lowers RECIST confidence if not naive', 'unknown')
+  .option('--wait', 'Wait for the GPU pipeline to finish')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Output as JSON')
+  .action(async (options: ImagingFindingsOptions) => {
+    try {
+      await imagingFindingsCommand(options);
+    } catch (error) {
+      Logger.error(`imaging findings failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// imaging characterize — Tier 2: study each tracked candidate from a findings job with
+// the Tier-2 method stack (PyRadiomics, CT-FM, Merlin, PASTA, MedGemma 1.5) -> per-candidate
+// side-by-side + agreement. GPU via biofs-node. Decision-support, not a diagnosis.
+imagingCmd
+  .command('characterize')
+  .description('Tier 2: study a findings job\'s candidates with the method stack -> per-candidate comparison (GPU via biofs-node)')
+  .requiredOption('--job <findings_job_id>', 'the findings_job_id from `biofs imaging findings`')
+  .option('--methods <csv>', 'methods to run (pyradiomics,ctfm,merlin,pasta,medgemma)', 'pyradiomics,ctfm,merlin,pasta,medgemma')
+  .option('--alpha <n>', 'conformal risk level (when the trained second-reader is available)', '0.1')
+  .option('--wait', 'Wait for the methods to finish')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Output as JSON')
+  .action(async (options: ImagingCharacterizeOptions) => {
+    try {
+      await imagingCharacterizeCommand(options);
+    } catch (error) {
+      Logger.error(`imaging characterize failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// imaging enrich — Phase 3 foundation-model enrichment of a finished twin:
+// merlin (whole-scan change score) | vista3d (resection-bed seg) | medgemma
+// (draft impression). Each runs its own GPU container and writes a sidecar.
+imagingCmd
+  .command('enrich')
+  .description('Enrich a finished imaging-twin with a foundation model (merlin | vista3d | medgemma) via biofs-node GPU')
+  .requiredOption('--job <twin_job_id>', 'the twin_job_id from `biofs imaging twin`')
+  .requiredOption('--model <name>', 'merlin (change score) | vista3d (resection-bed seg) | medgemma (draft impression)')
+  .option('--hf-token <token>', 'HuggingFace token for MedGemma (gated); transient, executor-only')
+  .option('--wait', 'Wait for the GPU job to finish')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Output as JSON')
+  .action(async (options: ImagingEnrichOptions) => {
+    try {
+      await imagingEnrichCommand(options);
+    } catch (error) {
+      Logger.error(`imaging enrich failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// imaging compare — the "Image Time Machine": rigid slice-by-slice comparator of two
+// CT timepoints (A=follow-up, B=baseline aligned into A, signed diff) for the 2D
+// blink/crossfade/diff viewer. CPU job via biofs-node. --region (+ --zlo/--zhi)
+// focuses the rigid alignment on one z-band (e.g. the pelvis), still spot-safe.
+imagingCmd
+  .command('compare')
+  .description('Image Time Machine: rigid slice-by-slice comparator of two CT timepoints (CPU job via biofs-node)')
+  .requiredOption('--baseline <studyUID>', 'baseline (earlier) study UID')
+  .requiredOption('--baseline-series <uid>', 'baseline primary CT series UID')
+  .requiredOption('--followup <studyUID>', 'follow-up (later) study UID = the reference grid')
+  .requiredOption('--followup-series <uid>', 'follow-up primary CT series UID')
+  .option('--baseline-label <label>', 'short label for the baseline (e.g. jan9)')
+  .option('--followup-label <label>', 'short label for the follow-up (e.g. mar3)')
+  .option('--anatomy <name>', 'anatomy (abdomen | chest)', 'abdomen')
+  .option('--region <label>', 'focus the rigid alignment on a z-band (needs --zlo/--zhi), e.g. pelvis')
+  .option('--zlo <frac>', 'region z-fraction lower bound [0..1]')
+  .option('--zhi <frac>', 'region z-fraction upper bound [0..1]')
+  .option('--wait', 'Wait for the comparator to finish')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Output as JSON')
+  .action(async (options: ImagingCompareOptions) => {
+    try {
+      await imagingCompareCommand(options);
+    } catch (error) {
+      Logger.error(`imaging compare failed: ${error}`);
       process.exit(1);
     }
   });
@@ -1179,6 +1418,103 @@ interpretCmd
       await interpretStatusCommand(jobId, options);
     } catch (error) {
       Logger.error(`Interpretation status check failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Ancestry command group - SOMOS 24-population admixture (privacy-preserving)
+const ancestryCmd = program
+  .command('ancestry')
+  .description('SOMOS 24-population ancestry — supervised-ADMIXTURE projection, optionally encrypted (genome never decrypted)');
+
+ancestryCmd
+  .command('ingest <file>')
+  .description('Ingest a DTC genotype into the SOMOS vault and register it, yielding a biosample serial')
+  .option('--biowallet <address>', 'Data owner (custodial biowallet). Defaults to your own wallet.')
+  .option('--wait', 'Wait for registration to complete and print the serial')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Emit JSON')
+  .action(async (file: string, options: AncestryIngestOptions) => {
+    try {
+      await ancestryIngestCommand(file, options);
+    } catch (error) {
+      Logger.error(`Ancestry ingest failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+ancestryCmd
+  .command('somos <biosample_serial>')
+  .description('Compute SOMOS admixture for a genotype in the vault (default: exact projection; --encrypted: blind CKKS)')
+  .option('--encrypted', 'Tier-1 BlindDot: CKKS-encrypt the genome; server projects blind (raw genome never decrypted)')
+  .option('--fully-blind', 'Tier-2 (optional): also hide the 24-pop result from the server (bootstrapping backend)')
+  .option('--biowallet <address>', 'Data owner: file the result under this wallet, not the operator\'s')
+  .option('--wait', 'Wait for the computation to complete')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Emit JSON')
+  .action(async (biosampleSerial: string, options: AncestrySomosOptions) => {
+    try {
+      await ancestrySomosCommand(biosampleSerial, options);
+    } catch (error) {
+      Logger.error(`Ancestry submission failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+ancestryCmd
+  .command('share <biosample_serial>')
+  .description('Mint a BioCID-gated, revocable, expiring report link (no storage URL is ever created)')
+  .option('--days <n>', 'Days until the link expires (max 30)', '7')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Emit JSON')
+  .action(async (serial: string, options: AncestryShareOptions) => {
+    try {
+      await ancestryShareCommand(serial, options);
+    } catch (error) {
+      Logger.error(`Ancestry share failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+ancestryCmd
+  .command('shares')
+  .description('List BioCID-gated report shares you created or own')
+  .option('--serial <biosample_serial>', 'Filter by biosample serial')
+  .option('--json', 'Emit JSON')
+  .action(async (options: AncestrySharesOptions) => {
+    try {
+      await ancestrySharesCommand(options);
+    } catch (error) {
+      Logger.error(`Ancestry shares failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+ancestryCmd
+  .command('revoke <share_id>')
+  .description('Revoke a report share immediately (the link dies on the next view)')
+  .option('--json', 'Emit JSON')
+  .action(async (shareId: string, options: AncestryRevokeOptions) => {
+    try {
+      await ancestryRevokeCommand(shareId, options);
+    } catch (error) {
+      Logger.error(`Ancestry revoke failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+ancestryCmd
+  .command('status <ancestry_job_id>')
+  .description('Check a SOMOS ancestry job status / fetch the 24-population result')
+  .option('--watch', 'Watch mode (poll until done)')
+  .option('--wait', 'Block until the job completes')
+  .option('--max-wait-min <minutes>', 'Max minutes to wait', '40')
+  .option('--json', 'Emit JSON')
+  .action(async (jobId: string, options: AncestryStatusOptions) => {
+    try {
+      await ancestryStatusCommand(jobId, options);
+    } catch (error) {
+      Logger.error(`Ancestry status check failed: ${error}`);
       process.exit(1);
     }
   });

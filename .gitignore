@@ -41,3 +41,7 @@ opencravat_annotators_dictionary.json
 
 # macOS
 ._*
+
+# Python bytecode (imaging container runners)
+__pycache__/
+*.pyc
