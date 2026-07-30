@@ -49,12 +49,22 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Ensure npm supports OIDC trusted publishing
-        # Trusted publishing needs npm >= 11.5.1. The npm bundled with Node 20 is
-        # older, so pin forward explicitly rather than hoping the runner image is
-        # current — a stale npm fails with a confusing auth error, not a clear one.
+        # Trusted publishing needs npm >= 11.5.1, and the npm bundled with Node 20 is
+        # older, so pin forward explicitly — a stale npm fails with a confusing auth
+        # error rather than a clear one.
+        #
+        # Pinned to 11, NOT latest, for two reasons:
+        #   1. npm@latest is 12.x, whose engines are ^22.22.2 || ^24.15.0 || >=26,
+        #      so it refuses to install on Node 20 (this step failed exactly that way).
+        #   2. npm 12 is the release that flips allowScripts OFF by default, which
+        #      would change how `npm ci` resolves this dependency tree. Publishing is
+        #      not the place to absorb that.
+        # npm 11.19.0 requires ^20.17.0 || >=22.9.0 and is comfortably past 11.5.1.
         run: |
-          npm install -g npm@latest
+          npm install -g npm@11
           echo "npm $(npm --version), node $(node --version)"
+          npm --version | awk -F. '($1>11)||($1==11&&($2>5||($2==5&&$3>=1))){ok=1} END{exit ok?0:1}' \
+            || { echo "npm too old for OIDC trusted publishing" >&2; exit 1; }
 
       - name: Install dependencies
         run: npm ci
