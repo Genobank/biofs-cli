@@ -34,7 +34,29 @@ export async function umountCommand(
       throw new Error(`Mount point not found: ${mountPoint}`);
     }
 
-    // 2. Check if it's an NFS mount
+    // 2a. A consent-gated FUSE mount unmounts via fusermount3, which does not
+    // need root. Check this first: it is now the default mount method, and
+    // `umount(8)` on a FUSE mount fails with "not mounted" or a permission
+    // error, which reads as a broken tool rather than the wrong unmounter.
+    if (await checkIfFuseMount(mountPoint)) {
+      spinner.text = 'Unmounting BioFS filesystem...';
+      try {
+        await execAsync(`fusermount3 -u ${JSON.stringify(mountPoint)}`);
+      } catch {
+        // fuse2 systems, and a lazy unmount for a busy mount.
+        try {
+          await execAsync(`fusermount -u ${JSON.stringify(mountPoint)}`);
+        } catch {
+          await execAsync(`fusermount3 -uz ${JSON.stringify(mountPoint)}`);
+        }
+      }
+      spinner.succeed(`✅ Unmounted ${mountPoint}`);
+      console.log('');
+      console.log(chalk.green('✅ Unmount complete!'));
+      return;
+    }
+
+    // 2b. Check if it's an NFS mount
     const isNFS = await checkIfNFSMount(mountPoint);
 
     if (isNFS) {
@@ -113,6 +135,24 @@ export async function umountCommand(
 /**
  * Check if path is an NFS mount
  */
+/**
+ * True when `mountPoint` carries a BioFS FUSE filesystem.
+ *
+ * Matches on the fstype the driver registers (`fuse.biofs`) rather than on a
+ * marker file, so it cannot be fooled by a leftover directory.
+ */
+async function checkIfFuseMount(mountPoint: string): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync('mount');
+    const resolved = path.resolve(mountPoint);
+    return stdout
+      .split('\n')
+      .some((l) => l.includes(` ${resolved} `) && l.includes('fuse.biofs'));
+  } catch {
+    return false;
+  }
+}
+
 async function checkIfNFSMount(mountPoint: string): Promise<boolean> {
   try {
     const { stdout } = await execAsync(`mount | grep '${mountPoint}'`);

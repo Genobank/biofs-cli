@@ -1,0 +1,103 @@
+# Publish @genobank/biofs to npm via Trusted Publishing (OIDC).
+#
+# No npm token exists anywhere in this repo or in GitHub secrets. npm verifies a
+# short-lived OIDC identity token minted by GitHub for THIS repository and THIS
+# workflow filename, matched against the trusted publisher configured on the
+# package (Genobank/biofs-cli + publish.yml). A leaked secret is not possible
+# because there is no secret.
+#
+# Why this replaced a token: npm is retiring 2FA-bypass granular tokens
+# (package/account management from early Aug 2026, direct publishing ~Jan 2027).
+# A bypass token here already returned 403 on every write while reads succeeded.
+# This account's 2FA is passkey-only, so the CLI's --otp path is unavailable too.
+# OIDC sidesteps all of it and is what npm's own token form recommends.
+#
+# The workflow FILENAME is load-bearing: npm's trusted publisher is pinned to
+# `publish.yml`. Renaming this file breaks publishing until the npm config is
+# updated to match.
+
+name: publish
+
+on:
+  # Tag-driven release: push v3.17.3 and this runs.
+  push:
+    tags:
+      - 'v*'
+  # Manual release from the Actions tab, so a publish never depends on tag hygiene.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Pack and verify without publishing'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  # REQUIRED for OIDC. Without this, GitHub mints no identity token and npm
+  # rejects the publish with a credentials error that looks like a permissions bug.
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Ensure npm supports OIDC trusted publishing
+        # Trusted publishing needs npm >= 11.5.1. The npm bundled with Node 20 is
+        # older, so pin forward explicitly rather than hoping the runner image is
+        # current — a stale npm fails with a confusing auth error, not a clear one.
+        run: |
+          npm install -g npm@latest
+          echo "npm $(npm --version), node $(node --version)"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        # Runs tsc, copies the ABI/abi assets, then validate-commands.mjs, which
+        # fails the build if a command registered in src is missing from dist.
+        # That guard exists because rebuilds have previously dropped verbs
+        # (rrm, cohort, fourier-score, variants) and shipped a silently
+        # narrower CLI.
+        run: npm run build
+
+      - name: Verify the built CLI exposes its verbs
+        # Cheap smoke test against the actual compiled entrypoint. Catches a
+        # registration that compiled but did not attach to the program.
+        run: |
+          set -e
+          for verb in fluency lineage query erase claim mount; do
+            if node dist/index.js --help 2>/dev/null | grep -qE "^\s+${verb}\b"; then
+              echo "ok: ${verb}"
+            else
+              echo "MISSING VERB IN BUILT CLI: ${verb}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Confirm the tag matches package.json
+        # A tag-triggered publish whose version disagrees with package.json means
+        # someone forgot a bump; npm would publish the package.json version under a
+        # misleading tag. Fail loudly instead.
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          echo "tag=$TAG package.json=$PKG"
+          [ "$TAG" = "$PKG" ] || { echo "tag/version mismatch" >&2; exit 1; }
+
+      - name: Pack (dry run)
+        run: npm pack --dry-run
+
+      - name: Publish to npm
+        if: ${{ github.event_name == 'push' || inputs.dry_run == false }}
+        # No NODE_AUTH_TOKEN and no secrets. npm exchanges the OIDC token for
+        # short-lived publish credentials and attaches build provenance
+        # automatically, so the tarball is cryptographically linked to this run.
+        run: npm publish

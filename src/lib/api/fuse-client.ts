@@ -79,6 +79,26 @@ export interface FuseQuerySubmitResponse {
   error?: string;
 }
 
+/**
+ * Consent-gated arbitrary read-only SQL over an NFT-gated queryable-biodata
+ * sqlite. `rows` are arrays aligned to `columns` (unlike variants(), which
+ * returns dict rows). `tables` is present when the request was schema=true.
+ */
+export interface FuseQueryResponse {
+  biocid: string | null;
+  biosample: string | null;
+  job_id: string | null;
+  gs_uri: string | null;
+  columns: string[];
+  count: number;
+  truncated?: boolean;
+  elapsed_ms?: number;
+  rows: unknown[][];
+  tables?: string[];
+  methodology?: string | null;
+  error?: string;
+}
+
 export interface FuseCohortAcmgPerSerial {
   status: 'ok' | 'no_annotation' | 'failed';
   error?: string;
@@ -282,6 +302,61 @@ export class FuseAPIClient {
   }
 
   /**
+   * Consent-gated, read-only SQL query over an NFT-gated queryable-biodata
+   * sqlite (an OpenCRAVAT-annotated VCF). The agent sends a biocid (or
+   * biosample) + a single SELECT; the sqlite never leaves the prod gcsfuse
+   * mount and only result rows transit. The server enforces a SQLite authorizer
+   * (writes / ATTACH / PRAGMA-writes / extensions / multi-statement are
+   * rejected) plus a row cap and time budget. Pass `schema=true` to introspect
+   * the tables instead of running a query. This is the Phase-1 flagship of the
+   * BioFS consented query surface over queryable biodata.
+   */
+  async query(
+    ref: { biocid?: string; biosample?: string },
+    sql: string | null,
+    wallet: string,
+    signature: string,
+    opts: { schema?: boolean; rowCap?: number | string; timeoutMs?: number | string; jobId?: string } = {},
+  ): Promise<FuseQueryResponse> {
+    try {
+      const params: Record<string, string> = { wallet, signature };
+      if (ref.biocid) params.biocid = ref.biocid;
+      if (ref.biosample) params.biosample = ref.biosample;
+      if (sql) params.sql = sql;
+      if (opts.schema) params.schema = 'true';
+      if (opts.rowCap !== undefined) params.row_cap = String(opts.rowCap);
+      if (opts.timeoutMs !== undefined) params.timeout_ms = String(opts.timeoutMs);
+      if (opts.jobId) params.job_id = opts.jobId;
+      // Cold OpenCRAVAT sqlite scans over gcsfuse can take minutes; match the
+      // variants() budget so a legitimate full-table scan is not cut short.
+      const TIMEOUT_MS = 240_000;
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), TIMEOUT_MS);
+      try {
+        const response = await axios.get(`${this.baseUrl}/query`, {
+          params,
+          timeout: TIMEOUT_MS,
+          signal: controller.signal,
+        });
+        return response.data;
+      } finally {
+        clearTimeout(t);
+      }
+    } catch (error: any) {
+      if (error.code === 'ERR_CANCELED' || error.name === 'CanceledError') {
+        throw new Error('query API timeout after 240 s (server-side sqlite scan timeout)');
+      }
+      const status = error.response?.status;
+      const serverMsg = error.response?.data?.error;
+      if (status === 400) throw new Error(serverMsg || 'Query rejected (only a single read-only SELECT is allowed)');
+      if (status === 403) throw new Error(serverMsg || 'BioNFT consent / signature rejected');
+      if (status === 404) throw new Error(serverMsg || 'No queryable-biodata sqlite resolved for this biocid/biosample');
+      if (status === 503) throw new Error(serverMsg || 'Sqlite path not mounted on prod (transient — try again)');
+      throw new Error(`query API failed: ${serverMsg || error.message}`);
+    }
+  }
+
+  /**
    * Genomi -> biofs Campaign A: submit a variants query as a background job.
    * Returns {query_job_id, status:'in_progress'} in <1s so the cold 462MB-sqlite
    * scan never blocks a request past Cloudflare's ~100s edge (the 524). If the
@@ -379,6 +454,117 @@ export class FuseAPIClient {
       if (Date.now() - start > 60_000) intervalMs = 15_000;
     }
     throw new Error(`variants query timed out after ${Math.round(MAX_MS / 60_000)} min (job ${qid})`);
+  }
+
+  /**
+   * Submit an arbitrary read-only SQL query as a background job — the heavy-path
+   * counterpart to query(). A cold full-table scan over the gcsfuse-mounted
+   * sqlite can exceed the synchronous 60 s ceiling; the async worker runs it with
+   * a larger (still bounded) budget. Authorization (owner/custodian or active
+   * BioNFT consent) is enforced at submit. Returns {query_job_id,status} or
+   * {fallback:true} when the prod analyzer lacks the async query verb (404/501).
+   */
+  async querySqlSubmit(
+    ref: { biocid?: string; biosample?: string },
+    sql: string | null,
+    wallet: string,
+    signature: string,
+    opts: { schema?: boolean; rowCap?: number | string; timeoutMs?: number | string; jobId?: string } = {},
+  ): Promise<FuseQuerySubmitResponse> {
+    const params: Record<string, string> = { verb: 'query', wallet, signature };
+    if (ref.biocid) params.biocid = ref.biocid;
+    if (ref.biosample) params.biosample = ref.biosample;
+    if (sql) params.sql = sql;
+    if (opts.schema) params.schema = 'true';
+    if (opts.rowCap !== undefined) params.row_cap = String(opts.rowCap);
+    if (opts.timeoutMs !== undefined) params.timeout_ms = String(opts.timeoutMs);
+    if (opts.jobId) params.job_id = opts.jobId;
+    try {
+      const r = await axios.get(`${this.baseUrl}/query_submit`, { params, timeout: 30_000 });
+      return r.data as FuseQuerySubmitResponse;
+    } catch (error: any) {
+      const status = error.response?.status;
+      const serverMsg = error.response?.data?.error;
+      if (status === 404 || status === 501) return { fallback: true };
+      if (status === 400) throw new Error(serverMsg || 'Query rejected (only a single read-only SELECT is allowed)');
+      if (status === 403) throw new Error(serverMsg || 'Not authorized (owner/custodian or active BioNFT consent required)');
+      throw new Error(`query_submit (sql) failed: ${serverMsg || error.message}`);
+    }
+  }
+
+  /**
+   * Arbitrary SQL via submit-then-poll (the heavy path, for cold full-table
+   * scans). Automatically falls back to the synchronous query() when the prod
+   * analyzer has no async query verb. Each network call is fast, so the scan can
+   * run as long as it needs without a Cloudflare gateway timeout.
+   */
+  async querySqlPolled(
+    ref: { biocid?: string; biosample?: string },
+    sql: string | null,
+    wallet: string,
+    signature: string,
+    opts: { schema?: boolean; rowCap?: number | string; timeoutMs?: number | string; jobId?: string } = {},
+    onProgress?: (elapsedSec: number, status: string) => void,
+  ): Promise<FuseQueryResponse> {
+    const sub = await this.querySqlSubmit(ref, sql, wallet, signature, opts);
+    if (sub.fallback || !sub.query_job_id) {
+      return this.query(ref, sql, wallet, signature, opts);
+    }
+    const qid = sub.query_job_id;
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const start = Date.now();
+    const MAX_MS = 20 * 60_000;
+    let intervalMs = 4_000;
+    if (sub.status === 'done') {
+      const st0 = await this.queryStatus(qid, wallet, signature);
+      if (st0.status === 'done') return st0 as FuseQueryResponse;
+    }
+    while (Date.now() - start < MAX_MS) {
+      await sleep(intervalMs);
+      let st: Record<string, any>;
+      try {
+        st = await this.queryStatus(qid, wallet, signature);
+      } catch (e: any) {
+        if (e.response?.status === 404) throw new Error(`query job ${qid} not found`);
+        continue;
+      }
+      const elapsed = Math.round((Date.now() - start) / 1000);
+      if (st.status === 'done') return st as FuseQueryResponse;
+      if (st.status === 'failed' || st.status === 'failed:stalled') {
+        throw new Error(st.error || 'query failed');
+      }
+      if (onProgress) onProgress(elapsed, String(st.status || 'in_progress'));
+      if (Date.now() - start > 60_000) intervalMs = 10_000;
+    }
+    throw new Error(`SQL query timed out after ${Math.round(MAX_MS / 60_000)} min (job ${qid})`);
+  }
+
+  /**
+   * GDPR Art. 17 erasure. Dry run by default: the server enumerates what would
+   * be destroyed and changes nothing. Executing additionally requires the typed
+   * confirm token, because it is irreversible. Long timeout: deleting many GCS
+   * objects is slow, and the saga is resumable if the connection drops.
+   */
+  async erase(
+    opts: { biosample?: string; dryRun?: boolean; confirm?: string; erasureId?: string },
+    wallet: string,
+    signature: string,
+  ): Promise<Record<string, any>> {
+    const params: Record<string, string> = { wallet, signature };
+    if (opts.biosample) params.biosample = opts.biosample;
+    if (opts.erasureId) params.erasure_id = opts.erasureId;
+    if (opts.confirm) params.confirm = opts.confirm;
+    params.dry_run = opts.dryRun === false ? 'false' : 'true';
+    try {
+      const r = await axios.get(`${this.baseUrl}/erase`, { params, timeout: 600_000 });
+      return r.data;
+    } catch (error: any) {
+      const status = error.response?.status;
+      const msg = error.response?.data?.error;
+      if (status === 403) throw new Error(msg || 'Not authorized: only an owner/custodian may erase this biosample');
+      if (status === 400) throw new Error(msg || 'Erasure rejected (confirmation required)');
+      throw new Error(`erase failed: ${msg || error.message}`);
+    }
   }
 
   /**

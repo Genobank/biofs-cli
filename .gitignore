@@ -44,3 +44,6 @@ opencravat_annotators_dictionary.json
 # Python bytecode (imaging container runners)
 __pycache__/
 *.pyc
+
+# Internal security audits — never commit to a PUBLIC repo
+SECURITY_AUDIT_*.md

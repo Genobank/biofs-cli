@@ -26,21 +26,186 @@ export interface MountOptions {
   readOnly?: boolean;
   quiet?: boolean;
   skipConsent?: boolean;
-  method?: 'copy' | 'nfs'; // Mount method
+  method?: 'copy' | 'nfs' | 'fuse'; // Mount method
   biocid?: string;          // Optional: specific BioCID to mount
   port?: number;            // NFS server port
+  consentTtl?: number;      // seconds before the driver re-verifies consent
+  apiUrl?: string;          // gateway base URL
+  allowOther?: boolean;     // expose the mount to other local users
+  foreground?: boolean;     // run in the foreground (debugging)
 }
 
+/**
+ * `biofs mount`
+ *
+ *   biofs mount <biosample> <mount_point>   consent-gated FUSE mount (default)
+ *   biofs mount <directory>                 legacy: copy granted files locally
+ *
+ * The two-argument form is the real one: it mounts a biosample as a read-only
+ * filesystem where EVERY read is re-authorized server-side against the BioNFT
+ * consent grant, so a patient's revocation reaches an already-mounted
+ * filesystem within one consent-TTL window.
+ */
 export async function mountCommand(
-  mountPoint: string,
+  target: string,
+  mountPoint?: string,
   options: MountOptions = {}
 ): Promise<void> {
-  const method = options.method || 'copy';
+  // Two positionals => the caller named a biosample and where to mount it.
+  if (mountPoint) {
+    if (options.method === 'nfs') return mountViaNFS(mountPoint, options);
+    return mountViaFuse(target, mountPoint, options);
+  }
+  // One positional => the legacy copy-into-a-directory behaviour.
+  if (options.method === 'nfs') return mountViaNFS(target, options);
+  return mountViaCopy(target, options);
+}
 
-  if (method === 'nfs') {
-    return mountViaNFS(mountPoint, options);
-  } else {
-    return mountViaCopy(mountPoint, options);
+/**
+ * Mount a biosample as a consent-gated read-only filesystem (biofs-fuse).
+ *
+ * Replaces the `bionfs` path, which gated on Story Protocol licences rather
+ * than the Sequentia BioNFT consent the rest of the protocol enforces, and
+ * which required a Go binary that is not distributed.
+ */
+async function mountViaFuse(
+  biosample: string,
+  mountPoint: string,
+  options: MountOptions
+): Promise<void> {
+  const spinner = ora(`Verifying consent for ${biosample}...`).start();
+
+  try {
+    const credManager = CredentialsManager.getInstance();
+    const creds = await credManager.loadCredentials();
+    if (!creds) {
+      spinner.fail('Not authenticated');
+      throw new Error('Not authenticated. Please run: biofs login');
+    }
+    const { wallet_address: wallet, user_signature: signature } = creds;
+
+    // Locate the driver.
+    const driver = process.env.BIOFS_FUSE_BIN || 'biofs-fuse';
+    try {
+      await execAsync(`which ${driver}`);
+    } catch {
+      spinner.fail('biofs-fuse driver not found');
+      console.log('');
+      console.log(chalk.yellow('The BioFS FUSE driver is not installed.'));
+      console.log('');
+      console.log(chalk.bold('Install:'));
+      console.log(chalk.gray('  sudo apt-get install -y fuse3 libfuse3-dev pkg-config'));
+      console.log(chalk.gray('  cargo build --release   # in the biofs-fuse repo'));
+      console.log(chalk.gray('  sudo install -m0755 target/release/biofs-fuse /usr/local/bin/'));
+      console.log('');
+      console.log(chalk.gray('Or set BIOFS_FUSE_BIN to its path.'));
+      throw new Error('biofs-fuse not installed');
+    }
+
+    // A driver that died leaves the kernel mount in place but disconnected.
+    // Every syscall on that path then fails with ENOTCONN, which surfaces as
+    // ECONNREFUSED from Node and makes even mkdir/rm fail -- confusing, and
+    // it blocks a retry. Clear it before doing anything else.
+    try {
+      const { stdout } = await execAsync(`stat -c %i ${JSON.stringify(mountPoint)} 2>&1 || true`);
+      if (/Transport endpoint is not connected|Connection refused|ENOTCONN/i.test(stdout)) {
+        await execAsync(`fusermount3 -uz ${JSON.stringify(mountPoint)} 2>/dev/null || true`);
+      }
+    } catch {
+      await execAsync(`fusermount3 -uz ${JSON.stringify(mountPoint)} 2>/dev/null || true`).catch(() => {});
+    }
+
+    await fs.ensureDir(mountPoint);
+    const existing = await fs.readdir(mountPoint);
+    if (existing.length > 0) {
+      spinner.fail(`Mount point is not empty: ${mountPoint}`);
+      throw new Error(`Refusing to mount over a non-empty directory: ${mountPoint}`);
+    }
+
+    const apiUrl = options.apiUrl || process.env.GENOBANK_API_BASE || 'https://genobank.app';
+    const ttl = String(options.consentTtl ?? 30);
+
+    const args = [
+      biosample,
+      mountPoint,
+      '--wallet', wallet,
+      '--api-url', apiUrl,
+      '--consent-ttl-secs', ttl,
+    ];
+    if (options.allowOther) args.push('--allow-other');
+    if (options.foreground) args.push('--foreground');
+
+    spinner.text = `Mounting ${biosample} at ${mountPoint}...`;
+
+    // SECURITY: the signature is a 30-day bearer credential. Passing it in
+    // argv (as the old NFS path did) publishes it to every local user via
+    // `ps` for the whole life of a long-running mount. The driver reads
+    // BIOFS_SIGNATURE from the environment, which is not world-readable.
+    const child = spawn(driver, args, {
+      detached: !options.foreground,
+      stdio: options.foreground ? 'inherit' : 'ignore',
+      env: { ...process.env, BIOFS_SIGNATURE: signature },
+    });
+
+    if (options.foreground) {
+      spinner.stop();
+      await new Promise<void>((resolve, reject) => {
+        child.on('exit', (code) => (code === 0 ? resolve() : reject(
+          new Error(`biofs-fuse exited with code ${code}`))));
+        child.on('error', reject);
+      });
+      return;
+    }
+
+    child.unref();
+    // Give the driver time to verify consent and hand the mount to the kernel.
+    await new Promise((r) => setTimeout(r, 3000));
+
+    const mounted = await isMounted(mountPoint);
+    if (!mounted) {
+      spinner.fail('Mount did not come up');
+      console.log('');
+      console.log(chalk.gray('The driver exited before the filesystem appeared. Common causes:'));
+      console.log(chalk.gray('  • no active BioNFT consent for this wallet on this biosample'));
+      console.log(chalk.gray('  • the biosample serial does not resolve to a file'));
+      console.log(chalk.gray(`  • run with --foreground to see the driver's output`));
+      throw new Error('mount failed');
+    }
+
+    spinner.succeed(`Mounted ${biosample} at ${mountPoint}`);
+    console.log('');
+    try {
+      for (const f of await fs.readdir(mountPoint)) {
+        const marker = f.startsWith('.') ? chalk.gray('·') : chalk.green('✓');
+        console.log(`  ${marker} ${f}`);
+      }
+    } catch { /* listing is best-effort */ }
+    console.log('');
+    console.log(chalk.gray(`  Consent is re-checked every ${ttl}s and on every open().`));
+    console.log(chalk.gray(`  If the owner revokes, reads fail with Permission denied.`));
+    console.log(chalk.gray(`  Unmount: biofs umount ${mountPoint}`));
+  } catch (error: any) {
+    if (spinner.isSpinning) spinner.fail('Mount failed');
+    try {
+      const creds = await CredentialsManager.getInstance().loadCredentials();
+      await ErrorReporter.report('mount', error, creds?.wallet_address, {
+        method: 'fuse',
+        biosample,
+        mount_point: mountPoint,
+      });
+    } catch { /* telemetry must never mask the real error */ }
+    throw error;
+  }
+}
+
+/** True if `mountPoint` currently carries a mounted filesystem. */
+async function isMounted(mountPoint: string): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync(`mount`);
+    const resolved = path.resolve(mountPoint);
+    return stdout.split('\n').some((l) => l.includes(` ${resolved} `));
+  } catch {
+    return false;
   }
 }
 
