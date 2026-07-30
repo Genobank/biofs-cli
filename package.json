@@ -1,6 +1,6 @@
 {
   "name": "@genobank/biofs",
-  "version": "3.15.0",
+  "version": "3.17.3",
   "description": "BioFS - GenoBank.io BioNFT-Gated Filesystem CLI with Sequentia Protocol (BioCIDRegistry, ConsentManager, BioPIL) - 97% cost savings vs Story Protocol",
   "main": "dist/index.js",
   "bin": {
@@ -16,7 +16,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/genobank-io/biofs-cli"
+    "url": "git+https://github.com/Genobank/biofs-cli.git"
   },
   "bugs": {
     "url": "mailto:security@genobank.io"

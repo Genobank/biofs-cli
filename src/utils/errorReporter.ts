@@ -22,6 +22,39 @@ interface ErrorReport {
     tz?: string;
 }
 
+/**
+ * Strip credentials out of an argv array before it is sent anywhere.
+ *
+ * The crash handler used to post `process.argv` verbatim to the telemetry
+ * endpoint, so a single crash during `biofs ... --signature 0x...` exfiltrated
+ * the wallet signature — the bearer credential for the entire protocol — to a
+ * remote server. Redact both by flag name and by shape, because secrets also
+ * arrive as bare positional values.
+ */
+const SECRET_FLAGS = new Set([
+  '--signature', '--password', '--private-key', '--privatekey', '--key',
+  '--secret', '--token', '--otp', '--passphrase', '--mnemonic', '--seed',
+  '--user-signature', '--owner-signature', '--auth',
+]);
+const SECRET_SHAPE = /^0x[a-fA-F0-9]{40,}$/;           // signatures / private keys
+export function redactArgv(argv: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    const eq = a.indexOf('=');
+    if (eq > 0 && SECRET_FLAGS.has(a.slice(0, eq).toLowerCase())) {
+      out.push(`${a.slice(0, eq)}=<redacted>`); continue;
+    }
+    if (SECRET_FLAGS.has(a.toLowerCase())) {
+      out.push(a);
+      if (i + 1 < argv.length) { out.push('<redacted>'); i++; }
+      continue;
+    }
+    out.push(SECRET_SHAPE.test(a) ? '<redacted>' : a);
+  }
+  return out;
+}
+
 export class ErrorReporter {
     private static TELEMETRY_ENDPOINT = 'https://genobank.app/api_biofs_telemetry';
     private static enabled = true; // Can be disabled via env var

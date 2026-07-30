@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
+// FLUENCY_LINEAGE_VERBS_20260730
+import { fluencyBuildCommand, fluencyStateCommand } from './commands/fluency';
+import { lineageCommand } from './commands/lineage';
 import { BIOFS_VERSION } from './version';
 import chalk from 'chalk';
 import { loginCommand, LoginOptions } from './commands/login';
@@ -140,6 +143,8 @@ import { paymentHistoryCommand, PaymentHistoryOptions } from './commands/payment
 import { X402Network } from './types/x402';
 import { resolveCommand, ResolveOptions } from './commands/resolve';
 import { variantsCommand, VariantsOptions } from './commands/variants';
+import { queryCommand, QueryOptions } from './commands/query';
+import { eraseCommand, EraseOptions } from './commands/erase';
 import { fourierScoreCommand, FourierScoreOptions } from './commands/fourier-score';
 import { rrmConsensusCommand, RrmConsensusOptions } from './commands/rrm-consensus';
 import { psmConsensusCommand, PsmConsensusOptions } from './commands/psm-consensus';
@@ -173,6 +178,7 @@ import { claimCommand, ClaimOptions } from './commands/claim';
 import { fingerprintCommand, FingerprintOptions } from './commands/fingerprint';
 import { researcherRegisterCommand, ResearcherRegisterOptions } from './commands/researcher/register';
 import { researcherStatusCommand, ResearcherStatusOptions } from './commands/researcher/status';
+import { redactArgv } from './utils/errorReporter';
 import { Logger } from './lib/utils/logger';
 import { ErrorReporter } from './utils/errorReporter';
 import { CredentialsManager } from './lib/auth/credentials';
@@ -186,19 +192,19 @@ async function reportAndExit(command: string, err: any, code: number): Promise<n
   try {
     const creds = await CredentialsManager.getInstance().loadCredentials().catch(() => null);
     const error = err instanceof Error ? err : new Error(String(err));
-    await ErrorReporter.report(command, error, creds?.wallet_address, { argv: process.argv.slice(2) });
+    await ErrorReporter.report(command, error, creds?.wallet_address, { argv: redactArgv(process.argv.slice(2)) });
   } catch { /* telemetry failure must never block exit */ }
   process.exit(code);
 }
 
 process.on('uncaughtException', (err) => {
   Logger.error(`Uncaught: ${err?.message || err}`);
-  reportAndExit(process.argv.slice(2).join(' ') || 'unknown', err, 1);
+  reportAndExit(redactArgv(process.argv.slice(2)).join(' ') || 'unknown', err, 1);
 });
 
 process.on('unhandledRejection', (reason) => {
   Logger.error(`UnhandledRejection: ${(reason as any)?.message || reason}`);
-  reportAndExit(process.argv.slice(2).join(' ') || 'unknown', reason, 1);
+  reportAndExit(redactArgv(process.argv.slice(2)).join(' ') || 'unknown', reason, 1);
 });
 
 // Set up the CLI
@@ -345,17 +351,30 @@ program
 
 // Mount command (mount all granted BioFiles with GDPR consent)
 program
-  .command('mount <mount_point>')
-  .description('Mount BioFiles as filesystem (NFS or copy method)')
-  .option('--method <type>', 'Mount method: nfs (true filesystem) or copy (download files)', 'copy')
-  .option('--biocid <biocid>', 'Mount specific BioCID (biocid://OWNER/bioip/IP_ID)')
-  .option('--port <number>', 'NFS server port (default: 2049)', parseInt)
+  .command('mount <target> [mount_point]')
+  .description('Mount a biosample as a consent-gated read-only filesystem')
+  .addHelpText('after', `
+Examples:
+  biofs mount DNA_TN25-336147.vcf /mnt/study     mount one biosample (FUSE)
+  biofs mount TN25-336147 /mnt/study             the bare serial also resolves
+  biofs mount ./my-files                         legacy: copy granted files here
+
+Every read is re-authorized server-side against the BioNFT consent grant on
+Sequentia. If the owner revokes, reads on the already-mounted filesystem begin
+failing with Permission denied, without unmounting.`)
+  .option('--method <type>', 'fuse (consent-gated filesystem, default), copy, or nfs (legacy)', 'fuse')
+  .option('--biocid <biocid>', 'Mount specific BioCID (copy method)')
+  .option('--port <number>', 'NFS server port (legacy nfs method)', parseInt)
+  .option('--api-url <url>', 'Gateway base URL (default: https://genobank.app)')
+  .option('--consent-ttl <seconds>', 'Seconds before the driver re-verifies consent', parseInt)
+  .option('--allow-other', 'Let other local users read the mount (needs user_allow_other)')
+  .option('--foreground', 'Run in the foreground and stream driver logs')
   .option('--read-only', 'Mount as read-only')
   .option('--quiet', 'Suppress output')
   .option('--skip-consent', 'Skip GDPR consent (for automation)')
-  .action(async (mountPoint: string, options: MountOptions) => {
+  .action(async (target: string, mountPoint: string | undefined, options: MountOptions) => {
     try {
-      await mountCommand(mountPoint, options);
+      await mountCommand(target, mountPoint, options);
     } catch (error) {
       Logger.error(`Mount failed: ${error}`);
       process.exit(1);
@@ -3164,6 +3183,46 @@ program
     }
   });
 
+// Query — the consented query surface over QUERYABLE biodata (Phase-1 flagship).
+// Run a read-only SELECT server-side against an NFT-gated OpenCRAVAT sqlite,
+// addressed by biocid or biosample. Opaque biodata (FASTQ/BAM) is NOT queryable
+// and is served by `biofs mount`/`stream` instead.
+program
+  .command('erase [biosample]')
+  .description('GDPR Art.17 erasure — destroy a biosample\'s bytes, registry rows and derived copies (DRY RUN by default)')
+  .option('--execute', 'Actually perform the erasure (irreversible; prompts for confirmation)')
+  .option('--resume <erasure_id>', 'Resume an interrupted erasure saga')
+  .option('--yes', 'Skip the interactive confirmation prompt (use with care)')
+  .option('--json', 'JSON output for the dry-run plan')
+  .action(async (biosample: string | undefined, options: EraseOptions) => {
+    try {
+      await eraseCommand(biosample, options);
+    } catch (error) {
+      Logger.error(`Erase failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('query <target> [sql]')
+  .description('Consent-gated read-only SQL over a queryable-biodata sqlite (biocid or biosample); the sqlite never leaves prod, only rows transit')
+  .option('--schema', 'List the tables in the annotated sqlite instead of running a query')
+  .option('--format <type>', 'Output format: table | tsv | csv | json (default: table)', 'table')
+  .option('--output <path>', 'Write output to a file instead of stdout')
+  .option('--row-cap <n>', 'Cap rows returned by the server (default 10000, max 100000)')
+  .option('--timeout-ms <n>', 'Server-side query time budget in ms (default 30000)')
+  .option('--job-id <timestamp>', 'Pick a specific OC job timestamp when multiple sqlites exist')
+  .option('--async', 'Run as a background job (submit-then-poll) for heavy full-table scans that exceed the 60s sync limit')
+  .option('--quiet', 'Suppress progress output')
+  .action(async (target: string, sql: string | undefined, options: QueryOptions) => {
+    try {
+      await queryCommand(target, sql, options);
+    } catch (error) {
+      Logger.error(`Query failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
 // Variants — query annotated variants from the latest OpenCRAVAT sqlite
 program
   .command('variants <biosample_serial>')
@@ -3374,6 +3433,37 @@ program
     }
   });
 
+// FLUENCY_LINEAGE_VERBS_20260730: make a genomics store AI-conversable, and report the metamorphosis.
+// Registered with the other groups, BEFORE the welcome banner and program.parse().
+const fluencyCmd = program
+  .command('fluency')
+  .description('Make a genomics store AI-conversable: precompute per-contig coverage + per-gene rollups (dispatched through biofs-node)');
+fluencyCmd
+  .command('build <biocid>')
+  .description('Build (or adopt) the fluency artifact. Idempotent; the derivative is registered to the data owner with parent lineage')
+  .option('--json', 'Emit JSON')
+  .option('--quiet', 'Suppress progress')
+  .action(async (biocid: string, options: { json?: boolean; quiet?: boolean }) => {
+    try { await fluencyBuildCommand(biocid, options); } catch (error) { Logger.error(`fluency build failed: ${error}`); process.exit(1); }
+  });
+fluencyCmd
+  .command('state <biocid>')
+  .description('Report whether a store is fluent (fresh / building / absent) and what it covers')
+  .option('--json', 'Emit JSON')
+  .option('--quiet', 'Suppress progress')
+  .action(async (biocid: string, options: { json?: boolean; quiet?: boolean }) => {
+    try { await fluencyStateCommand(biocid, options); } catch (error) { Logger.error(`fluency state failed: ${error}`); process.exit(1); }
+  });
+
+program
+  .command('lineage <biocid>')
+  .description('Report the biodata metamorphosis: what this was derived from, what came from it, who owns each piece, and what erases with what')
+  .option('--json', 'Emit JSON')
+  .option('--quiet', 'Suppress progress')
+  .action(async (biocid: string, options: { json?: boolean; quiet?: boolean }) => {
+    try { await lineageCommand(biocid, options); } catch (error) { Logger.error(`lineage failed: ${error}`); process.exit(1); }
+  });
+
 // Show welcome message if no command
 if (process.argv.length === 2) {
   console.log(chalk.cyan('\n╔═════════════════════════════════════════════╗'));
@@ -3390,6 +3480,8 @@ if (process.argv.length === 2) {
   console.log(`  ${chalk.green('biofiles')}    - List your BioFiles (all sources)`);
   console.log(`  ${chalk.green('download')}    - Download files (GDPR consent)`);
   console.log(`  ${chalk.green('mount')}       - Mount all files (GDPR consent)`);
+  console.log(`  ${chalk.green('fluency')}     - Make a store AI-conversable (coverage + per-gene rollups)`);
+  console.log(`  ${chalk.green('lineage')}     - Biodata metamorphosis: parents, derivatives, owners`);
   console.log(`  ${chalk.green('mount-remote')} - Mount biosample on agent`);
   console.log(`  ${chalk.green('upload')}      - Upload files`);
   console.log(`  ${chalk.green('tokenize')}    - Tokenize genomic data as BioNFT`);
