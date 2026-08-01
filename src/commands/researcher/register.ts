@@ -3,6 +3,7 @@ import { BrowserLauncher } from '../../lib/auth/browser';
 import { CredentialsManager } from '../../lib/auth/credentials';
 import { Logger } from '../../lib/utils/logger';
 import { CONFIG } from '../../lib/config/constants';
+import { ConfigPaths } from '../../lib/config/paths';
 import { BioFilesCacheManager } from '../../lib/storage/biofiles-cache';
 import { BioCIDResolver } from '../../lib/biofiles/resolver';
 import { ErrorReporter } from '../../utils/errorReporter';
@@ -32,7 +33,8 @@ export interface ResearcherProfile {
 const RESEARCHER_PROFILE_FILE = 'researcher.json';
 
 function getResearcherProfilePath(): string {
-  return path.join(CONFIG.HOME_DIR, CONFIG.CONFIG_DIR_NAME, RESEARCHER_PROFILE_FILE);
+  // Profile-aware: ~/.biofs/profiles/<BIOFS_PROFILE>/researcher.json when set
+  return path.join(ConfigPaths.getInstance().getConfigDir(), RESEARCHER_PROFILE_FILE);
 }
 
 export async function loadResearcherProfile(): Promise<ResearcherProfile | null> {
@@ -229,7 +231,7 @@ async function fetchAndSaveResearcherProfile(wallet: string): Promise<Researcher
     registered_at: new Date().toISOString()
   };
 
-  await fs.ensureDir(path.join(CONFIG.HOME_DIR, CONFIG.CONFIG_DIR_NAME));
+  await ConfigPaths.getInstance().ensureDirectories();
   await fs.writeJson(getResearcherProfilePath(), profile, { spaces: 2 });
   return profile;
 }

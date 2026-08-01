@@ -3,7 +3,18 @@
 import { Command } from 'commander';
 // FLUENCY_LINEAGE_VERBS_20260730
 import { fluencyBuildCommand, fluencyStateCommand } from './commands/fluency';
+// CONSENT_VERBS_20260730
+import { consentPayloadCommand, consentSubmitCommand } from './commands/consent';
 import { lineageCommand } from './commands/lineage';
+// BIODATA_ROOM_20260801: dual profiles + researcher biodata room
+import {
+  profileListCommand, profileUseCommand, profileStatusCommand, ProfileOptions,
+} from './commands/profile';
+import {
+  roomCreateCommand, roomRequestCommand, roomStatusCommand, roomAdmitCommand,
+  roomRevokeCommand, roomListCommand, roomEnterCommand, roomLeaveCommand,
+  roomFilesCommand, roomSigningUrlCommand, RoomOptions,
+} from './commands/room';
 import { BIOFS_VERSION } from './version';
 import chalk from 'chalk';
 import { loginCommand, LoginOptions } from './commands/login';
@@ -45,10 +56,33 @@ import { jobResultsCommand, JobResultsOptions } from './commands/job/results';
 import { jobListCommand, JobListOptions } from './commands/job/list';
 import { pipelinesCommand, PipelinesOptions } from './commands/job/pipelines';
 // v2.7.0: htsget + smart streaming + aliases
+// v3.18.0: TeleBioinformatics (`biofs tele`) + region stream
 import { streamCommand, StreamOptions } from './commands/stream';
 import { pipeCommand, PipeOptions } from './commands/pipe';
 import { aliasCommand, AliasOptions } from './commands/alias';
 import { htsgetServiceInfoCommand, htsgetTicketCommand } from './commands/htsget';
+import {
+  teleToolsCommand,
+  teleStatsCommand,
+  teleHeaderCommand,
+  teleFlagstatCommand,
+  teleCountCommand,
+  teleRegionCommand,
+  teleQueryCommand,
+  teleFilterCommand,
+  teleViewCommand,
+  teleSeqkitCommand,
+  teleSeqtkCommand,
+  teleBedtoolsCommand,
+  teleVtCommand,
+  teleMosdepthCommand,
+  teleIgvCommand,
+  teleJupyterCommand,
+  telePysamCommand,
+  teleStreamCommand,
+  teleTicketCommand,
+  TeleCommonCli,
+} from './commands/tele';
 import { submitClaraCommand, ClaraJobOptions } from './commands/job/submit-clara';
 import { recallCommand, RecallOptions } from './commands/job/recall';
 import { contextCreateCommand, ContextCreateOptions } from './commands/context/create';
@@ -178,6 +212,11 @@ import { claimCommand, ClaimOptions } from './commands/claim';
 import { fingerprintCommand, FingerprintOptions } from './commands/fingerprint';
 import { researcherRegisterCommand, ResearcherRegisterOptions } from './commands/researcher/register';
 import { researcherStatusCommand, ResearcherStatusOptions } from './commands/researcher/status';
+import {
+  researcherPassportPublishCommand,
+  researcherPassportShowCommand,
+  PassportOptions,
+} from './commands/researcher/passport';
 import { redactArgv } from './utils/errorReporter';
 import { Logger } from './lib/utils/logger';
 import { ErrorReporter } from './utils/errorReporter';
@@ -498,10 +537,15 @@ program
 // stream - htsget stream to stdout (pipes into any bioinformatics tool)
 program
   .command('stream <id>')
-  .description('Stream a BioNFT-gated VCF/BAM to stdout via htsget (pipe into bcftools/samtools/pysam)')
+  .description('Stream a BioNFT-gated VCF/BAM/CRAM/FASTQ to stdout via htsget (pipe into bcftools/samtools/pysam/seqkit)')
   .option('--kind <variants|reads>', 'force datatype (default: auto-detect from filename)')
   .option('--htsget-url <url>', 'override htsget endpoint (default: https://htsget.genobank.app)')
   .option('--annotated', 'stream the OpenCRAVAT-annotated VCF sibling (Phase D) instead of raw')
+  .option('--region <chr:start-end>', 'genomic region (forwarded to htsget; client tools may also filter)')
+  .option('--referenceName <chr>', 'htsget referenceName (alias of region chrom)')
+  .option('--start <n>', 'htsget start (0-based if set with --referenceName)')
+  .option('--end <n>', 'htsget end')
+  .option('--raw', 'treat as raw byte stream (still via htsget inventory)')
   .option('-q, --quiet', 'suppress info messages')
   .action(async (id: string, options: StreamOptions) => {
     try {
@@ -512,18 +556,20 @@ program
     }
   });
 
-// pipe - auto-pipe htsget stream into bcftools/samtools view
+// pipe - auto-pipe htsget stream into bcftools/samtools/seqkit
 // (distinct from the existing `view` command, which prints file content)
 program
   .command('pipe <id>')
-  .description('Pipe a BioIP stream into bcftools view (VCF) or samtools view (BAM) automatically')
-  .option('--tool <bcftools|samtools>', 'force tool (default: auto-detect from filename)')
+  .description('Pipe a BioIP stream into bcftools view (VCF), samtools view (BAM), or seqkit stats (FASTQ)')
+  .option('--tool <bcftools|samtools|seqkit>', 'force tool (default: auto-detect from filename)')
   .option('--htsget-url <url>', 'override htsget endpoint')
+  .option('--region <chr:start-end>', 'genomic region forwarded to htsget')
+  .option('--annotated', 'prefer OpenCRAVAT-annotated VCF sibling')
   .option('-q, --quiet', 'suppress info messages')
   .allowUnknownOption(true)
   .action(async (id: string, options: PipeOptions, cmd: any) => {
     try {
-      // Everything after `--` is passed through to bcftools/samtools view
+      // Everything after `--` is passed through to the tool
       const extra = cmd.args.slice(cmd.args.indexOf(id) + 1);
       await pipeCommand(id, { ...options, extra });
     } catch (error: any) {
@@ -531,6 +577,293 @@ program
       process.exit(6);
     }
   });
+
+// ========================================================================
+// v3.18.0 — TeleBioinformatics (`biofs tele`)
+// Consent-gated htsget → local tools (Tier A) + IGV/Jupyter (Tier B).
+// Heavy calling/annotation remains Tier C (annotate / job / skills).
+// ========================================================================
+const teleCmd = program
+  .command('tele')
+  .description('TeleBioinformatics: consent-gated streams into local tools (stats, IGV, jupyter, …)');
+
+function teleCommon(cmd: any) {
+  return cmd
+    .option('--kind <variants|reads>', 'force htsget datatype')
+    .option('--htsget-url <url>', 'override htsget endpoint')
+    .option('--region <chr:start-end>', 'genomic region')
+    .option('--annotated', 'OpenCRAVAT-annotated VCF sibling when available')
+    .option('-q, --quiet', 'suppress progress on stderr')
+    .option('--json', 'JSON output where supported');
+}
+
+teleCommon(
+  teleCmd
+    .command('tools')
+    .description('Catalog of TeleBioinformatics tools and tiers (A stream / B fuse / C server)'),
+).action(async (options: TeleCommonCli) => {
+  try {
+    await teleToolsCommand(options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('stats <id>')
+    .description('bcftools stats | samtools stats | seqkit stats (auto by filetype)'),
+).action(async (id: string, options: TeleCommonCli) => {
+  try {
+    await teleStatsCommand(id, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('header <id>')
+    .description('VCF/BAM header only (bcftools view -h | samtools view -H)'),
+).action(async (id: string, options: TeleCommonCli) => {
+  try {
+    await teleHeaderCommand(id, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('flagstat <id>')
+    .description('samtools flagstat on a streamed BAM/CRAM'),
+).action(async (id: string, options: TeleCommonCli) => {
+  try {
+    await teleFlagstatCommand(id, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('count <id>')
+    .description('Count variants (bcftools) or reads (samtools view -c)'),
+).action(async (id: string, options: TeleCommonCli) => {
+  try {
+    await teleCountCommand(id, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('region <id> <region>')
+    .description('Stream a genomic region (chr:start-end) via htsget + tool filter'),
+).action(async (id: string, region: string, options: TeleCommonCli) => {
+  try {
+    await teleRegionCommand(id, region, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('query <id>')
+    .description('bcftools query (pass -f after --)')
+    .option('--format <fmt>', 'bcftools -f format string')
+    .allowUnknownOption(true),
+).action(async (id: string, options: TeleCommonCli, cmd: any) => {
+  try {
+    const extra = cmd.args.slice(cmd.args.indexOf(id) + 1);
+    await teleQueryCommand(id, extra, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('filter <id>')
+    .description('bcftools view with -i/-e filters')
+    .option('--include <expr>', 'bcftools -i expression')
+    .option('--exclude <expr>', 'bcftools -e expression')
+    .allowUnknownOption(true),
+).action(async (id: string, options: TeleCommonCli, cmd: any) => {
+  try {
+    const extra = cmd.args.slice(cmd.args.indexOf(id) + 1);
+    await teleFilterCommand(id, extra, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('view <id>')
+    .description('Generic bcftools/samtools view (args after --)')
+    .allowUnknownOption(true),
+).action(async (id: string, options: TeleCommonCli, cmd: any) => {
+  try {
+    const extra = cmd.args.slice(cmd.args.indexOf(id) + 1);
+    await teleViewCommand(id, extra, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('seqkit <id>')
+    .description('seqkit stats on streamed FASTQ/FASTA'),
+).action(async (id: string, options: TeleCommonCli) => {
+  try {
+    await teleSeqkitCommand(id, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('seqtk <id>')
+    .description('seqtk on streamed FASTQ (args after --)')
+    .allowUnknownOption(true),
+).action(async (id: string, options: TeleCommonCli, cmd: any) => {
+  try {
+    const extra = cmd.args.slice(cmd.args.indexOf(id) + 1);
+    await teleSeqtkCommand(id, extra, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('bedtools <id>')
+    .description('bedtools on stream (e.g. -- intersect -b genes.bed)')
+    .allowUnknownOption(true),
+).action(async (id: string, options: TeleCommonCli, cmd: any) => {
+  try {
+    const extra = cmd.args.slice(cmd.args.indexOf(id) + 1);
+    await teleBedtoolsCommand(id, extra, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('vt <id>')
+    .description('vt on VCF stream (e.g. -- normalize -r ref.fa)')
+    .allowUnknownOption(true),
+).action(async (id: string, options: TeleCommonCli, cmd: any) => {
+  try {
+    const extra = cmd.args.slice(cmd.args.indexOf(id) + 1);
+    await teleVtCommand(id, extra, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('mosdepth <id>')
+    .description('mosdepth coverage (materializes temp BAM; prefer fuse for large WGS)')
+    .option('--out <prefix>', 'output prefix'),
+).action(async (id: string, options: TeleCommonCli) => {
+  try {
+    await teleMosdepthCommand(id, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('igv <id>')
+    .description('Write IGV desktop batch + IGV.js HTML session for the stream URL')
+    .option('--web', 'also open IGV.js HTML')
+    .option('--open', 'open the HTML session in the default browser')
+    .option('--out <path>', 'output HTML path'),
+).action(async (id: string, options: TeleCommonCli) => {
+  try {
+    await teleIgvCommand(id, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('jupyter <id>')
+    .description('Emit a Jupyter/Python cell that streams via biofs into pysam or line parser')
+    .option('--out <file>', 'write cell to file'),
+).action(async (id: string, options: TeleCommonCli) => {
+  try {
+    await teleJupyterCommand(id, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('pysam <id>')
+    .description('Alias of tele jupyter (pysam-oriented snippet)')
+    .option('--out <file>', 'write snippet to file'),
+).action(async (id: string, options: TeleCommonCli) => {
+  try {
+    await telePysamCommand(id, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('stream <id>')
+    .description('Same as biofs stream (raw htsget bytes to stdout)'),
+).action(async (id: string, options: TeleCommonCli) => {
+  try {
+    await teleStreamCommand(id, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
+
+teleCommon(
+  teleCmd
+    .command('ticket <id>')
+    .description('Show htsget ticket JSON for an id (TeleBioinformatics debug)'),
+).action(async (id: string, options: TeleCommonCli) => {
+  try {
+    await teleTicketCommand(id, options);
+  } catch (e: any) {
+    Logger.error(e?.message || e);
+    process.exit(6);
+  }
+});
 
 // alias - manage local shortcuts for ip_ids / BioCIDs
 program
@@ -569,13 +902,19 @@ htsgetCmd
 htsgetCmd
   .command('ticket <kind> <id>')
   .description('Fetch a raw htsget ticket for debugging (kind = variants | reads)')
-  .action(async (kind: string, id: string) => {
+  .option('--region <chr:start-end>', 'genomic region (htsget referenceName/start/end)')
+  .option('--referenceName <chr>', 'htsget referenceName')
+  .option('--start <n>', 'htsget start')
+  .option('--end <n>', 'htsget end')
+  .option('--annotated', 'request annotated VCF sibling')
+  .option('--htsget-url <url>', 'override htsget endpoint')
+  .action(async (kind: string, id: string, options: any) => {
     try {
       if (kind !== 'variants' && kind !== 'reads') {
         Logger.error(`kind must be 'variants' or 'reads' (got '${kind}')`);
         process.exit(2);
       }
-      await htsgetTicketCommand(kind as 'variants' | 'reads', id);
+      await htsgetTicketCommand(kind as 'variants' | 'reads', id, options);
     } catch (error: any) {
       Logger.error(`ticket failed: ${error?.message || error}`);
       process.exit(6);
@@ -2557,6 +2896,34 @@ researcherCmd
     }
   });
 
+researcherCmd
+  .command('passport')
+  .description('Publish or show known-identity passport (shown on Biodata Room admit / Telegram)')
+  .option('--publish', 'Publish/update passport on biofs-node (default if no --show)')
+  .option('--show', 'Show passport for a wallet')
+  .option('--name <name>', 'Display name')
+  .option('--provider <provider>', 'orcid|linkedin|twitter|google|metamask|…')
+  .option('--orcid <id>', 'ORCID iD')
+  .option('--linkedin <url>', 'LinkedIn profile URL')
+  .option('--twitter <handle>', 'X / Twitter handle')
+  .option('--institution <name>', 'Institution')
+  .option('--ga4gh <level>', 'NONE|BASIC|LITE|FULL', 'BASIC')
+  .option('--wallet <addr>', 'Wallet for --show')
+  .option('--json', 'JSON output')
+  .option('--quiet', 'Quiet')
+  .action(async (options: PassportOptions & { publish?: boolean; show?: boolean }) => {
+    try {
+      if (options.show || options.wallet) {
+        await researcherPassportShowCommand(options);
+      } else {
+        await researcherPassportPublishCommand(options);
+      }
+    } catch (error) {
+      Logger.error(`Passport failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
 // Lab Registry - List approved research labs
 program
   .command('labnfts')
@@ -3433,6 +3800,152 @@ program
     }
   });
 
+// BIODATA_ROOM_20260801: dual-role profiles (patient vault vs known researcher)
+const profileCmd = program
+  .command('profile')
+  .description('Manage dual BioFS profiles (patient vs researcher credential roots)');
+profileCmd
+  .command('list')
+  .description('List local profiles under ~/.biofs/profiles/*')
+  .option('--json', 'JSON output')
+  .action(async (o: ProfileOptions) => {
+    try { await profileListCommand(o); } catch (e) { Logger.error(String(e)); process.exit(1); }
+  });
+profileCmd
+  .command('use <name>')
+  .description('Prepare a named profile; print export BIOFS_PROFILE=... (--print for shell eval)')
+  .option('--print', 'Print shell exports only (for eval "$(biofs profile use researcher --print)")')
+  .option('--json', 'JSON output')
+  .action(async (name: string, o: ProfileOptions) => {
+    try { await profileUseCommand(name, o); } catch (e) { Logger.error(String(e)); process.exit(1); }
+  });
+profileCmd
+  .command('status')
+  .description('Show active profile, config dir, and wallet')
+  .option('--json', 'JSON output')
+  .action(async (o: ProfileOptions) => {
+    try { await profileStatusCommand(o); } catch (e) { Logger.error(String(e)); process.exit(1); }
+  });
+
+// BIODATA_ROOM_20260801: investor-style biodata room for researcher deep dives
+const roomCmd = program
+  .command('room')
+  .description('Researcher Biodata Room: create, request, admit, enter, scoped files (via biofs-node)');
+roomCmd
+  .command('create')
+  .description('Owner: create a room over one or more biocid:// assets')
+  .requiredOption('--biocids <list>', 'Comma/space-separated biocid:// list')
+  .option('--purpose <text>', 'Research purpose shown to the owner', 'research deep dive')
+  .option('--skills <list>', 'Allowed verbs (comma-separated)')
+  .option('--days <n>', 'TTL days after admit (1-30)', '7')
+  .option('--researcher <wallet>', 'Optional pre-assign researcher wallet')
+  .option('--json', 'JSON output')
+  .option('--quiet', 'Quiet mode')
+  .action(async (o: RoomOptions) => {
+    try { await roomCreateCommand(o); } catch (e) { Logger.error(String(e)); process.exit(1); }
+  });
+roomCmd
+  .command('request <room_id>')
+  .description('Researcher: request admission to a room')
+  .option('--purpose <text>', 'Purpose of the deep dive')
+  .option('--message <text>', 'Message to the data owner')
+  .option('--skills <list>', 'Requested skills')
+  .option('--json', 'JSON output')
+  .option('--quiet', 'Quiet mode')
+  .action(async (roomId: string, o: RoomOptions) => {
+    try { await roomRequestCommand(roomId, o); } catch (e) { Logger.error(String(e)); process.exit(1); }
+  });
+roomCmd
+  .command('status <room_id>')
+  .description('Show room status (members see full card)')
+  .option('--json', 'JSON output')
+  .action(async (roomId: string, o: RoomOptions) => {
+    try { await roomStatusCommand(roomId, o); } catch (e) { Logger.error(String(e)); process.exit(1); }
+  });
+roomCmd
+  .command('admit <room_id>')
+  .description('Owner (patient): admit the researcher and open the room')
+  .option('--json', 'JSON output')
+  .option('--quiet', 'Quiet mode')
+  .action(async (roomId: string, o: RoomOptions) => {
+    try { await roomAdmitCommand(roomId, o); } catch (e) { Logger.error(String(e)); process.exit(1); }
+  });
+roomCmd
+  .command('revoke <room_id>')
+  .description('Owner or researcher: revoke/leave the room')
+  .option('--json', 'JSON output')
+  .option('--quiet', 'Quiet mode')
+  .action(async (roomId: string, o: RoomOptions) => {
+    try { await roomRevokeCommand(roomId, o); } catch (e) { Logger.error(String(e)); process.exit(1); }
+  });
+roomCmd
+  .command('list')
+  .description('List rooms for the active profile wallet')
+  .option('--json', 'JSON output')
+  .action(async (o: RoomOptions) => {
+    try { await roomListCommand(o); } catch (e) { Logger.error(String(e)); process.exit(1); }
+  });
+roomCmd
+  .command('enter <room_id>')
+  .description('Enter an OPEN room (sets local active_room.json session)')
+  .option('--json', 'JSON output')
+  .option('--quiet', 'Quiet mode')
+  .action(async (roomId: string, o: RoomOptions) => {
+    try { await roomEnterCommand(roomId, o); } catch (e) { Logger.error(String(e)); process.exit(1); }
+  });
+roomCmd
+  .command('leave')
+  .description('Clear the local active room session')
+  .option('--json', 'JSON output')
+  .action(async (o: RoomOptions) => {
+    try { await roomLeaveCommand(o); } catch (e) { Logger.error(String(e)); process.exit(1); }
+  });
+roomCmd
+  .command('files [room_id]')
+  .description('List biocids in a room (defaults to active room). No gs:// paths returned.')
+  .option('--json', 'JSON output')
+  .action(async (roomId: string | undefined, o: RoomOptions) => {
+    try { await roomFilesCommand(roomId, o); } catch (e) { Logger.error(String(e)); process.exit(1); }
+  });
+roomCmd
+  .command('signing-url <room_id>')
+  .description('Get patient web + Telegram signing links for a room')
+  .option('--json', 'JSON output')
+  .action(async (roomId: string, o: RoomOptions) => {
+    try { await roomSigningUrlCommand(roomId, o); } catch (e) { Logger.error(String(e)); process.exit(1); }
+  });
+
+// CONSENT_VERBS_20260730: subject-signed consent for an AI-agent session. Two steps because the
+// node cannot sign for the data owner, which is the property that stops consent being
+// minted ABOUT a person instead of BY them.
+const consentCmd = program
+  .command('consent')
+  .description('Grant or inspect consent for an AI-agent session (dispatched through biofs-node)');
+consentCmd
+  .command('payload')
+  .description('Build the consent terms the data owner must sign for one MCP session')
+  .requiredOption('--session <id>', 'MCP session id (Mcp-Session-Id)')
+  .requiredOption('--biocid <biocid>', 'The biocid:// the grant covers')
+  .option('--days <n>', 'Validity in days (1-30)', '1')
+  .option('--json', 'Emit JSON')
+  .option('--quiet', 'Suppress progress')
+  .action(async (o: any) => {
+    try { await consentPayloadCommand(o.session, o.biocid, o); }
+    catch (e) { Logger.error(`consent payload failed: ${e}`); process.exit(1); }
+  });
+consentCmd
+  .command('submit')
+  .description('Relay a data-owner-signed consent grant on-chain (the node pays the gas)')
+  .requiredOption('--session <id>', 'MCP session id')
+  .requiredOption('--message <json>', 'The signed grant message, inline JSON or a path')
+  .requiredOption('--signature <sig>', 'EIP-712 signature by the data owner')
+  .option('--json', 'Emit JSON')
+  .option('--quiet', 'Suppress progress')
+  .action(async (o: any) => {
+    try { await consentSubmitCommand(o.session, o.message, o.signature, o); }
+    catch (e) { Logger.error(`consent submit failed: ${e}`); process.exit(1); }
+  });
+
 // FLUENCY_LINEAGE_VERBS_20260730: make a genomics store AI-conversable, and report the metamorphosis.
 // Registered with the other groups, BEFORE the welcome banner and program.parse().
 const fluencyCmd = program
@@ -3480,6 +3993,8 @@ if (process.argv.length === 2) {
   console.log(`  ${chalk.green('biofiles')}    - List your BioFiles (all sources)`);
   console.log(`  ${chalk.green('download')}    - Download files (GDPR consent)`);
   console.log(`  ${chalk.green('mount')}       - Mount all files (GDPR consent)`);
+  console.log(`  ${chalk.green('profile')}     - Dual profiles (patient vs researcher credentials)`);
+  console.log(`  ${chalk.green('room')}        - Researcher Biodata Room (admit + scoped deep dive)`);
   console.log(`  ${chalk.green('fluency')}     - Make a store AI-conversable (coverage + per-gene rollups)`);
   console.log(`  ${chalk.green('lineage')}     - Biodata metamorphosis: parents, derivatives, owners`);
   console.log(`  ${chalk.green('mount-remote')} - Mount biosample on agent`);

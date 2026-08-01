@@ -60,7 +60,8 @@ function parseUsage(modelKey: string, stdout: string): any {
   } catch { return {}; }
 }
 
-const DEFAULT_MCP_DIST = '/Users/danieluribe/Downloads/bio-context-sprint/mcp-bio-context/dist/index.js';
+// Resolve via BIOFS_MCP_DIST or --mcp-dist; no machine-local absolute paths in the published package.
+const DEFAULT_MCP_DIST = process.env.BIOFS_MCP_DIST || '';
 
 interface ModelDef {
   key: string;

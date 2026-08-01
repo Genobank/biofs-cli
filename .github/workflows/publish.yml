@@ -82,7 +82,7 @@ jobs:
         # registration that compiled but did not attach to the program.
         run: |
           set -e
-          for verb in fluency lineage query erase claim mount; do
+          for verb in fluency lineage query erase claim mount tele stream pipe htsget; do
             if node dist/index.js --help 2>/dev/null | grep -qE "^\s+${verb}\b"; then
               echo "ok: ${verb}"
             else
@@ -90,6 +90,13 @@ jobs:
               exit 1
             fi
           done
+          # tele subcommands must register too (TeleBioinformatics surface)
+          if node dist/index.js tele --help 2>/dev/null | grep -qE "stats|header|igv|jupyter"; then
+            echo "ok: tele subcommands"
+          else
+            echo "MISSING tele subcommands in built CLI" >&2
+            exit 1
+          fi
 
       - name: Confirm the tag matches package.json
         # A tag-triggered publish whose version disagrees with package.json means
