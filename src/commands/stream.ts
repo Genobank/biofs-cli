@@ -1,70 +1,56 @@
 /**
- * `biofs stream <id>` — stream a BioNFT-gated VCF/BAM to stdout via htsget.
+ * `biofs stream <id>` — stream a BioNFT-gated VCF/BAM/CRAM/FASTQ to stdout via htsget.
  *
- * Pipes cleanly into bcftools/samtools/pysam:
+ * Pipes cleanly into bcftools/samtools/pysam/seqkit:
  *
  *   biofs stream 0xCCe… | bcftools stats -
  *   biofs stream my-wes | bcftools view -H -
+ *   biofs stream my-bam --region chr17:7661779-7687538 | samtools view -
+ *   biofs stream my.fastq.gz | seqkit stats -
  *
  * Auto-detects 'variants' vs 'reads' from the registered filename; override
- * with --kind.
+ * with --kind. Region params are forwarded to htsget (server may full-file
+ * until tabix slices land; client tools can still filter).
  */
-import { spawnSync } from 'child_process';
-import { CredentialsManager } from '../lib/auth/credentials';
-import { GenoBankAPIClient } from '../lib/api/client';
 import { Logger } from '../lib/utils/logger';
-import { resolveAlias } from '../lib/aliases/store';
-import { getTicket, guessKindFromFilename, HtsgetKind } from '../lib/htsget/client';
+import { teleStreamStdout, TeleCommonOpts } from '../lib/tele/core';
+import { HtsgetKind } from '../lib/htsget/client';
 
 export interface StreamOptions {
   kind?: HtsgetKind;
   quiet?: boolean;
   apiUrl?: string;
   htsgetUrl?: string;
+  annotated?: boolean;
+  region?: string;
+  referenceName?: string;
+  /** CLI may pass strings; coerced to number in streamCommand */
+  start?: number | string;
+  end?: number | string;
+  raw?: boolean;
 }
 
 export async function streamCommand(rawId: string, options: StreamOptions = {}): Promise<void> {
-  const id = resolveAlias(rawId);
-
-  const creds = await CredentialsManager.getInstance().loadCredentials();
-  if (!creds) {
-    Logger.error('Not authenticated. Run: biofs login');
-    process.exit(3);
-  }
-
-  // Figure out the kind: user override > filename extension
-  let kind: HtsgetKind = options.kind ?? 'variants';
-  if (!options.kind) {
-    try {
-      const api = GenoBankAPIClient.getInstance();
-      const bioips = await api.getMyGrantedBioIPs();
-      const match = bioips.find((b: any) => (b.ip_id || '').toLowerCase() === id.toLowerCase());
-      if (match?.filename) {
-        kind = guessKindFromFilename(match.filename);
-      }
-    } catch {
-      // fall through with default
-    }
-  }
-
-  const ticket = await getTicket(kind, id, creds.user_signature, {
-    baseUrl: options.htsgetUrl,
-  });
-
-  if (!options.quiet) {
-    Logger.info(`htsget ticket: format=${ticket.format} urls=${ticket.urls.length}`);
-  }
-
-  // Stream each URL into stdout in order (curl is on every bio platform).
-  for (const u of ticket.urls) {
-    const result = spawnSync(
-      'curl',
-      ['-sSL', '--fail-with-body', '-A', 'biofs/2.7.0 (+https://genobank.io)', u.url],
-      { stdio: ['ignore', 'inherit', 'inherit'] },
-    );
-    if (result.status !== 0) {
-      Logger.error(`stream failed: curl exit ${result.status}`);
-      process.exit(result.status ?? 6);
-    }
+  try {
+    await teleStreamStdout(rawId, {
+      kind: options.kind,
+      quiet: options.quiet,
+      htsgetUrl: options.htsgetUrl,
+      annotated: options.annotated,
+      region: options.region,
+      referenceName: options.referenceName,
+      start:
+        options.start !== undefined && options.start !== null && options.start !== ''
+          ? Number(options.start)
+          : undefined,
+      end:
+        options.end !== undefined && options.end !== null && options.end !== ''
+          ? Number(options.end)
+          : undefined,
+      raw: options.raw,
+    });
+  } catch (e: any) {
+    Logger.error(e?.message || String(e));
+    process.exit(6);
   }
 }

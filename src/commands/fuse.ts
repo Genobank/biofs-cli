@@ -13,7 +13,12 @@ import * as path from 'path';
 import { Logger } from '../lib/utils/logger';
 import { getCredentials } from '../lib/auth/credentials';
 
-const DEFAULT_SERVER = process.env.BIOFS_NODE_URL || 'http://localhost:8081';
+// Fuse mount surface is api_biofs_fuse on genobank.app (not biofs-node :8787).
+// Override with BIOFS_FUSE_URL for local/dev. Legacy BIOFS_NODE_URL still honored.
+const DEFAULT_SERVER =
+  process.env.BIOFS_FUSE_URL ||
+  process.env.BIOFS_NODE_URL ||
+  `${process.env.GENOBANK_API_URL || 'https://genobank.app'}/api_biofs_fuse`;
 
 export interface FuseOptions {
   server?: string;
@@ -26,7 +31,28 @@ export interface FuseOptions {
  * Get server URL from options, env, or default
  */
 function getServerUrl(options: FuseOptions): string {
-  return options.server || process.env.BIOFS_NODE_URL || DEFAULT_SERVER;
+  return (
+    options.server ||
+    process.env.BIOFS_FUSE_URL ||
+    process.env.BIOFS_NODE_URL ||
+    DEFAULT_SERVER
+  );
+}
+
+/** Strip legacy /api/v1/fuse prefix if base already is api_biofs_fuse. */
+function fuseUrl(serverUrl: string, leaf: string): string {
+  const base = serverUrl.replace(/\/$/, '');
+  if (base.includes('api_biofs_fuse') || base.includes('/agent/')) {
+    // Map old fuse leaves onto node-compatible or fuse plugin paths
+    const map: Record<string, string> = {
+      list: '/list',
+      mount: '/mount',
+      info: '/info',
+      stream: '/stream',
+    };
+    return `${base}${map[leaf] || '/' + leaf}`;
+  }
+  return `${base}/api/v1/fuse/${leaf}`;
 }
 
 /**
@@ -48,7 +74,7 @@ export async function fuseListCommand(
     const { wallet_address, user_signature } = credentials;
 
     // Call FUSE list endpoint
-    const url = `${serverUrl}/api/v1/fuse/list`;
+    const url = fuseUrl(serverUrl, 'list');
     const params = {
       biosample: biosampleId,
       wallet: wallet_address,
@@ -114,7 +140,7 @@ export async function fuseMountCommand(
     const { wallet_address, user_signature } = credentials;
 
     // Call FUSE mount endpoint (consent verification)
-    const url = `${serverUrl}/api/v1/fuse/mount`;
+    const url = fuseUrl(serverUrl, 'mount');
     const params = {
       biosample: biosampleId,
       wallet: wallet_address,
@@ -187,7 +213,7 @@ export async function fuseStreamCommand(
     const { wallet_address, user_signature } = credentials;
 
     // First get file info
-    const infoUrl = `${serverUrl}/api/v1/fuse/info`;
+    const infoUrl = fuseUrl(serverUrl, 'info');
     const infoParams = {
       biosample: biosampleId,
       filename,
@@ -211,7 +237,7 @@ export async function fuseStreamCommand(
       const progress = Math.round((offset / fileSize) * 100);
       spinner.text = `Streaming ${filename} (${progress}% - ${(offset / 1024 / 1024).toFixed(0)}MB / ${(fileSize / 1024 / 1024).toFixed(0)}MB)...`;
 
-      const streamUrl = `${serverUrl}/api/v1/fuse/stream`;
+      const streamUrl = fuseUrl(serverUrl, 'stream');
       const streamParams = {
         biosample: biosampleId,
         filename,
@@ -281,7 +307,7 @@ export async function fuseSampleCommand(
       const progress = Math.round((offset / sampleSize) * 100);
       spinner.text = `Downloading sample (${progress}%)...`;
 
-      const streamUrl = `${serverUrl}/api/v1/fuse/stream`;
+      const streamUrl = fuseUrl(serverUrl, 'stream');
       const streamParams = {
         biosample: biosampleId,
         filename,

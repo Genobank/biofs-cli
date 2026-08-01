@@ -51,7 +51,8 @@ export interface BenchmarkOptions {
 type Tier = 'P' | 'LP' | 'VUS' | 'LB' | 'B';
 const TIERS: Tier[] = ['P', 'LP', 'VUS', 'LB', 'B'];
 const TIER_LABEL: Record<Tier, string> = { P: 'Pathogenic', LP: 'Likely pathogenic', VUS: 'VUS', LB: 'Likely benign', B: 'Benign' };
-const DEFAULT_MCP_DIST = '/Users/danieluribe/Downloads/bio-context-sprint/mcp-bio-context/dist/index.js';
+// Resolve via BIOFS_MCP_DIST or --mcp-dist; no machine-local absolute paths in the published package.
+const DEFAULT_MCP_DIST = process.env.BIOFS_MCP_DIST || '';
 
 interface Variant { variant_id: string; gene: string; hgvs: string; protein?: string; truth: Tier; note?: string }
 interface Call { agent_id: string; model: string; tier: Tier | null; raw: string | null; confidence: number | null; ms?: number; usage?: any }

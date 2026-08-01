@@ -1,16 +1,22 @@
 /**
  * `biofs htsget` — low-level GA4GH htsget operations.
  *
- *   biofs htsget service-info             # show endpoint metadata
- *   biofs htsget ticket variants|reads <id>   # fetch raw ticket JSON
+ *   biofs htsget service-info
+ *   biofs htsget ticket variants|reads <id>
+ *   biofs htsget ticket variants SAMPLE.vcf --region chr17:1-100000
  *
- * For day-to-day use, prefer `biofs stream` or `biofs view` which hide the
- * ticket dance. This command is here for debugging + scripting.
+ * For day-to-day use, prefer `biofs stream`, `biofs tele`, or `biofs pipe`.
  */
 import { CredentialsManager } from '../lib/auth/credentials';
 import { Logger } from '../lib/utils/logger';
 import { resolveAlias } from '../lib/aliases/store';
-import { getServiceInfo, getTicket, HtsgetKind } from '../lib/htsget/client';
+import {
+  getServiceInfo,
+  getTicket,
+  HtsgetKind,
+  parseGenomicRegion,
+  buildTicketRequestUrl,
+} from '../lib/htsget/client';
 
 export async function htsgetServiceInfoCommand(opts: { json?: boolean } = {}): Promise<void> {
   const info = await getServiceInfo();
@@ -31,7 +37,15 @@ export async function htsgetServiceInfoCommand(opts: { json?: boolean } = {}): P
 export async function htsgetTicketCommand(
   kind: HtsgetKind,
   rawId: string,
-  opts: { json?: boolean } = {},
+  opts: {
+    json?: boolean;
+    region?: string;
+    referenceName?: string;
+    start?: string | number;
+    end?: string | number;
+    annotated?: boolean;
+    htsgetUrl?: string;
+  } = {},
 ): Promise<void> {
   const id = resolveAlias(rawId);
   const creds = await CredentialsManager.getInstance().loadCredentials();
@@ -39,6 +53,32 @@ export async function htsgetTicketCommand(
     Logger.error('Not authenticated. Run: biofs login');
     process.exit(3);
   }
-  const ticket = await getTicket(kind, id, creds.user_signature);
-  process.stdout.write(JSON.stringify({ htsget: ticket }, null, 2) + '\n');
+  const query: Record<string, string | number | undefined> = {};
+  if (opts.annotated) query.annotated = 'true';
+  if (opts.region) {
+    const p = parseGenomicRegion(opts.region);
+    if (p) {
+      query.referenceName = p.referenceName;
+      if (p.start !== undefined) query.start = p.start;
+      if (p.end !== undefined) query.end = p.end;
+    }
+  }
+  if (opts.referenceName) query.referenceName = opts.referenceName;
+  if (opts.start !== undefined && opts.start !== '') query.start = Number(opts.start);
+  if (opts.end !== undefined && opts.end !== '') query.end = Number(opts.end);
+
+  const ticket = await getTicket(kind, id, creds.user_signature, {
+    baseUrl: opts.htsgetUrl,
+    query,
+  });
+  process.stdout.write(
+    JSON.stringify(
+      {
+        htsget: ticket,
+        request: buildTicketRequestUrl(kind, id, { baseUrl: opts.htsgetUrl, query }),
+      },
+      null,
+      2,
+    ) + '\n',
+  );
 }
