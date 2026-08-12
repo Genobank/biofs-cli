@@ -140,6 +140,7 @@ import { hifiDeepvariantSubmitCommand, HifiDeepvariantSubmitOptions } from './co
 import { hifiDeepvariantExecCommand, HifiDeepvariantExecOptions } from './commands/hifi-deepvariant/exec';
 import { somaticMutectSubmitCommand, SomaticMutectSubmitOptions } from './commands/somatic-mutect/submit';
 import { somaticMutectExecCommand, SomaticMutectExecOptions } from './commands/somatic-mutect/exec';
+import { somaticMutectFilterCommand, SomaticMutectFilterOptions } from './commands/somatic-mutect/filter';
 import { liftoverSubmitCommand, LiftoverSubmitOptions } from './commands/liftover/submit';
 import { liftoverExecCommand, LiftoverExecOptions } from './commands/liftover/exec';
 import { dipcallSubmitCommand, DipcallSubmitOptions } from './commands/dipcall/submit';
@@ -2560,6 +2561,18 @@ somaticMutectCmd
   .action(async (options: SomaticMutectExecOptions) => {
     try { await somaticMutectExecCommand(options); }
     catch (error) { Logger.error(`somatic-mutect exec failed: ${error}`); process.exit(1); }
+  });
+
+somaticMutectCmd
+  .command('filter')
+  .description('CPU verb: GATK FilterMutectCalls over a raw mutectcaller VCF; persists filtered VCF + stats beside it')
+  .requiredOption('--vcf <gs>', 'gs:// raw mutect2 .vcf.gz')
+  .requiredOption('--ref-fasta <gs>', 'gs:// reference fasta (with .fai and .dict beside it)')
+  .option('--stats <gs>', 'gs:// Mutect2 stats file (default: <vcf>.stats)')
+  .option('--out-dir <gs>', 'gs:// output folder (default: the raw VCF folder)')
+  .action(async (options: SomaticMutectFilterOptions) => {
+    try { await somaticMutectFilterCommand(options); }
+    catch (error) { Logger.error(`somatic-mutect filter failed: ${error}`); process.exit(1); }
   });
 
 // liftover command group — cross-reference VCF liftover (CrossMap, CHM13 -> GRCh38)
