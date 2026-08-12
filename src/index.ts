@@ -2549,6 +2549,7 @@ somaticMutectCmd
   .requiredOption('--tumor-bam <gs>', 'gs:// aligned tumor BAM')
   .requiredOption('--normal-bam <gs>', 'gs:// aligned matched-normal BAM')
   .option('--ref-fasta <gs>', 'Explicit gs:// reference fasta')
+  .option('--ref <build>', 'Reference build hint appended by the executor spawner (ignored; --ref-fasta wins)', 'auto')
   .option('--no-low-memory', 'Disable pbrun --mutect-low-memory')
   .option('--hotspot <ctg:pos>', 'Identity sanity pileup locus', '12:25398284')
   .option('--job-id <id>', 'Job id')
