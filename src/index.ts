@@ -138,6 +138,8 @@ import { phaseSubmitCommand, PhaseSubmitOptions } from './commands/phase/submit'
 import { phaseExecCommand, PhaseExecOptions } from './commands/phase/exec';
 import { hifiDeepvariantSubmitCommand, HifiDeepvariantSubmitOptions } from './commands/hifi-deepvariant/submit';
 import { hifiDeepvariantExecCommand, HifiDeepvariantExecOptions } from './commands/hifi-deepvariant/exec';
+import { somaticMutectSubmitCommand, SomaticMutectSubmitOptions } from './commands/somatic-mutect/submit';
+import { somaticMutectExecCommand, SomaticMutectExecOptions } from './commands/somatic-mutect/exec';
 import { liftoverSubmitCommand, LiftoverSubmitOptions } from './commands/liftover/submit';
 import { liftoverExecCommand, LiftoverExecOptions } from './commands/liftover/exec';
 import { dipcallSubmitCommand, DipcallSubmitOptions } from './commands/dipcall/submit';
@@ -2520,6 +2522,43 @@ hifiDvCmd
   .action(async (options: HifiDeepvariantExecOptions) => {
     try { await hifiDeepvariantExecCommand(options); }
     catch (error) { Logger.error(`hifi-deepvariant exec failed: ${error}`); process.exit(1); }
+  });
+
+// somatic-mutect command group — tumor/normal somatic calling (Parabricks Mutect2, GPU)
+const somaticMutectCmd = program
+  .command('somatic-mutect')
+  .description('Tumor/normal somatic small-variant calling (Parabricks mutectcaller = GPU Mutect2): submit (client) + exec (GPU runner)');
+
+somaticMutectCmd
+  .command('submit <caseId>', { isDefault: true })
+  .description('Submit a tumor/normal Mutect2 job to biofs-node (panel-design source for tumor-informed MRD)')
+  .requiredOption('--tumor-bam <gs>', 'gs:// aligned tumor BAM')
+  .requiredOption('--normal-bam <gs>', 'gs:// aligned matched-normal BAM (same reference)')
+  .option('--ref-fasta <gs>', 'Explicit gs:// reference fasta the BAMs were aligned to')
+  .option('--no-low-memory', 'Disable pbrun --mutect-low-memory')
+  .option('--json', 'Output as JSON')
+  .action(async (caseId: string, options: SomaticMutectSubmitOptions) => {
+    try { await somaticMutectSubmitCommand(caseId, options); }
+    catch (error) { Logger.error(`somatic-mutect submit failed: ${error}`); process.exit(1); }
+  });
+
+somaticMutectCmd
+  .command('exec')
+  .description('GPU-side executor: pbrun mutectcaller over NVMe-staged tumor/normal BAMs, persist somatic VCF to GCS')
+  .requiredOption('--sample <caseId>', 'Case id (sample names come from the BAM @RG SM tags)')
+  .requiredOption('--tumor-bam <gs>', 'gs:// aligned tumor BAM')
+  .requiredOption('--normal-bam <gs>', 'gs:// aligned matched-normal BAM')
+  .option('--ref-fasta <gs>', 'Explicit gs:// reference fasta')
+  .option('--no-low-memory', 'Disable pbrun --mutect-low-memory')
+  .option('--hotspot <ctg:pos>', 'Identity sanity pileup locus', '12:25398284')
+  .option('--job-id <id>', 'Job id')
+  .option('--batch-id <id>', 'Batch id')
+  .option('--creator <wallet>', 'Creator wallet (lowercased for GCS path)')
+  .option('--out-bucket <name>', 'Output bucket', 'genobank-parabricks-output')
+  .option('--ref-bucket <name>', 'Reference bucket', 'deepvariant-fastq-to-vcf-genobank-app')
+  .action(async (options: SomaticMutectExecOptions) => {
+    try { await somaticMutectExecCommand(options); }
+    catch (error) { Logger.error(`somatic-mutect exec failed: ${error}`); process.exit(1); }
   });
 
 // liftover command group — cross-reference VCF liftover (CrossMap, CHM13 -> GRCh38)
