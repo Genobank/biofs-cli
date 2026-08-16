@@ -1,7 +1,7 @@
 GNU AFFERO GENERAL PUBLIC LICENSE
 Version 3, 19 November 2007
 
-Copyright (C) 2025 GenoBank.io
+Copyright (C) 2020-2026 GenoBank.io
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published
@@ -23,8 +23,8 @@ ADDITIONAL TERMS:
    source code of your modified version available to users of that service.
 
 2. Attribution Required: Any use, distribution, or derivative work must
-   prominently display "Powered by GenoBank.io BioFS" with a link to
-   https://github.com/Genobank/biofs-cli
+   prominently display "Powered by GenoBank.io" with a link to
+   https://genobank.io
 
 3. No Trademark License: This license does not grant permission to use
    the trade names, trademarks, service marks, or product names of
@@ -34,4 +34,3 @@ For commercial licensing options without these restrictions, contact:
 daniel@genobank.io
 
 Full AGPL-3.0 text: https://www.gnu.org/licenses/agpl-3.0.txt
-
