@@ -121,8 +121,15 @@ export function agentPrivateKey(key: CancerTwinAgentKey): string {
   const envName = `${key.toUpperCase()}_AGENT_PRIVATE_KEY`;
   const override = process.env[envName];
   if (override) return override.startsWith('0x') ? override : `0x${override}`;
-  const seed = process.env.BIOFS_AGENT_SEED
-    || 'genobank.io/cancer-digital-twin/x402-agents/v1';
+  const seed = process.env.BIOFS_AGENT_SEED;
+  if (!seed) {
+    throw new Error(
+      `Refusing to derive the ${key} agent key from a hardcoded default seed: it would make the `
+      + `agent's private key publicly computable by anyone reading this source, and any seqUSDC or `
+      + `native funds paid to that wallet would be sweepable. Set BIOFS_AGENT_SEED to a deployment `
+      + `secret, or set ${envName} to the agent's private key directly.`,
+    );
+  }
   return ethers.keccak256(ethers.toUtf8Bytes(`${seed}:agent:${key}`));
 }
 
