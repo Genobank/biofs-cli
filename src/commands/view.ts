@@ -2,6 +2,8 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { GenoBankAPIClient } from '../lib/api/client';
 import { Logger } from '../lib/utils/logger';
+import { BioCIDParser } from '../lib/biofiles/biocid';
+import { isHeavyGenomicName } from '../lib/biofiles/filetype';
 
 export interface ViewOptions {
   lines?: number;      // Number of lines to display (default: all)
@@ -19,9 +21,15 @@ export async function viewCommand(
   try {
     const api = GenoBankAPIClient.getInstance();
     
-    // Determine if it's a BioCID or filename
-    const isBioCID = biocidOrFilename.startsWith('biocid://');
-    
+    const parsed = BioCIDParser.parse(biocidOrFilename);
+    const isBioCID = !!parsed || biocidOrFilename.startsWith('biocid://');
+    const nameHint = parsed?.identifier || biocidOrFilename;
+    if (isHeavyGenomicName(nameHint) || ['bam', 'cram', 'fastq', 'vcf', 'gvcf', 'sqlite'].includes(parsed?.type || '')) {
+      spinner.fail('This biodata is not a text view');
+      console.log(chalk.yellow('Use `biofs stream` for BAM/CRAM/FASTQ/VCF or `biofs query` for sqlite. Bytes stay server-side.'));
+      process.exit(2);
+    }
+
     if (isBioCID) {
       spinner.text = 'Resolving BioCID...';
     } else {

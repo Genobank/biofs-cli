@@ -3,6 +3,8 @@ export interface BioCID {
   type: string;
   identifier: string;
   fullCID: string;
+  /** Bioagent / lab prefix on the canonical 4-part form. */
+  lab?: string;
 }
 
 /**

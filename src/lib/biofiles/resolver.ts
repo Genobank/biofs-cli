@@ -122,6 +122,30 @@ export class BioCIDResolver {
     );
 
     if (!file) {
+      try {
+        const inv = await this.api.getBioRouterInventory();
+        const parsed = BioCIDParser.parse(biocidOrFilename);
+        const hit = inv.find((row: any) => {
+          const id = String(row.biocid || '');
+          const name = String(row.biofile || row.dataset || row.object_name || '');
+          return (
+            id === biocidOrFilename ||
+            id.toLowerCase() === String(biocidOrFilename).toLowerCase() ||
+            (parsed && id.toLowerCase().endsWith('/' + parsed.identifier.toLowerCase())) ||
+            name.endsWith(searchIdentifier) ||
+            name.split('/').pop() === searchIdentifier
+          );
+        });
+        if (hit) {
+          const gcsPath = hit.gcs_path || (hit.bucket && hit.object_name ? `${hit.object_name}` : undefined);
+          return {
+            type: 'GCS',
+            path: gcsPath,
+            bucket: hit.bucket || hit.gcs_bucket,
+            filename: hit.biofile || hit.dataset || searchIdentifier,
+          };
+        }
+      } catch { /* fall through */ }
       throw new Error(`File not found: ${biocidOrFilename}`);
     }
 
@@ -373,19 +397,28 @@ export class BioCIDResolver {
 
       for (const row of inv) {
         const owner = String(row.owner_wallet || targetOwner || callerWallet || '').toLowerCase();
-        const objName: string = row.object_name || '';
-        const filename = row.biofile || (objName ? objName.split('/').pop() : '') || row.biocid || 'unknown';
+        const objName: string = row.object_name || row.gcs_path || '';
+        const filename = row.biofile || row.dataset || (objName ? objName.split('/').pop() : '') || row.biocid || 'unknown';
+        const parsed = BioCIDParser.parse(row.biocid || '');
+        const type =
+          parsed?.type ||
+          row.filetype ||
+          row.biodata_type ||
+          row.file_type_guess ||
+          BioCIDParser.detectFileType(filename);
         bioFiles.push({
           filename,
           biocid: row.biocid || `biocid://${owner || 'resolver_err/no-owner'}/biorouter/${row.sample_serial || 'na'}`,
-          type: row.filetype || row.file_type_guess || BioCIDParser.detectFileType(filename),
+          type,
           source: 'BioRouter',
-          size: row.size_bytes,
-          created_at: row.time_created,
+          size: row.size_bytes || row.file_size,
+          created_at: row.time_created || row.created_at,
           owner: owner || undefined,
+          gcs_path: row.gcs_path || (row.bucket && objName ? `gs://${row.bucket}/${objName}` : undefined),
         });
       }
     } catch (error) {
+      Logger.error(`BioRouter inventory failed: ${(error as Error).message}`);
       if (verbose) console.error('❌ Error fetching BioRouter inventory:', error);
     }
 

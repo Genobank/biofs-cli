@@ -182,16 +182,37 @@ export class GenoBankAPIClient {
     try {
       const creds = await this.credManager.loadCredentials();
       if (!creds) return [];
-      const params: any = { wallet: creds.wallet_address, signature: creds.user_signature };
-      if (targetOwner) params.owner = targetOwner;
-
-      const response = await this.axios.get('/api_biofs_node/list_inventory', { params });
-      const files = response.data?.files || [];
-      Logger.debug(`✅ BioRouter inventory: ${files.length} files`);
-      return files;
+      const all: any[] = [];
+      const pageSize = 5000;
+      let skip = 0;
+      for (let i = 0; i < 40; i++) {
+        const params: any = {
+          wallet: creds.wallet_address,
+          signature: creds.user_signature,
+          limit: pageSize,
+          skip,
+        };
+        if (targetOwner) params.owner = targetOwner;
+        const response = await this.axios.get('/api_biofs_node/list_inventory', {
+          params,
+          timeout: 180_000,
+          validateStatus: (s) => s < 500,
+        });
+        if (response.status >= 400) {
+          throw new Error(`list_inventory HTTP ${response.status}: ${response.data?.error || 'failed'}`);
+        }
+        const files = response.data?.files || [];
+        all.push(...files);
+        const total = Number(response.data?.total);
+        if (files.length < pageSize) break;
+        if (Number.isFinite(total) && all.length >= total) break;
+        skip += pageSize;
+      }
+      Logger.debug(`✅ BioRouter inventory: ${all.length} files`);
+      return all;
     } catch (error) {
       Logger.debug(`❌ Error fetching BioRouter inventory: ${error}`);
-      return [];
+      throw error;
     }
   }
 
@@ -200,17 +221,13 @@ export class GenoBankAPIClient {
     try {
       Logger.debug('Calling /biosamples?chainID=43113...');
 
-      const response = await this.axios.get('/biosamples', {
-        params: { chainID: 43113 }
-      });
-
+      const chainIds = (process.env.AVALANCHE_CHAIN_ID || '43114,43113').split(',').map((s) => s.trim()).filter(Boolean);
       let allBiosamples: any[] = [];
-      if (Array.isArray(response.data)) {
-        allBiosamples = response.data;
-      } else if (response.data.biosamples && Array.isArray(response.data.biosamples)) {
-        allBiosamples = response.data.biosamples;
-      } else if (response.data.data && Array.isArray(response.data.data)) {
-        allBiosamples = response.data.data;
+      for (const chainID of chainIds) {
+        const response = await this.axios.get('/biosamples', { params: { chainID } });
+        if (Array.isArray(response.data)) allBiosamples.push(...response.data);
+        else if (response.data.biosamples && Array.isArray(response.data.biosamples)) allBiosamples.push(...response.data.biosamples);
+        else if (response.data.data && Array.isArray(response.data.data)) allBiosamples.push(...response.data.data);
       }
 
       // Filter for user's biosamples (we'll need wallet address)
