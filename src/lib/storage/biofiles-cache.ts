@@ -115,9 +115,13 @@ export class BioFilesCacheManager {
   /**
    * Get all biofiles from cache
    */
-  getAll(): BioFile[] {
+  getAll(expectedWallet?: string): BioFile[] {
     const cache = this.load();
-    return cache ? cache.biofiles : [];
+    if (!cache) return [];
+    if (expectedWallet && cache.wallet_address.toLowerCase() !== expectedWallet.toLowerCase()) {
+      return [];
+    }
+    return cache.biofiles;
   }
 
   /**
@@ -169,10 +173,14 @@ export class BioFilesCacheManager {
   /**
    * Check if cache needs update (older than 1 hour)
    */
-  needsUpdate(maxAgeMs: number = 3600000): boolean {
-    const age = this.getCacheAge();
-    if (age === null) return true;
-    return age > maxAgeMs;
+  needsUpdate(maxAgeMs: number = 3600000, expectedWallet?: string): boolean {
+    const cache = this.load();
+    if (!cache) return true;
+    if (expectedWallet && cache.wallet_address.toLowerCase() !== expectedWallet.toLowerCase()) {
+      return true;
+    }
+    const lastUpdated = new Date(cache.last_updated);
+    return Date.now() - lastUpdated.getTime() > maxAgeMs;
   }
 
   /**
