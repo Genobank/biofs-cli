@@ -19,6 +19,7 @@ import { SEQUENTIA_NETWORK, API_CONFIG } from '../lib/config/constants';
 
 export interface TokenizeBiosampleOptions {
   ownerName?: string;
+  owner?: string;
   role?: string;
   sampleType?: string;
   captureKit?: string;
@@ -198,12 +199,21 @@ export async function tokenizeBiosampleCommand(
       }
     }
 
-    // Step 4: Generate custodian BioWallet
-    spinner.start('Step 4/5: Generating custodian BioWallet...');
-
-    const custodianWallet = ethers.Wallet.createRandom();
-
-    spinner.succeed(`Step 4/5: BioWallet created: ${custodianWallet.address}`);
+    // Step 4: Resolve the ROOT OWNER biowallet. Every biofile is owned by exactly one
+    // legitimate biowallet, never a throwaway. Root ownership goes to an explicit
+    // --owner biowallet, otherwise to the authenticated caller. A random ephemeral
+    // wallet is never generated, and no private key is ever created or printed here.
+    spinner.start('Step 4/5: Resolving root owner biowallet...');
+    let ownerAddress: string;
+    if (options.owner) {
+      if (!ethers.isAddress(options.owner)) {
+        throw new Error(`--owner must be a valid biowallet address, got: ${options.owner}`);
+      }
+      ownerAddress = ethers.getAddress(options.owner);
+    } else {
+      ownerAddress = ethers.getAddress(credentials.wallet_address);
+    }
+    spinner.succeed(`Step 4/5: Root owner biowallet: ${ownerAddress}`);
 
     // Step 5: Mint BioNFT
     spinner.start('Step 5/5: Minting BioNFT on Sequentia...');
@@ -235,7 +245,7 @@ export async function tokenizeBiosampleCommand(
     let gasEstimate: bigint;
     try {
       gasEstimate = await bionftWithSigner.getFunction('mintBiosample').estimateGas(
-        custodianWallet.address,
+        ownerAddress,
         biosampleSerial,
         ownerName,
         sampleType,
@@ -249,7 +259,7 @@ export async function tokenizeBiosampleCommand(
 
     // Send transaction
     const tx = await bionftWithSigner.getFunction('mintBiosample')(
-      custodianWallet.address,
+      ownerAddress,
       biosampleSerial,
       ownerName,
       sampleType,
@@ -278,18 +288,13 @@ export async function tokenizeBiosampleCommand(
     console.log(`${chalk.cyan('🔬 Biosample:')}     ${chalk.white(biosampleSerial)}`);
     console.log(`${chalk.cyan('🏷️  Token ID:')}      ${chalk.white('#' + tokenId.toString())}`);
     console.log(`${chalk.cyan('👤 Owner:')}         ${chalk.white(ownerName)} (${role})`);
-    console.log(`${chalk.cyan('💼 BioWallet:')}     ${chalk.white(custodianWallet.address)}`);
+    console.log(`${chalk.cyan('👤 Owner Wallet:')}   ${chalk.white(ownerAddress)}`);
     console.log(`${chalk.cyan('📁 Files:')}         ${chalk.white(files.length.toString())} genomic file(s)`);
     console.log(`${chalk.cyan('🌐 Network:')}       ${chalk.white(network.name)} (Chain ID: ${CHAIN_ID})`);
     console.log(`${chalk.cyan('🔐 TX Hash:')}       ${chalk.gray(receipt.hash)}`);
     console.log(`${chalk.cyan('📦 Block:')}         ${chalk.white(receipt.blockNumber.toString())}`);
     console.log(`${chalk.cyan('⛽ Gas Used:')}      ${chalk.white(receipt.gasUsed.toString())}`);
 
-    console.log(chalk.gray('\n' + '━'.repeat(50)));
-    console.log(chalk.bold('🔐 IMPORTANT: Save this BioWallet private key securely!'));
-    console.log(chalk.gray('━'.repeat(50)));
-    console.log(chalk.yellow(`Private Key: ${custodianWallet.privateKey}`));
-    console.log(chalk.gray('━'.repeat(50) + '\n'));
 
     console.log(chalk.gray('💡 Next steps:'));
     console.log(chalk.gray(`   biofs access grant ${biosampleSerial} --agent <lab_wallet>  # Grant access to lab`));
