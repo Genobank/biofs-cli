@@ -2,6 +2,8 @@ import { FileDownloader } from '../lib/biofiles/downloader';
 import { BioRoutesClient, biocidToKey } from '../lib/bioroutes/client';
 import { calculateSnpFingerprint } from '../lib/biofiles/fingerprint';
 import { Logger } from '../lib/utils/logger';
+import { isHeavyGenomicName } from '../lib/biofiles/filetype';
+import { BioCIDParser } from '../lib/biofiles/biocid';
 import chalk from 'chalk';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -27,12 +29,24 @@ export async function downloadCommand(
   // via `biofs route check` (bioroutes.inventory) but aren't in the API index.
   // The biosample serial passed as positional arg is used only for the default
   // local destination filename; auth is via the local gcloud service account.
+  const parsed = BioCIDParser.parse(biocidOrFilename);
+  const heavyName = parsed?.identifier || biocidOrFilename;
+  if (isHeavyGenomicName(heavyName) || ['bam', 'cram', 'fastq', 'vcf', 'gvcf', 'sqlite'].includes(parsed?.type || '')) {
+    Logger.error('Refusing to copy BAM/CRAM/FASTQ/VCF/sqlite bytes onto this machine.');
+    console.log(chalk.yellow('Use `biofs stream` or `biofs query`. Heavy biodata stays on the server behind the biocid.'));
+    process.exit(2);
+  }
+
   if (options.gsUri || biocidOrFilename.startsWith('gs://')) {
     const gsPath = options.gsUri || biocidOrFilename;
     if (!gsPath.startsWith('gs://')) {
       throw new Error(`--gs-uri must start with gs://, got: ${gsPath}`);
     }
     const defaultName = gsPath.split('/').pop() || 'download.bin';
+    if (isHeavyGenomicName(defaultName)) {
+      Logger.error('Refusing to `gcloud storage cp` genomic bytes onto this machine.');
+      process.exit(2);
+    }
     const target = destination || options.output || defaultName;
     if (!options.quiet) {
       Logger.info(`Direct GCS fetch (bypassing BioFiles discovery): ${gsPath}`);

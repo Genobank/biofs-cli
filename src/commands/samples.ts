@@ -15,10 +15,13 @@
 
 import { spawnSync } from 'child_process';
 import * as fs from 'fs';
+import axios from 'axios';
 import chalk from 'chalk';
 import { Logger } from '../lib/utils/logger';
-
-const BIOROUTER_API = process.env.BIOROUTER_API || 'https://api.genobank.app';
+import { CredentialsManager } from '../lib/auth/credentials';
+import { CONFIG } from '../lib/config/constants';
+import { fileMatchesTypeFilter } from '../lib/biofiles/filetype';
+import { BIOFS_VERSION } from '../version';
 
 export interface SamplesListOptions {
   lab?: string;
@@ -40,44 +43,33 @@ interface SampleRow {
 }
 
 async function fetchSamples(opts: SamplesListOptions): Promise<SampleRow[]> {
-  // The bioroutes inventory exposes a per-sample roll-up at /api_bioroutes/samples
-  // (admin or lab-custodian scoped). We curl with the Authorization signature
-  // derived from the operator's wallet via the standard biofs auth flow.
-  const sigFlags = ['-sS', '-A', 'biofs/3.2.0', '--max-time', '120'];
-  let url = `${BIOROUTER_API}/api_bioroutes/samples?limit=${opts.limit || '5000'}`;
-  if (opts.lab) url += `&lab=${encodeURIComponent(opts.lab)}`;
-  if (opts.has) url += `&has=${encodeURIComponent(opts.has)}`;
-
-  // Try with the operator's signed-message header if present; otherwise rely on
-  // server-side IP allowlist for admin scope.
-  const signFile = process.env.HOME + '/.biofs/auth/credentials.json';
-  if (fs.existsSync(signFile)) {
-    const creds = JSON.parse(fs.readFileSync(signFile, 'utf8'));
-    if (creds.root_signature) {
-      sigFlags.push('-H', `X-Auth-Wallet: ${creds.wallet_address}`);
-      sigFlags.push('-H', `X-Auth-Root-Signature: ${creds.root_signature}`);
-    }
+  const creds = await CredentialsManager.getInstance().loadCredentials();
+  if (!creds) throw new Error('Not authenticated. Run: biofs login');
+  const base = process.env.BIOROUTER_API || CONFIG.API_BASE_URL;
+  const url = `${base}/api_bioroutes/samples`;
+  const resp = await axios.get(url, {
+    params: {
+      limit: opts.limit || '5000',
+      lab: opts.lab,
+      has: opts.has,
+      wallet: creds.wallet_address,
+      signature: creds.user_signature,
+    },
+    timeout: 120_000,
+    headers: {
+      'User-Agent': `biofs/${BIOFS_VERSION}`,
+      'X-Auth-Wallet': creds.wallet_address,
+    },
+    validateStatus: (s) => s < 500,
+  });
+  if (resp.status >= 400) {
+    throw new Error(`bioroutes samples HTTP ${resp.status}: ${resp.data?.error || 'unauthorized'}`);
   }
-
-  const r = spawnSync('curl', [...sigFlags, url], { encoding: 'utf8', maxBuffer: 200 * 1024 * 1024 });
-  if (r.status !== 0) throw new Error(`bioroutes samples fetch failed: ${r.stderr}`);
-  const text = (r.stdout || '').trim();
-  if (text.startsWith('<')) {
-    throw new Error(`bioroutes returned HTML (likely 404 / unauthorized): ${text.slice(0, 200)}`);
-  }
-  let data: any;
-  try {
-    data = JSON.parse(text);
-  } catch (e) {
-    throw new Error(`bioroutes returned non-JSON: ${text.slice(0, 200)}`);
-  }
+  const data = resp.data;
   if (Array.isArray(data)) return data as SampleRow[];
   if (Array.isArray(data?.samples)) return data.samples as SampleRow[];
   if (Array.isArray(data?.results)) return data.results as SampleRow[];
-  // The API may not exist yet; fall back to scraping `biofs inventory --json`
-  // and aggregating client-side. This is a soft fallback so the verb works
-  // even before the server-side endpoint ships.
-  throw new Error(`Unexpected bioroutes response shape: ${text.slice(0, 200)}`);
+  throw new Error(`Unexpected bioroutes samples shape`);
 }
 
 async function fallbackFromInventoryJson(opts: SamplesListOptions): Promise<SampleRow[]> {
@@ -109,7 +101,11 @@ export async function samplesListCommand(opts: SamplesListOptions): Promise<void
   // Apply client-side filters if the server didn't
   let filtered = rows;
   if (opts.lab) filtered = filtered.filter(r => (r.lab || '').toLowerCase() === opts.lab!.toLowerCase());
-  if (opts.has) filtered = filtered.filter(r => (r.filetypes || []).includes(opts.has!));
+  if (opts.has) {
+    filtered = filtered.filter(r =>
+      (r.filetypes || []).some(t => fileMatchesTypeFilter(opts.has as string, { type: t, filename: t }))
+    );
+  }
 
   // Emit
   if (opts.short) {

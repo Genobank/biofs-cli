@@ -1,3 +1,11 @@
+# v3.20.2 — wallet-keyed cache, fuse default host, samples verb, no hardcoded HLA/cassette paths
+
+# v3.20.1 — accept `Biocid:` prefixes and somatic/germline VCF type aliases
+
+# v3.20.0 — list and resolve real BAM/VCF/sqlite biocids
+
+`biofs files --filter sqlite` no longer returns 0 when OpenCRAVAT rows are typed `opencravat`. `--filter bam` / `--filter vcf` match aliases and biocid paths. Canonical 4-part `biocid://lab/wallet/type/dataset` parses. `list_inventory` unions `biocid_registry`. `biofs samples` uses `~/.biofs/credentials.json`. `view` / `download` refuse heavy genomic bytes on the laptop.
+
 # v3.5.0 — biofs clinical: phenotype-driven multi-exome ACMG/AMP 2015 + ClinGen-SVI classifier
 
 **Published**: 2026-05-23. Server endpoint at `POST https://genobank.app/api_biofs_fuse/clinical_acmg` (analyzer at `/home/ubuntu/Genobank_APIs/production_api/clinical_acmg/clinical_acmg.py`).

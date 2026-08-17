@@ -3,6 +3,7 @@ import { BioFilesCacheManager } from '../lib/storage/biofiles-cache';
 import { CredentialsManager } from '../lib/auth/credentials';
 import { Logger } from '../lib/utils/logger';
 import { BioFile } from '../types/biofiles';
+import { fileMatchesTypeFilter } from '../lib/biofiles/filetype';
 import chalk from 'chalk';
 import boxen from 'boxen';
 
@@ -25,15 +26,17 @@ export async function filesCommand(options: FilesOptions): Promise<void> {
   // the caller's own cache — it would show stale data and clobber the
   // operator's cache. Always fetch fresh for a targeted view.
   const targetOwner = options.wallet ? options.wallet.toLowerCase() : undefined;
+  const creds = await credManager.loadCredentials();
+  const callerWallet = creds?.wallet_address;
 
   // Check if we should use cache or force update
-  const useCache = !targetOwner && !options.update && !cacheManager.needsUpdate();
+  const useCache = !targetOwner && !options.update && !cacheManager.needsUpdate(3600000, callerWallet);
 
   if (useCache) {
     // Load from cache
     const spinner = Logger.spinner('Loading BioFiles from cache...');
     try {
-      const cachedBiofiles = cacheManager.getAll();
+      const cachedBiofiles = cacheManager.getAll(callerWallet);
 
       if (cachedBiofiles.length > 0) {
         // Convert cache format back to BioFile format
@@ -73,7 +76,7 @@ export async function filesCommand(options: FilesOptions): Promise<void> {
   let files = allFiles;
 
   if (options.filter) {
-    files = files.filter(f => f.type.toLowerCase() === options.filter?.toLowerCase());
+    files = files.filter(f => fileMatchesTypeFilter(options.filter as string, f));
   }
 
   if (options.source) {

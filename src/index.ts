@@ -207,6 +207,10 @@ import { matchCommand, MatchOptions } from './commands/match';
 import { ticketCommand, TicketOptions } from './commands/ticket';
 import { scanCommand, ScanOptions } from './commands/scan';
 import { inventoryCommand, InventoryOptions } from './commands/inventory';
+import { samplesListCommand, SamplesListOptions } from './commands/samples';
+import { cassetteCommand, CassetteOptions } from './commands/cassette';
+import { hlaTypeSubmitCommand, HlaTypeOptions } from './commands/hla-type/submit';
+import { cancermapRegenCommand, CancermapRegenOptions } from './commands/cancermap/regen';
 import { inventoryCohortCommand, InventoryCohortOptions } from './commands/inventory/cohort';
 import { jobReconcileCommand, JobReconcileOptions } from './commands/job/reconcile';
 import { cohortPipelineCommand, CohortPipelineOptions } from './commands/cohort-pipeline';
@@ -337,7 +341,7 @@ program
   .alias('files')  // Keep 'files' as alias for backward compatibility
   .alias('ls')
   .description('Discover all your BioFiles from GenoBank ecosystem (Story Protocol, Avalanche, S3, BioIP)')
-  .option('--filter <type>', 'Filter by file type (vcf, fastq, bam, pdf, etc.)')
+  .option('--filter <type>', 'Filter by file type (bam, vcf, sqlite, fastq, ...). Aliases: sqlite=opencravat/.pas, vcf=gvcf, bam=cram')
   .option('--source <source>', 'Filter by source (story, avalanche, s3, biofs, biorouter)')
   .option('--wallet <address>', "Admin: list another wallet's files (e.g. a custodian's). Bypasses cache.")
   .option('--json', 'Output as JSON')
@@ -449,7 +453,7 @@ const fuseCmd = program
 fuseCmd
   .command('mount <biosample_id>')
   .description('Verify BioNFT consent for a biosample')
-  .option('--server <url>', 'BioFS-Node server URL', 'http://localhost:8081')
+  .option('--server <url>', 'FUSE API URL (default https://genobank.app/api_biofs_fuse)')
   .option('--json', 'Output as JSON')
   .option('--verbose', 'Show detailed output')
   .action(async (biosampleId: string, options: FuseOptions) => {
@@ -466,7 +470,7 @@ fuseCmd
   .command('list <biosample_id>')
   .alias('ls')
   .description('List files available in a biosample')
-  .option('--server <url>', 'BioFS-Node server URL', 'http://localhost:8081')
+  .option('--server <url>', 'FUSE API URL (default https://genobank.app/api_biofs_fuse)')
   .option('--json', 'Output as JSON')
   .option('--verbose', 'Show detailed output')
   .action(async (biosampleId: string, options: FuseOptions) => {
@@ -483,7 +487,7 @@ fuseCmd
   .command('stream <biosample_id> <filename>')
   .alias('download')
   .description('Stream/download a file from a biosample')
-  .option('--server <url>', 'BioFS-Node server URL', 'http://localhost:8081')
+  .option('--server <url>', 'FUSE API URL (default https://genobank.app/api_biofs_fuse)')
   .option('--output <path>', 'Output file path')
   .option('--json', 'Output as JSON')
   .option('--verbose', 'Show detailed output')
@@ -500,7 +504,7 @@ fuseCmd
 fuseCmd
   .command('sample <biosample_id> <filename>')
   .description('Download a sample of a file (for FastQC preview)')
-  .option('--server <url>', 'BioFS-Node server URL', 'http://localhost:8081')
+  .option('--server <url>', 'FUSE API URL (default https://genobank.app/api_biofs_fuse)')
   .option('--size <size>', 'Sample size (e.g., 100MB, 1GB)', '100MB')
   .option('--output <path>', 'Output file path')
   .option('--json', 'Output as JSON')
@@ -1063,6 +1067,28 @@ inventoryCmd
       await inventoryCohortCommand(options);
     } catch (error) {
       Logger.error(`inventory cohort failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+const samplesCmd = program
+  .command('samples')
+  .description('List biosample serials from BioRouter inventory');
+samplesCmd
+  .command('list')
+  .description('List distinct biosample serials (optional --lab / --has)')
+  .option('--lab <name>', 'Filter by origin lab')
+  .option('--has <type>', 'Require this filetype (aliases: sqlite, bam, vcf)')
+  .option('--json', 'JSON output')
+  .option('--csv', 'CSV output')
+  .option('--short', 'Serials only')
+  .option('--limit <n>', 'Max rows')
+  .option('--out-file <path>', 'Write to file')
+  .action(async (options: SamplesListOptions) => {
+    try {
+      await samplesListCommand(options);
+    } catch (error) {
+      Logger.error(`samples list failed: ${error}`);
       process.exit(1);
     }
   });
@@ -1779,6 +1805,82 @@ interpretCmd
       await interpretStatusCommand(jobId, options);
     } catch (error) {
       Logger.error(`Interpretation status check failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+const cassetteCmd = program
+  .command('cassette')
+  .description('Audit a Cancer Digital Twin and simulate the one-neoantigen RNA cassette (CD8)');
+
+cassetteCmd
+  .command('audit [biosample_serial]')
+  .description('List missing or contradictory twin layers needed for a CD8 cassette')
+  .option('--wallet <addr>', 'Owner wallet')
+  .option('--remote', 'Dispatch to biofs-node /agent/cassette')
+  .option('--json', 'Emit JSON')
+  .action(async (serial: string | undefined, options: CassetteOptions) => {
+    try {
+      if (!serial) throw new Error('Pass a biosample serial');
+      await cassetteCommand('audit', serial, options);
+    } catch (error) {
+      Logger.error(`cassette audit failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+cassetteCmd
+  .command('simulate [biosample_serial]')
+  .description('Select 4-8 RNAs and estimate de novo blood CD8 probability')
+  .option('--wallet <addr>', 'Owner wallet')
+  .option('--remote', 'Dispatch to biofs-node /agent/cassette')
+  .option('--json', 'Emit JSON')
+  .option('--html <path>', 'Write the simulation HTML report')
+  .option('--min <n>', 'Minimum RNAs', '4')
+  .option('--max <n>', 'Maximum RNAs', '8')
+  .action(async (serial: string | undefined, options: CassetteOptions) => {
+    try {
+      if (!serial) throw new Error('Pass a biosample serial');
+      await cassetteCommand('simulate', serial, options);
+    } catch (error) {
+      Logger.error(`cassette simulate failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+const hlaTypeCmd = program
+  .command('hla-type')
+  .description('RNA HLA typing (arcasHLA) dispatched through biofs-node; BAM stays on the server');
+
+hlaTypeCmd
+  .command('submit <biosample_serial>')
+  .description('Submit arcasHLA on the case RNA BAM biocid')
+  .option('--rna-biocid <biocid>', 'Override RNA BAM biocid')
+  .option('--json', 'Emit JSON')
+  .action(async (serial: string, options: HlaTypeOptions) => {
+    try {
+      await hlaTypeSubmitCommand(serial, options);
+    } catch (error) {
+      Logger.error(`hla-type submit failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+const cancermapCmd = program
+  .command('cancermap')
+  .description('Grounded cancer-map regeneration (biofs-node /agent/cancermap)');
+
+cancermapCmd
+  .command('regen [wallet]')
+  .description('Regenerate twin.json + grounded map for a wallet (does not pull genomic bytes)')
+  .option('--serial <serial>', 'Biosample serial')
+  .option('--case-id <id>', 'Case id')
+  .option('--json', 'Emit JSON')
+  .action(async (wallet: string | undefined, options: CancermapRegenOptions) => {
+    try {
+      await cancermapRegenCommand(wallet, options);
+    } catch (error) {
+      Logger.error(`cancermap regen failed: ${error}`);
       process.exit(1);
     }
   });
@@ -4033,7 +4135,7 @@ program
 // Show welcome message if no command
 if (process.argv.length === 2) {
   console.log(chalk.cyan('\n╔═════════════════════════════════════════════╗'));
-  console.log(chalk.cyan('║  BioFS CLI v3.2.0                           ║'));
+  console.log(chalk.cyan(`║  BioFS CLI v${String(BIOFS_VERSION).padEnd(31)}║`));
   console.log(chalk.cyan('║  BioNFT-Gated Genomics + Researcher ID      ║'));
   console.log(chalk.cyan('╚═════════════════════════════════════════════╝\n'));
 
