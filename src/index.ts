@@ -15,6 +15,7 @@ import {
   roomRevokeCommand, roomListCommand, roomEnterCommand, roomLeaveCommand,
   roomFilesCommand, roomSigningUrlCommand, RoomOptions,
 } from './commands/room';
+import { manifestPublishCommand, manifestShowCommand, ManifestOptions } from './commands/manifest';
 import { BIOFS_VERSION } from './version';
 import chalk from 'chalk';
 import { loginCommand, LoginOptions } from './commands/login';
@@ -3980,6 +3981,34 @@ profileCmd
   .option('--json', 'JSON output')
   .action(async (o: ProfileOptions) => {
     try { await profileStatusCommand(o); } catch (e) { Logger.error(String(e)); process.exit(1); }
+  });
+
+// MEMBER_PROFILE_20260824: the aggregate collection manifest of a consortium member node
+const manifestCmd = program
+  .command('manifest')
+  .description('Consortium member: publish or show the aggregate collection manifest (counts and conditions, never identifiers)');
+manifestCmd
+  .command('publish')
+  .description('Principal investigator: build and publish the aggregate manifest of this node')
+  .requiredOption('--institution <name>', 'Institution name shown on the manifest')
+  .option('--lab-id <id>', 'Origin lab id to scope the inventory (default: whole node)')
+  .option('--contact <text>', 'Contact shown on the manifest')
+  .option('--conditions <list>', 'Conditions of use as DUO codes, comma-separated (e.g. DUO:0000042,DUO:0000006)')
+  .option('--passport <list>', 'Passport requirements, comma-separated')
+  .option('--min-cell <n>', 'Minimum cell size; smaller counts are published as a range', '5')
+  .option('--node <url>', 'biofs-node base URL (default: BIOFS_NODE_URL or the GenoBank.io node)')
+  .option('--json', 'JSON output')
+  .option('--quiet', 'Quiet mode')
+  .action(async (o: ManifestOptions) => {
+    try { await manifestPublishCommand(o); } catch (e) { Logger.error(String(e)); process.exit(1); }
+  });
+manifestCmd
+  .command('show')
+  .description('Show the manifest a node has published (public)')
+  .option('--node <url>', 'biofs-node base URL (default: BIOFS_NODE_URL or the GenoBank.io node)')
+  .option('--json', 'JSON output')
+  .action(async (o: ManifestOptions) => {
+    try { await manifestShowCommand(o); } catch (e) { Logger.error(String(e)); process.exit(1); }
   });
 
 // BIODATA_ROOM_20260801: investor-style biodata room for researcher deep dives
