@@ -1,5 +1,9 @@
 # v3.20.2 — wallet-keyed cache, fuse default host, samples verb, no hardcoded HLA/cassette paths
 
+## 3.20.4 (2026-08-24) biofs manifest
+
+New verb `biofs manifest` for consortium member nodes running biofs-node v0.4.20 in the member profile. `biofs manifest publish --institution <name> [--lab-id <id>] [--contact <text>] [--conditions DUO:...] [--passport ...] [--min-cell 5] [--node <url>]` asks the node (POST /agent/manifest/publish, principal investigator signature plus the operator headers) to build and publish the aggregate collection manifest: counts by biodata type, category, assay and reference build, provenance months, conditions of use and Passport requirements, with cells under the minimum reported as a range. `biofs manifest show [--node <url>]` prints a node's published manifest (GET /agent/manifest, public). The manifest never carries a sample, file, token, storage, owner, or record identifier; the node refuses to build one that would.
+
 # v3.20.1 — accept `Biocid:` prefixes and somatic/germline VCF type aliases
 
 # v3.20.0 — list and resolve real BAM/VCF/sqlite biocids
