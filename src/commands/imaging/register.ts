@@ -112,9 +112,19 @@ async function fetchStatus(jobId: string, signature: string): Promise<{ status: 
 async function waitFor(jobId: string, signature: string, quiet?: boolean): Promise<RegisterRow | null> {
   const spin = quiet ? null : ora(`waiting for register job ${jobId} on the GPU executor ...`).start();
   const deadline = Date.now() + 3 * 60 * 60_000;   // 3 h ceiling
+  let failures = 0;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 20_000));
-    const { status, data } = await fetchStatus(jobId, signature);
+    let status: number; let data: RegisterRow;
+    try {
+      ({ status, data } = await fetchStatus(jobId, signature));
+      failures = 0;
+    } catch (e: any) {
+      // a dropped connection during a long wait is not a job failure: keep retrying for about 10 minutes
+      if (++failures >= 30) { spin?.fail(`imaging_register_status unreachable: ${e?.message || e}`); return null; }
+      if (spin) spin.text = `register job ${jobId}: status unreachable (${e?.message || e}), retrying`;
+      continue;
+    }
     if (status >= 400) { spin?.fail(`imaging_register_status ${status}: ${(data as any)?.error || 'unknown'}`); return null; }
     if (data.status === 'done' || data.status === 'error') {
       if (data.status === 'done') spin?.succeed(`register job done: gate ${data.result?.gate?.verdict}`);
