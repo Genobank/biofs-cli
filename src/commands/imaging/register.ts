@@ -3,12 +3,16 @@
  *
  * Staged 3D registration of N CT timepoints into one reference frame, with a quality
  * gate, dispatched through biofs-node to the GPU executor. For every non-reference
- * timepoint the executor aligns coarse to fine (vertebral-centroid translation, rigid on
- * bone, affine on the body, SyN deformable) and measures each stage: per-structure Dice
- * from TotalSegmentator masks, vertebral landmark error, Jacobian folding, bone rigidity,
- * and, with three or more timepoints, agreement of A->B->C with A->C. The gate verdict
- * (PASS, PASS_WITH_WARNINGS, FAIL) is computed against thresholds written into the
- * result, so a later lesion or organ comparison knows how far the alignment can be trusted.
+ * timepoint the executor aligns coarse to fine: a rigid fit to the vertebrae segmented
+ * consistently in both scans, rigid refinement on the vertebral column, then a piecewise
+ * deformable stage in which the lungs, the solid abdominal organs and the rest of the body
+ * are registered separately, so organs can slide against the rib cage. Each stage is
+ * measured: surface distance of the whole spine, of each lung, of the liver and of the
+ * spleen, per-structure Dice from TotalSegmentator masks,
+ * vertebral landmark error, Jacobian folding, bone rigidity, and, with three or more
+ * timepoints, agreement of A->B->C with A->C. The gate verdict (PASS, PASS_WITH_WARNINGS,
+ * FAIL) is computed against thresholds written into the result, so a later lesion or
+ * organ comparison knows how far the alignment can be trusted.
  *
  * biofs-node checks that every study belongs to the signer and picks each series by
  * comparability with the reference (axial, original, soft-tissue kernel, closest
@@ -86,8 +90,9 @@ function printRow(row: RegisterRow): void {
   for (const p of r.pairs || []) {
     const d = p.deformable || {};
     const pc = p.verdict === 'PASS' ? chalk.green : p.verdict === 'FAIL' ? chalk.red : chalk.yellow;
-    console.log(`  ${p.pair.padEnd(18)} ${pc(p.verdict.padEnd(18))} vertebra TRE ${d.vertebra_tre_mean_mm ?? '-'} mm  lungs/heart min Dice ${d.large_structure_dice_min ?? '-'}  `
-      + `aorta/trachea/esophagus min ${d.medium_structure_dice_min ?? '-'}  folds ${d.jacobian_fold_fraction ?? '-'}`);
+    console.log(`  ${p.pair.padEnd(18)} ${pc(p.verdict.padEnd(18))} spine ${d.spine_assd_mm ?? '-'} mm (HD95 ${d.spine_hd95_mm ?? '-'})  `
+      + `lungs Dice ${d.lung_dice_min ?? '-'}, HD95 ${d.lung_hd95_max_mm ?? '-'} mm  liver/spleen HD95 ${d.abdominal_organ_hd95_max_mm ?? '-'} mm  `
+      + `heart ${d.heart_dice ?? '-'}  folds ${d.jacobian_fold_fraction ?? '-'}`);
     for (const h of p.hard_failures || []) console.log(chalk.red(`      fail: ${h}`));
     for (const w of p.warnings || []) console.log(chalk.yellow(`      warn: ${w}`));
   }
