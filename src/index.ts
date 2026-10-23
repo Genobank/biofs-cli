@@ -116,6 +116,7 @@ import { imagingCharacterizeCommand, ImagingCharacterizeOptions } from './comman
 import { imagingEnrichCommand, ImagingEnrichOptions } from './commands/imaging/enrich';
 import { imagingCompareCommand, ImagingCompareOptions } from './commands/imaging/compare';
 import { imagingReconcileCommand, ImagingReconcileOptions } from './commands/imaging/reconcile';
+import { imagingRegisterCommand, imagingRegisterStatusCommand, ImagingRegisterOptions, ImagingRegisterStatusOptions } from './commands/imaging/register';
 import { methylSubmitCommand, MethylSubmitOptions } from './commands/methyl/submit';
 import { methylExecCommand, MethylExecOptions } from './commands/methyl/exec';
 import { alignShardSubmitCommand, AlignShardSubmitOptions } from './commands/align-shard/submit';
@@ -1437,6 +1438,45 @@ imagingCmd
       await imagingReconcileCommand(options);
     } catch (error) {
       Logger.error(`imaging reconcile failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// imaging register — staged 3D registration of N CT timepoints into one reference
+// frame with a quality gate (rigid on bone -> affine -> SyN, QC per stage, transitivity),
+// on the GPU executor via biofs-node.
+const collect = (v: string, prev: string[]) => prev.concat([v]);
+imagingCmd
+  .command('register')
+  .description('Register CT timepoints into one reference frame with a quality gate (GPU via biofs-node)')
+  .requiredOption('--tp <label=study>', 'timepoint as label=StudyInstanceUID or label=dicom biocid, in time order (repeat)', collect, [])
+  .option('--series <label=series>', 'override the series biofs-node picks for one timepoint (repeat)', collect, [])
+  .option('--reference <label>', 'timepoint whose frame the others are registered into (default: the first)')
+  .option('--anatomy <name>', 'chest | abdomen', 'chest')
+  .option('--protocol-mode <mode>', 'auto | same | cross (auto compares the acquisitions)', 'auto')
+  .option('--wait', 'Wait for the GPU job and print the gate')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Output as JSON')
+  .action(async (options: ImagingRegisterOptions) => {
+    try {
+      await imagingRegisterCommand(options);
+    } catch (error) {
+      Logger.error(`imaging register failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+imagingCmd
+  .command('register-status <registerJobId>')
+  .description('Status and quality gate of an imaging register job')
+  .option('--wait', 'Wait until the job finishes')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Output as JSON')
+  .action(async (registerJobId: string, options: ImagingRegisterStatusOptions) => {
+    try {
+      await imagingRegisterStatusCommand(registerJobId, options);
+    } catch (error) {
+      Logger.error(`imaging register-status failed: ${error}`);
       process.exit(1);
     }
   });
