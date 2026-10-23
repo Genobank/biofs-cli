@@ -7,8 +7,10 @@
  * missing or carry no metadata. biofs-node asks the api_imaging executor which
  * studies it actually ingested for the signer, then inserts a missing row with
  * the same shape a pull writes and fills a metadata field only where the row
- * has none. Existing values (chain status, consent status) are never
- * overwritten, and a row held by another owner is reported, never touched.
+ * has none. Existing values are never overwritten: chain status stays as it
+ * is, and a consent status of active, revoked or erased is never changed; a
+ * registry row with no consent status at all gets 'active', the value a pull
+ * writes. A row held by another owner is reported, never touched.
  *
  * Flow:
  *   POST /api_biofs_node/imaging_reconcile {wallet, signature, apply}
