@@ -227,6 +227,8 @@ import {
   PassportOptions,
 } from './commands/researcher/passport';
 import { redactArgv } from './utils/errorReporter';
+// CARBONX_VERB_20261023: Carbon-X variant pathogenicity screen through biofs-node
+import { carbonxScoreCommand, carbonxStatusCommand, carbonxReportCommand, CarbonxScoreOptions } from './commands/carbonx';
 import { Logger } from './lib/utils/logger';
 import { ErrorReporter } from './utils/errorReporter';
 import { CredentialsManager } from './lib/auth/credentials';
@@ -4181,6 +4183,62 @@ program
   });
 
 // Show welcome message if no command
+// Carbon-X command group: variant pathogenicity of one owned biofile, scored on a GPU VM by
+// biofs-node (biocid in, biocid out; no genomic bytes on this machine).
+const carbonxCmd = program
+  .command('carbonx')
+  .description('Carbon-X DNA language model: variant pathogenicity screen of a VCF or SOMOS genotype biocid, server-side');
+
+carbonxCmd
+  .command('score <input_biocid>')
+  .description('Submit a Carbon-X screen of one biofile you own (germline VCF or SOMOS/23andMe genotypes)')
+  .option('--window <bp>', 'sequence window centered on each variant, 512 to 8192', '4096')
+  .option('--max-plp <n>', 'cap on ClinVar Pathogenic/Likely pathogenic calls scored', '200')
+  .option('--max-vus <n>', 'cap on ClinVar Uncertain significance calls scored', '400')
+  .option('--max-conflicting <n>', 'cap on ClinVar conflicting calls scored', '200')
+  .option('--max-blb <n>', 'seeded sample of ClinVar Benign/Likely benign calls used as negative controls', '300')
+  .option('--plan-only', 'select and count the variants, call no model')
+  .option('--no-rationale', 'do not store the model rationale in the report')
+  .option('--label <text>', 'free label for the job')
+  .option('--wait', 'poll until the job finishes')
+  .option('--json', 'JSON output')
+  .action(async (inputBiocid: string, options: CarbonxScoreOptions & { rationale?: boolean }) => {
+    try {
+      await carbonxScoreCommand(inputBiocid, { ...options, noRationale: options.rationale === false });
+    } catch (error: any) {
+      Logger.error(`carbonx score failed: ${error?.message || error}`);
+      process.exit(1);
+    }
+  });
+
+carbonxCmd
+  .command('report <carbonx_job_id>')
+  .description('Read the Markdown (default) or JSON report of a finished Carbon-X job (owner only, sha256 checked)')
+  .option('--format <fmt>', 'md or json', 'md')
+  .option('--out <file>', 'write to a file (mode 600) instead of stdout')
+  .action(async (jobId: string, options: { format?: string; out?: string }) => {
+    try {
+      await carbonxReportCommand(jobId, options);
+    } catch (error: any) {
+      Logger.error(`carbonx report failed: ${error?.message || error}`);
+      process.exit(1);
+    }
+  });
+
+carbonxCmd
+  .command('status <carbonx_job_id>')
+  .description('Status, selection counts, metrics and report biocids of a Carbon-X job')
+  .option('--wait', 'poll until the job finishes')
+  .option('--json', 'JSON output')
+  .action(async (jobId: string, options: { wait?: boolean; json?: boolean }) => {
+    try {
+      await carbonxStatusCommand(jobId, options);
+    } catch (error: any) {
+      Logger.error(`carbonx status failed: ${error?.message || error}`);
+      process.exit(1);
+    }
+  });
+
 if (process.argv.length === 2) {
   console.log(chalk.cyan('\n╔═════════════════════════════════════════════╗'));
   console.log(chalk.cyan(`║  BioFS CLI v${String(BIOFS_VERSION).padEnd(31)}║`));
