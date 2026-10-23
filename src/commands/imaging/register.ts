@@ -5,8 +5,9 @@
  * gate, dispatched through biofs-node to the GPU executor. For every non-reference
  * timepoint the executor aligns coarse to fine: a rigid fit to the vertebrae segmented
  * consistently in both scans, rigid refinement on the vertebral column, then a piecewise
- * deformable stage in which the lungs, the solid abdominal organs and the rest of the body
- * are registered separately, so organs can slide against the rib cage. Each stage is
+ * deformable stage in which the lungs, the viscera that move with the diaphragm (heart and
+ * abdominal organs) and the rest of the body are registered separately, so organs can slide
+ * against the rib cage. Each stage is
  * measured: surface distance of the whole spine, of each lung, of the liver and of the
  * spleen, per-structure Dice from TotalSegmentator masks,
  * vertebral landmark error, Jacobian folding, bone rigidity, and, with three or more
