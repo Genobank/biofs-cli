@@ -1,5 +1,9 @@
 # v3.20.2 — wallet-keyed cache, fuse default host, samples verb, no hardcoded HLA/cassette paths
 
+## 3.20.5 (2026-10-23) biofs imaging reconcile
+
+New verb `biofs imaging reconcile [--apply] [--json]` repairs the registry rows of DICOM studies already in the signer's vault. It calls biofs-node `POST /agent/imaging_reconcile`, which asks the api_imaging executor which studies it ingested for the signer and, for each one, inserts a missing `bioroutes.inventory` or `biorouter.biocid_registry` row with the same shape `biofs imaging pull` writes and fills a metadata field (study UID, modality, description, date, series and image counts) only where the row has none. Existing values are never overwritten, so chain status and consent status stay as they are; a study whose row is held by another owner in either collection is reported as a conflict and left untouched in both. Dry run unless `--apply`. Needs biofs-node with the IMAGING_RECONCILE_20261023 endpoint.
+
 ## 3.20.4 (2026-08-24) biofs manifest
 
 New verb `biofs manifest` for consortium member nodes running biofs-node v0.4.20 in the member profile. `biofs manifest publish --institution <name> [--lab-id <id>] [--contact <text>] [--conditions DUO:...] [--passport ...] [--min-cell 5] [--node <url>]` asks the node (POST /agent/manifest/publish, principal investigator signature plus the operator headers) to build and publish the aggregate collection manifest: counts by biodata type, category, assay and reference build, provenance months, conditions of use and Passport requirements, with cells under the minimum reported as a range. `biofs manifest show [--node <url>]` prints a node's published manifest (GET /agent/manifest, public). The manifest never carries a sample, file, token, storage, owner, or record identifier; the node refuses to build one that would.

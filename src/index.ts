@@ -115,6 +115,7 @@ import { imagingFindingsCommand, ImagingFindingsOptions } from './commands/imagi
 import { imagingCharacterizeCommand, ImagingCharacterizeOptions } from './commands/imaging/characterize';
 import { imagingEnrichCommand, ImagingEnrichOptions } from './commands/imaging/enrich';
 import { imagingCompareCommand, ImagingCompareOptions } from './commands/imaging/compare';
+import { imagingReconcileCommand, ImagingReconcileOptions } from './commands/imaging/reconcile';
 import { methylSubmitCommand, MethylSubmitOptions } from './commands/methyl/submit';
 import { methylExecCommand, MethylExecOptions } from './commands/methyl/exec';
 import { alignShardSubmitCommand, AlignShardSubmitOptions } from './commands/align-shard/submit';
@@ -1416,6 +1417,24 @@ imagingCmd
       await imagingCompareCommand(options);
     } catch (error) {
       Logger.error(`imaging compare failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// imaging reconcile — repair the registry rows of studies already in the vault:
+// insert a missing bioroutes.inventory / biocid_registry row and fill empty
+// metadata, never overwriting a value and never touching another owner's row.
+imagingCmd
+  .command('reconcile')
+  .description('Repair the registry rows of DICOM studies already in your vault (dry run unless --apply)')
+  .option('--apply', 'Write the missing rows and empty fields (default: dry run, nothing written)')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Output as JSON')
+  .action(async (options: ImagingReconcileOptions) => {
+    try {
+      await imagingReconcileCommand(options);
+    } catch (error) {
+      Logger.error(`imaging reconcile failed: ${error}`);
       process.exit(1);
     }
   });
