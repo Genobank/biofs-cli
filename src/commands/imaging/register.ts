@@ -112,21 +112,33 @@ async function fetchStatus(jobId: string, signature: string): Promise<{ status: 
 
 async function waitFor(jobId: string, signature: string, quiet?: boolean): Promise<RegisterRow | null> {
   const spin = quiet ? null : ora(`waiting for register job ${jobId} on the GPU executor ...`).start();
+  // A wrong id or a job of another wallet fails at once; after the job has answered once, a dropped
+  // connection or an error reply (the node also answers 403 when it briefly cannot recover the signer)
+  // is retried for about 10 minutes before the wait gives up.
+  const first = await fetchStatus(jobId, signature);
+  if (first.status >= 400) { spin?.fail(`imaging_register_status ${first.status}: ${(first.data as any)?.error || 'unknown'}`); return null; }
+  if (first.data.status === 'done' || first.data.status === 'error') {
+    if (first.data.status === 'done') spin?.succeed(`register job done: gate ${first.data.result?.gate?.verdict}`);
+    else spin?.fail(`register job error: ${first.data.error || first.data.result?.error || 'unknown'}`);
+    return first.data;
+  }
   const deadline = Date.now() + 3 * 60 * 60_000;   // 3 h ceiling
   let failures = 0;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 20_000));
-    let status: number; let data: RegisterRow;
+    let status = 0; let data = {} as RegisterRow; let problem = '';
     try {
       ({ status, data } = await fetchStatus(jobId, signature));
-      failures = 0;
+      if (status >= 400) problem = `imaging_register_status ${status}: ${(data as any)?.error || 'unknown'}`;
     } catch (e: any) {
-      // a dropped connection during a long wait is not a job failure: keep retrying for about 10 minutes
-      if (++failures >= 30) { spin?.fail(`imaging_register_status unreachable: ${e?.message || e}`); return null; }
-      if (spin) spin.text = `register job ${jobId}: status unreachable (${e?.message || e}), retrying`;
+      problem = `imaging_register_status unreachable: ${e?.message || e}`;
+    }
+    if (problem) {
+      if (++failures >= 30) { spin?.fail(problem); return null; }
+      if (spin) spin.text = `register job ${jobId}: ${problem}, retrying`;
       continue;
     }
-    if (status >= 400) { spin?.fail(`imaging_register_status ${status}: ${(data as any)?.error || 'unknown'}`); return null; }
+    failures = 0;
     if (data.status === 'done' || data.status === 'error') {
       if (data.status === 'done') spin?.succeed(`register job done: gate ${data.result?.gate?.verdict}`);
       else spin?.fail(`register job error: ${data.error || data.result?.error || 'unknown'}`);
