@@ -17,12 +17,14 @@ trust, and it says in numbers how far it can be trusted:
        -> deformable, piecewise so the organs inside the rib cage can slide against it
           (the "motion mask" idea of thoracic registration):
             lungs: SyN (cross-correlation, lung window) inside the lungs
-            abdominal viscera: SyN (cross-correlation, soft-tissue window) driven by the
-              solid organs (liver, spleen, kidneys, pancreas, adrenals, gallbladder,
-              portal and splenic veins); stomach and bowel follow this deformation
-              but do not drive it, since their content changes between scans
-            rest of the body (wall, skeleton, mediastinum): SyN with the lung and
-              visceral interiors excluded
+            viscera that move with the diaphragm: SyN (cross-correlation, soft-tissue
+              window) driven by the heart, inferior vena cava and the solid abdominal
+              organs (liver, spleen, kidneys, pancreas, adrenals, gallbladder, portal and
+              splenic veins); stomach and bowel follow this deformation but do not
+              drive it, since their content changes between scans. The heart rests on
+              the diaphragm and descends with it on a deep breath, as the liver does
+            rest of the body (wall, skeleton, aorta, airway, esophagus): SyN with the
+              lung and visceral interiors excluded
             each reference voxel takes the transform of the region its reference label
             belongs to, and the body transform everywhere else
      with QC after every stage: label-agnostic surface distance of the whole bony spine,
@@ -1036,12 +1038,13 @@ def main():
             "heart_id": (ids_matching(names, r"^heart$") or [None])[0],
             "liver": ids_matching(names, r"^liver$"),
             "spleen": ids_matching(names, r"^spleen$"),
-            # solid organs drive the visceral deformation; hollow organs follow it
-            "viscera_solid": ids_matching(names, r"^(liver|spleen|pancreas|gallbladder|kidney_(left|right)|kidney_cyst_(left|right)"
-                                                 r"|adrenal_gland_(left|right)|portal_vein_and_splenic_vein)$"),
-            "viscera": ids_matching(names, r"^(liver|spleen|pancreas|gallbladder|kidney_(left|right)|kidney_cyst_(left|right)"
-                                            r"|adrenal_gland_(left|right)|portal_vein_and_splenic_vein|stomach|duodenum"
-                                            r"|small_bowel|colon)$"),
+            # the viscera that move with the diaphragm: heart, inferior vena cava and the solid
+            # abdominal organs drive this deformation; hollow organs follow it
+            "viscera_solid": ids_matching(names, r"^(heart|inferior_vena_cava|liver|spleen|pancreas|gallbladder|kidney_(left|right)"
+                                                 r"|kidney_cyst_(left|right)|adrenal_gland_(left|right)|portal_vein_and_splenic_vein)$"),
+            "viscera": ids_matching(names, r"^(heart|inferior_vena_cava|liver|spleen|pancreas|gallbladder|kidney_(left|right)"
+                                            r"|kidney_cyst_(left|right)|adrenal_gland_(left|right)|portal_vein_and_splenic_vein"
+                                            r"|stomach|duodenum|small_bowel|colon)$"),
         }
         for t in tps:
             cmp = compare_protocols(ref["protocol"], t["protocol"]) if t is not ref else {"comparability": "reference", "differences_hard": [], "differences_soft": []}

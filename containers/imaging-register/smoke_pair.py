@@ -83,8 +83,8 @@ groups = {
     "heart_id": (R.ids_matching(names, r"^heart$") or [None])[0],
     "liver": R.ids_matching(names, r"^liver$"),
     "spleen": R.ids_matching(names, r"^spleen$"),
-    "viscera_solid": R.ids_matching(names, r"^(liver|spleen|pancreas|gallbladder|kidney_(left|right))$"),
-    "viscera": R.ids_matching(names, r"^(liver|spleen|pancreas|gallbladder|kidney_(left|right)|stomach)$"),
+    "viscera_solid": R.ids_matching(names, r"^(heart|inferior_vena_cava|liver|spleen|pancreas|gallbladder|kidney_(left|right))$"),
+    "viscera": R.ids_matching(names, r"^(heart|inferior_vena_cava|liver|spleen|pancreas|gallbladder|kidney_(left|right)|stomach)$"),
 }
 t0 = time.time()
 res = {}
