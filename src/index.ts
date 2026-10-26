@@ -185,6 +185,7 @@ import { resolveCommand, ResolveOptions } from './commands/resolve';
 import { variantsCommand, VariantsOptions } from './commands/variants';
 import { queryCommand, QueryOptions } from './commands/query';
 import { eraseCommand, EraseOptions } from './commands/erase';
+import { eraseTrialRunCommand, eraseTrialNodeCommand, eraseTrialReadCommand, eraseTrialGranteeCommand, EraseTrialOptions } from './commands/erase-trial';
 import { fourierScoreCommand, FourierScoreOptions } from './commands/fourier-score';
 import { rrmConsensusCommand, RrmConsensusOptions } from './commands/rrm-consensus';
 import { psmConsensusCommand, PsmConsensusOptions } from './commands/psm-consensus';
@@ -3786,6 +3787,33 @@ program
       process.exit(1);
     }
   });
+
+// erase-trial — exercise GDPR Art. 17 erasure end to end on a synthetic biosample
+const eraseTrial = program
+  .command('erase-trial')
+  .description('Exercise biofs erase end to end on a SYNTHETIC biosample (no real biodata): build, grant, read, erase, re-check');
+eraseTrial
+  .command('run')
+  .description('Build a synthetic serial, grant it, read it, erase it, and record what remains')
+  .option('--json', 'Output the full report as JSON')
+  .action(async (options: EraseTrialOptions) => { await eraseTrialRunCommand(options); });
+eraseTrial
+  .command('grantee')
+  .description('Grant a synthetic biosample to a throwaway grantee wallet, revoke it, and record who is refused while the data remain available (nothing is erased)')
+  .option('--json', 'Output the full report as JSON')
+  .action(async (options: EraseTrialOptions) => { await eraseTrialGranteeCommand(options); });
+eraseTrial
+  .command('inspect <serial>')
+  .description('Report what still exists for an erase-trial serial')
+  .action(async (serial: string, options: EraseTrialOptions) => { await eraseTrialNodeCommand('inspect', serial, options); });
+eraseTrial
+  .command('cleanup <serial>')
+  .description('Remove what erase left behind for an erase-trial serial (synthetic rows and generations only)')
+  .action(async (serial: string, options: EraseTrialOptions) => { await eraseTrialNodeCommand('cleanup', serial, options); });
+eraseTrial
+  .command('read <serial>')
+  .description('One gated read of an erase-trial object as the signer, recording the gate decision (403 refused; 500 with storage not-found = admitted, bytes gone)')
+  .action(async (serial: string, options: EraseTrialOptions) => { await eraseTrialReadCommand(serial, options); });
 
 program
   .command('query <target> [sql]')
