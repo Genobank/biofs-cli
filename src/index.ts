@@ -117,6 +117,7 @@ import { imagingEnrichCommand, ImagingEnrichOptions } from './commands/imaging/e
 import { imagingCompareCommand, ImagingCompareOptions } from './commands/imaging/compare';
 import { imagingReconcileCommand, ImagingReconcileOptions } from './commands/imaging/reconcile';
 import { imagingRegisterCommand, imagingRegisterStatusCommand, ImagingRegisterOptions, ImagingRegisterStatusOptions } from './commands/imaging/register';
+import { imagingPackageCommand, imagingPackageStatusCommand, ImagingPackageOptions, ImagingPackageStatusOptions } from './commands/imaging/package';
 import { methylSubmitCommand, MethylSubmitOptions } from './commands/methyl/submit';
 import { methylExecCommand, MethylExecOptions } from './commands/methyl/exec';
 import { alignShardSubmitCommand, AlignShardSubmitOptions } from './commands/align-shard/submit';
@@ -1478,6 +1479,40 @@ imagingCmd
       await imagingRegisterStatusCommand(registerJobId, options);
     } catch (error) {
       Logger.error(`imaging register-status failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// imaging package — the organ package of a finished register job (per organ and timepoint: native volume, CT crop and mask,
+// slice table, GLB meshes, volume change with its measured repeatability floor), built on the GPU executor via biofs-node.
+imagingCmd
+  .command('package <registerJobId>')
+  .description('Build the organ package of a finished imaging register job (GPU via biofs-node)')
+  .option('--organs <list>', 'comma separated organ names (default: the standard organ list)')
+  .option('--no-floors', 'leave the repeatability floors out of the change table')
+  .option('--wait', 'Wait for the GPU job and print the summary')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Output as JSON')
+  .action(async (registerJobId: string, options: ImagingPackageOptions) => {
+    try {
+      await imagingPackageCommand(registerJobId, options);
+    } catch (error) {
+      Logger.error(`imaging package failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+imagingCmd
+  .command('package-status <packageJobId>')
+  .description('Status and summary of an organ package job')
+  .option('--wait', 'Wait until the job finishes')
+  .option('--quiet', 'Suppress progress output')
+  .option('--json', 'Output as JSON')
+  .action(async (packageJobId: string, options: ImagingPackageStatusOptions) => {
+    try {
+      await imagingPackageStatusCommand(packageJobId, options);
+    } catch (error) {
+      Logger.error(`imaging package-status failed: ${error}`);
       process.exit(1);
     }
   });
