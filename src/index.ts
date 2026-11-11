@@ -133,6 +133,8 @@ import { ontVariantsSubmitCommand, OntVariantsSubmitOptions } from './commands/o
 import { ontVariantsExecCommand, OntVariantsExecOptions } from './commands/ont-variants/exec';
 import { hifiAlignSubmitCommand, HifiAlignSubmitOptions } from './commands/hifi-align/submit';
 import { hifiAlignExecCommand, HifiAlignExecOptions } from './commands/hifi-align/exec';
+import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenStatusCommand, NeoantigenEvidenceOptions, NeoantigenDesignOptions } from './commands/neoantigen-pipeline';
+import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { pbsvSubmitCommand, PbsvSubmitOptions } from './commands/pbsv/submit';
 import { pbsvExecCommand, PbsvExecOptions } from './commands/pbsv/exec';
 import { repeatGenotypeSubmitCommand, RepeatGenotypeSubmitOptions } from './commands/repeat-genotype/submit';
@@ -4218,6 +4220,82 @@ consentCmd
     try { await consentSubmitCommand(o.session, o.message, o.signature, o); }
     catch (e) { Logger.error(`consent submit failed: ${e}`); process.exit(1); }
   });
+
+// ONRAMP_HTTPS_VERB_20261111: stream public HTTPS objects (hash-verified) into the vault under an owner biowallet, server side.
+const onrampHttpsCmd = program
+  .command('onramp-https')
+  .description('Stream public HTTPS objects into the BioRouter vault under an owner biowallet, hash-verified, server side (dispatched through biofs-node)');
+onrampHttpsCmd
+  .command('submit')
+  .description('Submit an on-ramp job; the manifest lists each object with its published sha256 and size')
+  .requiredOption('--owner <biowallet>', 'Owner biowallet (a custodial biowallet is claimable)')
+  .requiredOption('--serial <serial>', 'Origin biosample serial (never UNKNOWN)')
+  .requiredOption('--case-id <id>', 'Case identifier (never a person name)')
+  .requiredOption('--originlab <tag>', 'Origin lab or source tag, lowercase')
+  .requiredOption('--manifest <file>', 'Manifest JSON: objects with url (or key with --base-url), sha256, bytes, optional dataset')
+  .option('--base-url <url>', 'Base URL for catalog objects given as keys')
+  .option('--key-prefix <prefix>', 'Only catalog keys that start with this prefix')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (options: OnrampHttpsOptions) => { await onrampHttpsSubmitCommand(options); });
+onrampHttpsCmd
+  .command('status <job>')
+  .description('Show an on-ramp job')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await onrampHttpsStatusCommand(id, options); });
+
+// NEOANTIGEN_PIPELINE_VERBS_20261111: evidence table and engine v2 design for a patient's somatic calls (dispatched through biofs-node; every input a biocid).
+const neoantigenEvidenceCmd = program
+  .command('neoantigen-evidence')
+  .description('Read-level evidence for every somatic missense call (tumor, normal, second assay, RNA) plus FilterMutectCalls status and TPM, as one features table (dispatched through biofs-node)');
+neoantigenEvidenceCmd
+  .command('submit <caseId>')
+  .description('Submit a neoantigen-evidence job; every input is a biocid')
+  .requiredOption('--somatic-sqlite <biocid>', 'OpenCRAVAT somatic annotation sqlite of the tumor/normal callset')
+  .requiredOption('--filtered-vcf <biocid>', 'FilterMutectCalls VCF of the same callset')
+  .requiredOption('--tumor <biocid>', 'Aligned tumor BAM/CRAM')
+  .requiredOption('--normal <biocid>', 'Aligned matched-normal BAM/CRAM')
+  .option('--second-dna <biocid...>', 'Optional second tumor DNA assay (orthogonal evidence)')
+  .option('--rna <biocid>', 'Optional tumor RNA BAM')
+  .option('--tpm <biocid>', 'Optional gene TPM table')
+  .option('--min-mapq <n>', 'Minimum mapping quality (default 20)')
+  .option('--min-bq <n>', 'Minimum base quality (default 20)')
+  .option('--label <text>', 'Case label (a case identifier, never a name)')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: NeoantigenEvidenceOptions) => { await neoantigenEvidenceSubmitCommand(caseId, options); });
+neoantigenEvidenceCmd
+  .command('status <job>')
+  .description('Show a neoantigen-evidence job (only the signer who submitted it can read it)')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('evidence', id, options); });
+
+const neoantigenDesignCmd = program
+  .command('neoantigen-design')
+  .description('Rank neoantigens from a neoantigen-evidence result with the genobank engine v2 and assemble the cassette (dispatched through biofs-node)');
+neoantigenDesignCmd
+  .command('submit <caseId>')
+  .description('Submit a neoantigen-design job; the evidence result is a biocid')
+  .requiredOption('--evidence <biocid>', 'Result biocid of a neoantigen-evidence job')
+  .requiredOption('--hla <alleles>', 'Comma separated class I alleles, for example HLA-A*02:01,HLA-A*29:02,HLA-B*38:01')
+  .option('--proteome <biocid>', 'GENCODE protein FASTA (default: the node reference)')
+  .option('--n <count>', 'Cassette size, 1 to 50 (default 20)')
+  .option('--weights <list>', 'presentation,foreignness,expression,clonality[,evidence] summing to 1 (default 0.45,0.25,0.20,0.10)')
+  .option('--patient <label>', 'Case label (a case identifier, never a name)')
+  .option('--expect <genes>', 'Comma separated genes, for a retrospective check only')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: NeoantigenDesignOptions) => { await neoantigenDesignSubmitCommand(caseId, options); });
+neoantigenDesignCmd
+  .command('status <job>')
+  .description('Show a neoantigen-design job (only the signer who submitted it can read it)')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('design', id, options); });
 
 // FLUENCY_LINEAGE_VERBS_20260730: make a genomics store AI-conversable, and report the metamorphosis.
 // Registered with the other groups, BEFORE the welcome banner and program.parse().
