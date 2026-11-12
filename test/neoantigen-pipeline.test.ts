@@ -104,7 +104,7 @@ describe('neoantigen verbs: custodial owner', () => {
   });
 });
 
-import { buildHlaBody } from '../src/commands/neoantigen-pipeline';
+import { buildHlaBody, parseDepthCurve } from '../src/commands/neoantigen-pipeline';
 describe('neoantigen-hla verb', () => {
   const own = '0xFD1f085f8d10375df8A1c7C9ffA4FD0eB80B0b1d';
   test('germline BAM as a biocid, optional RNA, custodial owner, no raw paths', () => {
@@ -113,5 +113,39 @@ describe('neoantigen-hla verb', () => {
     expect((buildHlaBody('C1', { normal: bc('bam', 'n.bam') }, W, 's') as any).rna_biocid).toBe('');
     expect(() => buildHlaBody('C1', { normal: 'gs://b/n.bam' }, W, 's')).toThrow(/biocid/);
     expect(() => buildHlaBody('Jane Doe', { normal: bc('bam', 'n.bam') }, W, 's')).toThrow(/case identifier/);
+  });
+});
+
+describe('neoantigen-hla verb: depth curve and unmapped reads', () => {
+  test('depth curve is parsed, bounded, de-duplicated and sorted', () => {
+    expect(parseDepthCurve('0.1, 0.5,0.25,0.5')).toEqual([0.5, 0.25, 0.1]);
+    for (const bad of ['', '0', '1', '1.5', '-0.2', 'x', '0.1,0.2,0.3,0.4,0.5,0.6']) expect(() => parseDepthCurve(bad)).toThrow(/depth-curve/);
+  });
+  test('the body carries the curve and the flag only as asked', () => {
+    const plain: any = buildHlaBody('C1', { normal: bc('bam', 'n.bam') }, W, 's');
+    expect(plain.depth_curve).toBeUndefined(); expect(plain.include_unmapped).toBe(false);
+    const full: any = buildHlaBody('C1', { normal: bc('bam', 'n.bam'), depthCurve: '0.5,0.1', includeUnmapped: true }, W, 's');
+    expect(full.depth_curve).toEqual([0.5, 0.1]); expect(full.include_unmapped).toBe(true);
+    expect(() => buildHlaBody('C1', { normal: bc('bam', 'n.bam'), depthCurve: '2' }, W, 's')).toThrow(/depth-curve/);
+  });
+});
+
+describe('neoantigen-design verb: alleles from a registered HLA report', () => {
+  const evidence = bc('neoantigen_evidence', 'e.json', 'genobank');
+  const report = bc('hla-typing-report', 'neo-1.hla_typing_report.json', 'genobank');
+  test('explicit alleles still work and send no report biocid', () => {
+    const b: any = buildDesignBody('C1', { evidence, hla: 'HLA-A*02:01,HLA-B*38:01' }, W, 's');
+    expect(b.hla).toEqual(['HLA-A*02:01', 'HLA-B*38:01']); expect(b.hla_biocid).toBeUndefined(); expect(b.accept_low_confidence).toBeUndefined();
+  });
+  test('--hla-from sends the report biocid and no alleles; accepting low confidence is explicit', () => {
+    const b: any = buildDesignBody('C1', { evidence, hlaFrom: report }, W, 's');
+    expect(b.hla_biocid).toBe(report); expect(b.hla).toEqual([]); expect(b.accept_low_confidence).toBe(false);
+    expect((buildDesignBody('C1', { evidence, hlaFrom: report, acceptLowConfidence: true }, W, 's') as any).accept_low_confidence).toBe(true);
+  });
+  test('refusals: both sources, neither source, a raw path, accepting without a report', () => {
+    expect(() => buildDesignBody('C1', { evidence, hla: 'HLA-A*02:01', hlaFrom: report }, W, 's')).toThrow(/not both/);
+    expect(() => buildDesignBody('C1', { evidence }, W, 's')).toThrow(/--hla .* or --hla-from/);
+    expect(() => buildDesignBody('C1', { evidence, hlaFrom: 'gs://b/r.json' }, W, 's')).toThrow(/biocid/);
+    expect(() => buildDesignBody('C1', { evidence, hla: 'HLA-A*02:01', acceptLowConfidence: true }, W, 's')).toThrow(/only with --hla-from/);
   });
 });

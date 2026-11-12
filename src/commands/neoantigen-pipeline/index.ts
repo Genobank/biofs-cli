@@ -1,7 +1,8 @@
 /**
  * biofs neoantigen-evidence submit <caseId> --somatic-sqlite <biocid> --filtered-vcf <biocid> --tumor <biocid> --normal <biocid> [--second-dna <biocid>] [--rna <biocid>] [--tpm <biocid>]
  * biofs neoantigen-evidence status <job> [--wait]
- * biofs neoantigen-design   submit <caseId> --evidence <biocid> --hla <alleles> [--n 20] [--weights ...]
+ * biofs neoantigen-design   submit <caseId> --evidence <biocid> (--hla <alleles> | --hla-from <biocid> [--accept-low-confidence]) [--n 20] [--weights ...]
+ * biofs neoantigen-hla      submit <caseId> --normal <biocid> [--rna <biocid>] [--depth-curve 0.5,0.25,0.1] [--include-unmapped]
  * biofs neoantigen-design   status <job> [--wait]
  *
  * CLIENT verbs. Evidence: for every somatic missense call of the caller's own annotation sqlite, the FilterMutectCalls status and read-level evidence (depth, ref/alt/other
@@ -43,7 +44,9 @@ export interface NeoantigenEvidenceOptions {
 
 export interface NeoantigenDesignOptions {
   evidence: string;
-  hla: string;
+  hla?: string;
+  hlaFrom?: string;
+  acceptLowConfidence?: boolean;
   proteome?: string;
   n?: string;
   weights?: string;
@@ -111,21 +114,41 @@ export function buildEvidenceBody(caseId: string, o: NeoantigenEvidenceOptions, 
   };
 }
 
-export interface NeoantigenHlaOptions { normal: string; rna?: string; owner?: string; wait?: boolean; json?: boolean }
+export interface NeoantigenHlaOptions { normal: string; rna?: string; depthCurve?: string; includeUnmapped?: boolean; owner?: string; wait?: boolean; json?: boolean }
+
+/** Fractions of the typed read pairs to retype at (the depth curve), 1 to 5 values strictly between 0 and 1, largest first. */
+export function parseDepthCurve(list: string): number[] {
+  const parts = (list || '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (parts.length < 1 || parts.length > 5) throw new Error('--depth-curve needs 1 to 5 fractions, for example 0.5,0.25,0.1');
+  const nums = parts.map((x) => Number(x));
+  if (nums.some((x) => !isFinite(x) || x <= 0 || x >= 1)) throw new Error('--depth-curve fractions must be strictly between 0 and 1');
+  return Array.from(new Set(nums)).sort((a, b) => b - a);
+}
 
 export function buildHlaBody(caseId: string, o: NeoantigenHlaOptions, wallet: string, signature: string): Record<string, unknown> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
-  return { wallet: ownerOr(o.owner, wallet), signature, case_id: caseId, normal_biocid: requireBiocid('--normal', o.normal), rna_biocid: o.rna ? requireBiocid('--rna', o.rna) : '' };
+  const body: Record<string, unknown> = {
+    wallet: ownerOr(o.owner, wallet), signature, case_id: caseId, normal_biocid: requireBiocid('--normal', o.normal), rna_biocid: o.rna ? requireBiocid('--rna', o.rna) : '',
+    include_unmapped: !!o.includeUnmapped,
+  };
+  if (o.depthCurve !== undefined) body.depth_curve = parseDepthCurve(o.depthCurve);
+  return body;
 }
 
 export function buildDesignBody(caseId: string, o: NeoantigenDesignOptions, wallet: string, signature: string): Record<string, unknown> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  if (o.hla && o.hlaFrom) throw new Error('give --hla or --hla-from, not both');
+  if (!o.hla && !o.hlaFrom) throw new Error('--hla (class I alleles) or --hla-from (the biocid of an HLA typing report) is required');
+  if (o.acceptLowConfidence && !o.hlaFrom) throw new Error('--accept-low-confidence applies only with --hla-from');
+  const hlaFields = o.hlaFrom
+    ? { hla: [] as string[], hla_biocid: requireBiocid('--hla-from', o.hlaFrom), accept_low_confidence: !!o.acceptLowConfidence }
+    : { hla: parseHla(o.hla as string) };
   return {
     wallet: ownerOr(o.owner, wallet),
     signature,
     case_id: caseId,
     evidence_biocid: requireBiocid('--evidence', o.evidence),
-    hla: parseHla(o.hla),
+    ...hlaFields,
     proteome_biocid: o.proteome ? requireBiocid('--proteome', o.proteome) : '',
     n: parseCount(o.n, 20, 1, 50, '--n'),
     weights: parseWeights(o.weights),
