@@ -103,3 +103,15 @@ describe('neoantigen verbs: custodial owner', () => {
     expect((buildDesignBody('C1', { evidence: bc('neoantigen_evidence', 'e.json', 'genobank'), hla: 'HLA-A*02:01', owner: own }, sg, 's') as any).wallet).toBe(own);
   });
 });
+
+import { buildHlaBody } from '../src/commands/neoantigen-pipeline';
+describe('neoantigen-hla verb', () => {
+  const own = '0xFD1f085f8d10375df8A1c7C9ffA4FD0eB80B0b1d';
+  test('germline BAM as a biocid, optional RNA, custodial owner, no raw paths', () => {
+    const b: any = buildHlaBody('C1', { normal: bc('bam', 'n.bam'), rna: bc('bam', 'r.bam'), owner: own }, W, 's');
+    expect(b.wallet).toBe(own); expect(b.normal_biocid).toMatch(/^biocid:\/\//); expect(b.rna_biocid).toMatch(/^biocid:\/\//);
+    expect((buildHlaBody('C1', { normal: bc('bam', 'n.bam') }, W, 's') as any).rna_biocid).toBe('');
+    expect(() => buildHlaBody('C1', { normal: 'gs://b/n.bam' }, W, 's')).toThrow(/biocid/);
+    expect(() => buildHlaBody('Jane Doe', { normal: bc('bam', 'n.bam') }, W, 's')).toThrow(/case identifier/);
+  });
+});

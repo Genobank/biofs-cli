@@ -133,7 +133,7 @@ import { ontVariantsSubmitCommand, OntVariantsSubmitOptions } from './commands/o
 import { ontVariantsExecCommand, OntVariantsExecOptions } from './commands/ont-variants/exec';
 import { hifiAlignSubmitCommand, HifiAlignSubmitOptions } from './commands/hifi-align/submit';
 import { hifiAlignExecCommand, HifiAlignExecOptions } from './commands/hifi-align/exec';
-import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenStatusCommand, NeoantigenEvidenceOptions, NeoantigenDesignOptions } from './commands/neoantigen-pipeline';
+import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenStatusCommand, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { pbsvSubmitCommand, PbsvSubmitOptions } from './commands/pbsv/submit';
 import { pbsvExecCommand, PbsvExecOptions } from './commands/pbsv/exec';
@@ -4302,6 +4302,25 @@ neoantigenDesignCmd
   .option('--wait', 'Poll until done or failed')
   .option('--json', 'Emit JSON')
   .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('design', id, options); });
+
+const neoantigenHlaCmd = program
+  .command('neoantigen-hla')
+  .description('Class I HLA typing with T1K from the germline BAM (optional tumor RNA cross-check), depth-matched and memory-capped (dispatched through biofs-node)');
+neoantigenHlaCmd
+  .command('submit <caseId>')
+  .description('Submit an HLA typing job; every input is a biocid')
+  .requiredOption('--normal <biocid>', 'Aligned germline (matched normal) BAM/CRAM')
+  .option('--rna <biocid>', 'Optional tumor RNA BAM for a cross-check')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: NeoantigenHlaOptions) => { await neoantigenHlaSubmitCommand(caseId, options); });
+neoantigenHlaCmd
+  .command('status <job>')
+  .description('Show an HLA typing job (only the signer who submitted it can read it)')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('hla', id, options); });
 
 // FLUENCY_LINEAGE_VERBS_20260730: make a genomics store AI-conversable, and report the metamorphosis.
 // Registered with the other groups, BEFORE the welcome banner and program.parse().
