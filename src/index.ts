@@ -133,6 +133,7 @@ import { ontVariantsSubmitCommand, OntVariantsSubmitOptions } from './commands/o
 import { ontVariantsExecCommand, OntVariantsExecOptions } from './commands/ont-variants/exec';
 import { hifiAlignSubmitCommand, HifiAlignSubmitOptions } from './commands/hifi-align/submit';
 import { hifiAlignExecCommand, HifiAlignExecOptions } from './commands/hifi-align/exec';
+import { registerDerivedGcsCommand, RegisterDerivedGcsOptions } from './commands/register-derived';
 import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenStatusCommand, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { pbsvSubmitCommand, PbsvSubmitOptions } from './commands/pbsv/submit';
@@ -4323,6 +4324,20 @@ neoantigenHlaCmd
   .option('--wait', 'Poll until done or failed')
   .option('--json', 'Emit JSON')
   .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('hla', id, options); });
+
+const registerDerivedCmd = program
+  .command('register-derived')
+  .description('Give a biocid, with lineage, to a derived biofile (dispatched through biofs-node)');
+registerDerivedCmd
+  .command('gcs <gsUri>')
+  .description('Register a job output that already sits in your own biowallet GCS prefix, in place (the node hashes it on the server)')
+  .requiredOption('--type <biodata_type>', 'Biodata type of the new biocid, for example vcf, annotation, report')
+  .requiredOption('--parent <biocid...>', 'Parent biocid(s) the output derives from (1 to 8, owned by you)')
+  .option('--case-id <id>', 'Case identifier (never a person name)')
+  .option('--filename <name>', 'Dataset name of the biocid (default: the object name)')
+  .option('--category <cat>', 'dna | rna | clinical | imaging | protein', 'dna')
+  .option('--json', 'Emit JSON')
+  .action(async (gsUri: string, options: RegisterDerivedGcsOptions) => { await registerDerivedGcsCommand(gsUri, options); });
 
 // FLUENCY_LINEAGE_VERBS_20260730: make a genomics store AI-conversable, and report the metamorphosis.
 // Registered with the other groups, BEFORE the welcome banner and program.parse().
