@@ -15,3 +15,15 @@ describe('register-derived gcs', () => {
     expect(() => buildRegisterDerivedGcsBody(U, { type: 'vcf', parent: [P], caseId: 'Jane Doe' })).toThrow(/case identifier/);
   });
 });
+
+import { validateReadArgs, sha256Hex } from '../src/commands/register-derived';
+describe('register-derived read', () => {
+  test('accepts a biocid, refuses a path or URL', () => {
+    expect(() => validateReadArgs(P, '/tmp/x.json')).not.toThrow();
+    expect(() => validateReadArgs('gs://b/x')).toThrow(/biocid/);
+    expect(() => validateReadArgs('https://x/y')).toThrow(/biocid/);
+  });
+  test('sha256 of known bytes', () => {
+    expect(sha256Hex(Buffer.from('abc'))).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+  });
+});
