@@ -26,6 +26,9 @@ export interface SomaticMutectSubmitOptions {
   tumorBam: string;    // gs:// aligned tumor BAM
   normalBam: string;   // gs:// aligned matched-normal BAM (same reference as tumor)
   refFasta?: string;   // explicit gs:// reference fasta the BAMs were aligned to (else auto candidates)
+  intervalFile?: string; // gs:// BED of regions to call (default: whole genome)
+  streamNormal?: boolean; // read the normal in place through gcsfuse instead of copying it
+  streamThresholdGb?: string; // copy below this size, stream above (default 60)
   lowMemory?: boolean; // pbrun --mutect-low-memory (default true)
   json?: boolean;
 }
@@ -40,6 +43,7 @@ export async function somaticMutectSubmitCommand(caseId: string, options: Somati
     if (!options.tumorBam || !options.tumorBam.startsWith('gs://')) throw new Error('--tumor-bam must be a gs:// aligned BAM URI');
     if (!options.normalBam || !options.normalBam.startsWith('gs://')) throw new Error('--normal-bam must be a gs:// aligned BAM URI');
     if (options.refFasta && !options.refFasta.startsWith('gs://')) throw new Error('--ref-fasta must be a gs:// fasta URI');
+    if (options.intervalFile && !options.intervalFile.startsWith('gs://')) throw new Error('--interval-file must be a gs:// BED URI');
 
     const jobId = `somamu-${caseId}-${Date.now()}`;
 
@@ -51,6 +55,9 @@ export async function somaticMutectSubmitCommand(caseId: string, options: Somati
       tumorBam: options.tumorBam,
       normalBam: options.normalBam,
       refFasta: options.refFasta || '',
+      intervalFile: options.intervalFile || '',
+      streamNormal: !!options.streamNormal,
+      streamThresholdGb: options.streamThresholdGb || '60',
       lowMemory: options.lowMemory !== false,
       creatorWallet: credentials.wallet_address,
       creatorSig: credentials.user_signature,

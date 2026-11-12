@@ -13,6 +13,10 @@
  * b37 12:25398284) in both staged BAMs and writes the alt fractions to the run log, so the run
  * itself documents which BAM carries the tumor signal.
  *
+ * Large pairs: a normal BAM above --stream-threshold-gb (default 60), or --stream-normal, is NOT copied: it is read in place through a read-only gcsfuse mount (the executor disk
+ * cannot hold a 143 GB whole-genome normal next to the tumor, and genomic bytes are read through gcsfuse by rule). --interval-file (gs:// BED) restricts calling to the territory the
+ * tumor assay covers, which is what makes a whole-genome normal against an exome tumor practical. The reference build is detected from the tumor header (hg38 when chr1 is 248,956,422).
+ *
  * AUDIT: gs://<OUT>/biowallet/<WALLET_LC>/somatic-mutect/<JOB_ID>/
  */
 
@@ -26,6 +30,9 @@ export interface SomaticMutectExecOptions {
   tumorBam: string;      // gs:// aligned tumor BAM
   normalBam: string;     // gs:// aligned matched-normal BAM
   refFasta?: string;     // explicit gs:// reference fasta (must match the BAM alignment reference)
+  intervalFile?: string; // gs:// BED of regions to call (default: whole genome)
+  streamNormal?: boolean; // read the normal BAM in place through gcsfuse instead of copying it
+  streamThresholdGb?: string; // copy below this size, stream above it (default 60)
   lowMemory?: boolean;   // pbrun --mutect-low-memory (default true)
   hotspot?: string;      // identity sanity pileup locus, "CTG:POS" (default 12:25398284, KRAS G12D b37)
   jobId?: string;
@@ -52,6 +59,23 @@ function run(cmd: string, args: string[], label: string): void {
 function capture(cmd: string, args: string[]): string {
   const r = spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
   return r.status === 0 ? (r.stdout || '').trim() : '';
+}
+
+export function splitGs(uri: string): { bucket: string; object: string; dir: string; file: string } {
+  const m = /^gs:\/\/([^/]+)\/(.+)$/.exec(uri || '');
+  if (!m) throw new Error(`not a gs:// object URI: ${uri}`);
+  const object = m[2];
+  return { bucket: m[1], object, dir: object.includes('/') ? object.slice(0, object.lastIndexOf('/')) : '', file: object.slice(object.lastIndexOf('/') + 1) };
+}
+
+export function detectBuild(chr1Length: number | null): 'hg38' | 'b37' | 'unknown' {
+  if (chr1Length === 248956422) return 'hg38';
+  if (chr1Length === 249250621) return 'b37';
+  return 'unknown';
+}
+
+export function shouldStream(opts: { streamNormal?: boolean }, sizeBytes: number, thresholdGb: number): boolean {
+  return !!opts.streamNormal || sizeBytes > thresholdGb * 1024 ** 3;
 }
 
 export async function somaticMutectExecCommand(opts: SomaticMutectExecOptions): Promise<void> {
@@ -101,20 +125,47 @@ export async function somaticMutectExecCommand(opts: SomaticMutectExecOptions): 
     return local;
   };
   const tumorLocal = stage(opts.tumorBam, 'tumor');
-  const normalLocal = stage(opts.normalBam, 'normal');
+  // the normal: copy when it fits, stream through a read-only gcsfuse mount when it is large (or --stream-normal)
+  const normalSize = Number((capture('sh', ['-c', `gcloud storage ls -l ${opts.normalBam} 2>/dev/null | head -1 | awk '{print $1}'`]) || '0'));
+  const streamIt = shouldStream(opts, normalSize, Number(opts.streamThresholdGb || 60));
+  let normalDocker = '/w/normal.bam';
+  let normalVolume: string[] = [];
+  if (streamIt) {
+    const g = splitGs(opts.normalBam);
+    const mnt = `/mnt/gcsfuse-raw/${g.bucket}`;
+    const mounted = spawnSync('mountpoint', ['-q', mnt]).status === 0;
+    if (!mounted) {
+      run('sudo', ['mkdir', '-p', mnt], 'create the gcsfuse mount point');
+      run('sudo', ['gcsfuse', '--implicit-dirs', '-o', 'ro,allow_other', '--type-cache-max-size-mb=32', '--kernel-list-cache-ttl-secs=60', g.bucket, mnt], `mount gs://${g.bucket} read-only (gcsfuse)`);
+    }
+    const hostDir = path.join(mnt, g.dir);
+    if (!fs.existsSync(path.join(hostDir, g.file)) || !(fs.existsSync(path.join(hostDir, `${g.file}.bai`)) || fs.existsSync(path.join(hostDir, g.file.replace(/\.bam$/, '.bai'))))) {
+      logLine(`[somatic-mutect] the normal BAM and its index must both be in ${hostDir}; cannot stream`); uploadAudit(); process.exit(1);
+    }
+    normalVolume = ['-v', `${hostDir}:/n:ro`];
+    normalDocker = `/n/${g.file}`;
+    logLine(`[somatic-mutect] normal BAM (${(normalSize / 1e9).toFixed(1)} GB) is read in place through ${mnt}; not copied`);
+  } else {
+    stage(opts.normalBam, 'normal');
+  }
 
   // sample names come from each BAM's own @RG SM tag (Parabricks requires exact SM matches)
   const smOf = (base: string): string =>
-    capture('docker', ['run', '--rm', '-v', `${work}:/w:ro`, '--entrypoint', 'bash', IMG_SAMTOOLS, '-c',
-      `samtools view -H /w/${base}.bam | grep -m1 '^@RG' | tr '\\t' '\\n' | grep '^SM:' | cut -c4- | head -1`]);
+    capture('docker', ['run', '--rm', '-v', `${work}:/w:ro`, ...(base === 'normal' ? normalVolume : []), '--entrypoint', 'bash', IMG_SAMTOOLS, '-c',
+      `samtools view -H ${base === 'normal' ? normalDocker : '/w/' + base + '.bam'} | grep -m1 '^@RG' | tr '\\t' '\\n' | grep '^SM:' | cut -c4- | head -1`]);
   const tumorSM = smOf('tumor'); const normalSM = smOf('normal');
+  const chr1 = capture('docker', ['run', '--rm', '-v', `${work}:/w:ro`, '--entrypoint', 'bash', IMG_SAMTOOLS, '-c', "samtools view -H /w/tumor.bam | grep -m1 -P '^@SQ\\tSN:(chr)?1\\t' | tr '\\t' '\\n' | grep '^LN:' | cut -c4-"]);
+  const build = detectBuild(chr1 ? Number(chr1) : null);
+  logLine(`[somatic-mutect] reference build detected from the tumor header: ${build}`);
   if (!tumorSM || !normalSM) { logLine(`[somatic-mutect] missing @RG SM tag (tumor='${tumorSM}' normal='${normalSM}'); reheader the BAMs first`); uploadAudit(); process.exit(1); }
   if (tumorSM === normalSM) { logLine(`[somatic-mutect] tumor and normal share SM '${tumorSM}'; Mutect2 needs distinct sample names`); uploadAudit(); process.exit(1); }
   logLine(`[somatic-mutect] tumor SM=${tumorSM} normal SM=${normalSM}`);
 
   // 1. reference: exact assembly the BAMs were aligned to. Explicit --ref-fasta wins; else b37
   //    candidates (hs37d5 with decoys first — the standard Signatera/1000G alignment reference).
-  const refCandidates = opts.refFasta ? [opts.refFasta] : [
+  const refCandidates = opts.refFasta ? [opts.refFasta] : build === 'hg38' ? [
+    `gs://${refBucket}/reference/hg38/Homo_sapiens_assembly38.fasta`,
+  ] : [
     `gs://${refBucket}/reference/hs37d5/Homo_sapiens_assembly19_1000genomes_decoy.fasta`,
     `gs://${refBucket}/reference/hg19/Homo_sapiens_assembly19.fasta`,
   ];
@@ -129,12 +180,19 @@ export async function somaticMutectExecCommand(opts: SomaticMutectExecOptions): 
   run('gcloud', ['storage', 'cp', `${refGs}.fai`, path.join(work, `${localRef}.fai`)], 'stage reference .fai');
   spawnSync('sh', ['-c', `gcloud storage cp ${refGs.replace(/\.(fa|fasta)$/, '.dict')} ${work}/ 2>/dev/null || gcloud storage cp ${refGs}.dict ${work}/ 2>/dev/null || true`], { stdio: 'ignore' });
   logLine(`[somatic-mutect] ref=${refGs}`);
+  let intervalLocal = '';
+  if (opts.intervalFile) {
+    if (!opts.intervalFile.startsWith('gs://')) { logLine('[somatic-mutect] --interval-file must be a gs:// BED'); uploadAudit(); process.exit(1); }
+    intervalLocal = 'callable.bed';
+    run('gcloud', ['storage', 'cp', opts.intervalFile, path.join(work, intervalLocal)], 'stage interval BED');
+    logLine(`[somatic-mutect] intervals: ${capture('sh', ['-c', `wc -l < ${work}/${intervalLocal}`])} regions`);
+  }
 
   // 1b. identity sanity check (non-blocking): pileup the hotspot in both BAMs and log alt fractions,
   //     so the run log itself documents which BAM carries the tumor signal.
   for (const base of ['tumor', 'normal']) {
-    const pile = capture('docker', ['run', '--rm', '-v', `${work}:/w:ro`, '--entrypoint', 'bash', IMG_SAMTOOLS, '-c',
-      `samtools mpileup -r ${hotspot}-${hotspot.split(':')[1]} -f /w/${localRef} /w/${base}.bam 2>/dev/null | head -1`]);
+    const pile = capture('docker', ['run', '--rm', '-v', `${work}:/w:ro`, ...(base === 'normal' ? normalVolume : []), '--entrypoint', 'bash', IMG_SAMTOOLS, '-c',
+      `samtools mpileup -r ${hotspot}-${hotspot.split(':')[1]} -f /w/${localRef} ${base === 'normal' ? normalDocker : '/w/' + base + '.bam'} 2>/dev/null | head -1`]);
     logLine(`[somatic-mutect] hotspot ${hotspot} ${base}: ${pile ? pile.split('\t').slice(3, 5).join(' ') : 'no coverage/parse'}`);
   }
 
@@ -143,10 +201,11 @@ export async function somaticMutectExecCommand(opts: SomaticMutectExecOptions): 
   const mutectArgs = ['pbrun', 'mutectcaller',
     '--ref', `/w/${localRef}`,
     '--in-tumor-bam', '/w/tumor.bam', '--tumor-name', tumorSM,
-    '--in-normal-bam', '/w/normal.bam', '--normal-name', normalSM,
+    '--in-normal-bam', normalDocker, '--normal-name', normalSM,
     '--out-vcf', `/w/${vcfGz}`, '--num-gpus', '1'];
+  if (intervalLocal) mutectArgs.push('--interval-file', `/w/${intervalLocal}`);
   if (lowMemory) mutectArgs.push('--mutect-low-memory');
-  run('docker', ['run', '--rm', '--gpus', 'all', '-v', `${work}:/w:rw`, IMG_PARABRICKS, ...mutectArgs],
+  run('docker', ['run', '--rm', '--gpus', 'all', '-v', `${work}:/w:rw`, ...normalVolume, IMG_PARABRICKS, ...mutectArgs],
     'pbrun mutectcaller (Mutect2 tumor/normal somatic calling, GPU, local NVMe)');
   const producedVcf = fs.existsSync(path.join(work, vcfGz)) ? vcfGz
     : (fs.existsSync(path.join(work, vcfGz.replace(/\.gz$/, ''))) ? vcfGz.replace(/\.gz$/, '') : '');
@@ -172,7 +231,7 @@ export async function somaticMutectExecCommand(opts: SomaticMutectExecOptions): 
   const manifest = {
     schema: 'genobank.somamu.manifest/v1', pipeline: 'somatic-mutect2',
     jobId, caseId, creator: walletLc, status: valid ? 'OK' : 'EMPTY',
-    inputs: { tumorBam: opts.tumorBam, normalBam: opts.normalBam, tumorSM, normalSM, reference: refGs, lowMemory },
+    inputs: { tumorBam: opts.tumorBam, normalBam: opts.normalBam, tumorSM, normalSM, reference: refGs, build, intervalFile: opts.intervalFile || null, normalStreamed: streamIt, lowMemory },
     tools: { parabricks_mutectcaller: IMG_PARABRICKS, htslib: IMG_HTSLIB, samtools: IMG_SAMTOOLS },
     outputs: { somatic_vcf: `${BIOWALLET_GCS}/${finalVcf}` },
     summary: { total_variants: Number(total), pass_variants: Number(passN) },
