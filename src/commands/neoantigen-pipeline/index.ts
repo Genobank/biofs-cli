@@ -195,12 +195,26 @@ async function fetchStatus(kind: Kind, id: string, headers: Record<string, strin
   return r.data;
 }
 
+/** One line about the on-chain proof of a finished job. Never blank for a finished job: an unanchored job must not look anchored. */
+export function anchorLine(row: any): string | null {
+  if (!row || row.status !== 'done') return null;
+  const a = row.anchor;
+  if (a && a.anchored === true) {
+    return `token ${a.tokenId} on chain ${a.chain_id || '?'}${a.tx ? `, tx ${a.tx}` : ''}${a.idempotent ? ' (already on chain)' : ''}, manifest ${row.manifest_biocid || '?'}`;
+  }
+  if (a && a.anchored === false) return `NOT anchored: ${a.reason || 'no reason recorded'}`;
+  if (row.anchor_request) return `pending (sealed in ${row.manifest_biocid || 'a manifest'}; the node anchors it within a minute)`;
+  return 'NOT anchored: no manifest was sealed for this job';
+}
+
 function printSummary(kind: Kind, row: any): void {
   console.log(`${chalk.cyan('Job:')}     ${row[ROUTE[kind].id]}  ${row.status}`);
   if (row.executor) console.log(`${chalk.cyan('Executor:')} ${row.executor}${row.executor_note ? ` (${row.executor_note})` : ''}`);
   if (row.progress) console.log(`${chalk.cyan('Progress:')} ${JSON.stringify(row.progress)}`);
   if (row.summary) console.log(`${chalk.cyan('Summary:')}  ${JSON.stringify(row.summary)}`);
   if (row.result_biocid) console.log(`${chalk.cyan('Result:')}   ${row.result_biocid}`);
+  const anchor = anchorLine(row);
+  if (anchor) console.log(`${chalk.cyan('Anchor:')}   ${anchor}`);
   if (row.error) console.log(`${chalk.red('Error:')}    ${row.error}`);
 }
 
