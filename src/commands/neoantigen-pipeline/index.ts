@@ -111,6 +111,13 @@ export function buildEvidenceBody(caseId: string, o: NeoantigenEvidenceOptions, 
   };
 }
 
+export interface NeoantigenHlaOptions { normal: string; rna?: string; owner?: string; wait?: boolean; json?: boolean }
+
+export function buildHlaBody(caseId: string, o: NeoantigenHlaOptions, wallet: string, signature: string): Record<string, unknown> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  return { wallet: ownerOr(o.owner, wallet), signature, case_id: caseId, normal_biocid: requireBiocid('--normal', o.normal), rna_biocid: o.rna ? requireBiocid('--rna', o.rna) : '' };
+}
+
 export function buildDesignBody(caseId: string, o: NeoantigenDesignOptions, wallet: string, signature: string): Record<string, unknown> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
   return {
@@ -137,10 +144,11 @@ async function auth() {
   };
 }
 
-type Kind = 'evidence' | 'design';
+type Kind = 'evidence' | 'design' | 'hla';
 const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: string }> = {
   evidence: { post: 'neoantigen_evidence', status: 'neoantigen_evidence_status', id: 'neoantigen_job_id', verb: 'neoantigen-evidence' },
   design: { post: 'neoantigen_design', status: 'neoantigen_design_status', id: 'neoantigen_job_id', verb: 'neoantigen-design' },
+  hla: { post: 'neoantigen_hla', status: 'neoantigen_hla_status', id: 'neoantigen_job_id', verb: 'neoantigen-hla' },
 };
 
 async function fetchStatus(kind: Kind, id: string, headers: Record<string, string>): Promise<any> {
@@ -202,6 +210,16 @@ export async function neoantigenDesignSubmitCommand(caseId: string, options: Neo
     await submit('design', buildDesignBody(caseId, options, a.wallet, a.signature), a.headers, options);
   } catch (e: any) {
     Logger.error(`neoantigen-design submit failed: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+export async function neoantigenHlaSubmitCommand(caseId: string, options: NeoantigenHlaOptions): Promise<void> {
+  try {
+    const a = await auth();
+    await submit('hla', buildHlaBody(caseId, options, a.wallet, a.signature), a.headers, options);
+  } catch (e: any) {
+    Logger.error(`neoantigen-hla submit failed: ${e.message}`);
     process.exit(1);
   }
 }
