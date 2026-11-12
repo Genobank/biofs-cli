@@ -2700,8 +2700,10 @@ const somaticMutectCmd = program
 somaticMutectCmd
   .command('submit <caseId>', { isDefault: true })
   .description('Submit a tumor/normal Mutect2 job to biofs-node (panel-design source for tumor-informed MRD)')
-  .requiredOption('--tumor-bam <gs>', 'gs:// aligned tumor BAM')
-  .requiredOption('--normal-bam <gs>', 'gs:// aligned matched-normal BAM (same reference)')
+  .option('--tumor-biocid <biocid>', 'biocid:// of the aligned tumor BAM (registered to the signing biowallet)')
+  .option('--normal-biocid <biocid>', 'biocid:// of the aligned matched-normal BAM (registered to the signing biowallet)')
+  .option('--tumor-bam <gs>', 'gs:// aligned tumor BAM (legacy; prefer --tumor-biocid)')
+  .option('--normal-bam <gs>', 'gs:// aligned matched-normal BAM (legacy; prefer --normal-biocid)')
   .option('--ref-fasta <gs>', 'Explicit gs:// reference fasta the BAMs were aligned to')
   .option('--interval-file <gs>', 'gs:// BED of the regions to call (default: whole genome)')
   .option('--stream-normal', 'Read the normal BAM in place through a read-only gcsfuse mount instead of copying it')

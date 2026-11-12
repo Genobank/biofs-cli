@@ -20,3 +20,20 @@ describe('somatic-mutect exec: large-pair handling', () => {
     expect(shouldStream({}, 60 * GB, 60)).toBe(false);
   });
 });
+
+import { validateSomaticMutectInputs } from '../src/commands/somatic-mutect/submit';
+describe('somatic-mutect submit inputs', () => {
+  const B = 'biocid://public-r2/0xabc/bam/x.bam';
+  test('biocids accepted, legacy gs accepted, mixed per side accepted', () => {
+    expect(() => validateSomaticMutectInputs({ tumorBiocid: B, normalBiocid: B })).not.toThrow();
+    expect(() => validateSomaticMutectInputs({ tumorBam: 'gs://b/t.bam', normalBam: 'gs://b/n.bam' })).not.toThrow();
+    expect(() => validateSomaticMutectInputs({ tumorBiocid: B, normalBam: 'gs://b/n.bam' })).not.toThrow();
+  });
+  test('missing, both, and malformed inputs are refused', () => {
+    expect(() => validateSomaticMutectInputs({ normalBiocid: B })).toThrow(/tumor/);
+    expect(() => validateSomaticMutectInputs({ tumorBiocid: B, tumorBam: 'gs://b/t.bam', normalBiocid: B })).toThrow(/not both/);
+    expect(() => validateSomaticMutectInputs({ tumorBiocid: 'gs://b/t.bam', normalBiocid: B })).toThrow(/biocid:\/\//);
+    expect(() => validateSomaticMutectInputs({ tumorBam: 'https://x/t.bam', normalBiocid: B })).toThrow(/gs:\/\//);
+    expect(() => validateSomaticMutectInputs({ tumorBiocid: B, normalBiocid: B, intervalFile: 'file:///x.bed' })).toThrow(/gs:\/\//);
+  });
+});
