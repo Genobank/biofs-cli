@@ -23,14 +23,27 @@ import { Logger } from '../../lib/utils/logger';
 import { CONFIG } from '../../lib/config/constants';
 
 export interface SomaticMutectSubmitOptions {
-  tumorBam: string;    // gs:// aligned tumor BAM
-  normalBam: string;   // gs:// aligned matched-normal BAM (same reference as tumor)
+  tumorBam?: string;    // gs:// aligned tumor BAM (or use tumorBiocid)
+  normalBam?: string;   // gs:// aligned matched-normal BAM (same reference as tumor) (or use normalBiocid)
+  tumorBiocid?: string;  // biocid:// of the aligned tumor BAM, registered to the signing biowallet
+  normalBiocid?: string; // biocid:// of the aligned matched-normal BAM, registered to the signing biowallet
   refFasta?: string;   // explicit gs:// reference fasta the BAMs were aligned to (else auto candidates)
   intervalFile?: string; // gs:// BED of regions to call (default: whole genome)
   streamNormal?: boolean; // read the normal in place through gcsfuse instead of copying it
   streamThresholdGb?: string; // copy below this size, stream above (default 60)
   lowMemory?: boolean; // pbrun --mutect-low-memory (default true)
   json?: boolean;
+}
+
+export function validateSomaticMutectInputs(o: SomaticMutectSubmitOptions): void {
+  for (const [label, bam, bio] of [['tumor', o.tumorBam, o.tumorBiocid], ['normal', o.normalBam, o.normalBiocid]] as const) {
+    if (!bam && !bio) throw new Error(`--${label}-biocid (or --${label}-bam gs://) is required`);
+    if (bam && bio) throw new Error(`give --${label}-biocid or --${label}-bam, not both`);
+    if (bio && !bio.startsWith('biocid://')) throw new Error(`--${label}-biocid must be a biocid:// identifier`);
+    if (bam && !bam.startsWith('gs://')) throw new Error(`--${label}-bam must be a gs:// aligned BAM URI`);
+  }
+  if (o.refFasta && !o.refFasta.startsWith('gs://')) throw new Error('--ref-fasta must be a gs:// fasta URI');
+  if (o.intervalFile && !o.intervalFile.startsWith('gs://')) throw new Error('--interval-file must be a gs:// BED URI');
 }
 
 export async function somaticMutectSubmitCommand(caseId: string, options: SomaticMutectSubmitOptions): Promise<void> {
@@ -40,10 +53,7 @@ export async function somaticMutectSubmitCommand(caseId: string, options: Somati
     if (!credentials) throw new Error('Not authenticated. Run "biofs login" first.');
     const apiBase = CONFIG.API_BASE_URL;
 
-    if (!options.tumorBam || !options.tumorBam.startsWith('gs://')) throw new Error('--tumor-bam must be a gs:// aligned BAM URI');
-    if (!options.normalBam || !options.normalBam.startsWith('gs://')) throw new Error('--normal-bam must be a gs:// aligned BAM URI');
-    if (options.refFasta && !options.refFasta.startsWith('gs://')) throw new Error('--ref-fasta must be a gs:// fasta URI');
-    if (options.intervalFile && !options.intervalFile.startsWith('gs://')) throw new Error('--interval-file must be a gs:// BED URI');
+    validateSomaticMutectInputs(options);
 
     const jobId = `somamu-${caseId}-${Date.now()}`;
 
@@ -52,8 +62,10 @@ export async function somaticMutectSubmitCommand(caseId: string, options: Somati
       jobId,
       biosampleId: caseId,
       inputType: 'somatic-mutect',  // discriminator; front routes this to the Parabricks GPU executor
-      tumorBam: options.tumorBam,
-      normalBam: options.normalBam,
+      tumorBam: options.tumorBam || '',
+      normalBam: options.normalBam || '',
+      tumorBiocid: options.tumorBiocid || '',
+      normalBiocid: options.normalBiocid || '',
       refFasta: options.refFasta || '',
       intervalFile: options.intervalFile || '',
       streamNormal: !!options.streamNormal,
@@ -73,8 +85,8 @@ export async function somaticMutectSubmitCommand(caseId: string, options: Somati
     console.log(`  ${chalk.cyan('Job ID:')}     ${response.data.jobId || jobId}`);
     console.log(`  ${chalk.cyan('Case:')}       ${caseId}`);
     console.log(`  ${chalk.cyan('Caller:')}     Parabricks mutectcaller (Mutect2 tumor/normal, GPU)`);
-    console.log(`  ${chalk.cyan('Tumor BAM:')}  ${options.tumorBam}`);
-    console.log(`  ${chalk.cyan('Normal BAM:')} ${options.normalBam}`);
+    console.log(`  ${chalk.cyan('Tumor BAM:')}  ${options.tumorBiocid || options.tumorBam}`);
+    console.log(`  ${chalk.cyan('Normal BAM:')} ${options.normalBiocid || options.normalBam}`);
     console.log(`  ${chalk.cyan('Reference:')}  ${options.refFasta || 'auto (hs37d5/b37 candidates)'}`);
     console.log(`  ${chalk.cyan('Status:')}     ${response.data.status || 'accepted'}`);
     console.log();
