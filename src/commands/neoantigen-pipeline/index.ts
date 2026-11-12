@@ -3,6 +3,7 @@
  * biofs neoantigen-evidence status <job> [--wait]
  * biofs neoantigen-design   submit <caseId> --evidence <biocid> (--hla <alleles> | --hla-from <biocid> [--accept-low-confidence]) [--n 20] [--weights ...]
  * biofs neoantigen-hla      submit <caseId> --normal <biocid> [--rna <biocid>] [--depth-curve 0.5,0.25,0.1] [--include-unmapped]
+ * every submit verb takes [--executor auto|worker|local]: auto (default) runs on a healthy neoantigen worker agent and otherwise on the node, worker never falls back, local never uses a worker.
  * biofs neoantigen-design   status <job> [--wait]
  *
  * CLIENT verbs. Evidence: for every somatic missense call of the caller's own annotation sqlite, the FilterMutectCalls status and read-level evidence (depth, ref/alt/other
@@ -37,6 +38,7 @@ export interface NeoantigenEvidenceOptions {
   minMapq?: string;
   minBq?: string;
   label?: string;
+  executor?: string;
   owner?: string;
   wait?: boolean;
   json?: boolean;
@@ -52,6 +54,7 @@ export interface NeoantigenDesignOptions {
   weights?: string;
   patient?: string;
   expect?: string;
+  executor?: string;
   owner?: string;
   wait?: boolean;
   json?: boolean;
@@ -83,6 +86,13 @@ export function parseWeights(w?: string): number[] {
   return parts;
 }
 
+/** Where the job runs: a healthy neoantigen worker agent when there is one (auto, the default), only on a worker (worker: never falls back to the node), or only on the node (local). */
+export function parseExecutor(v?: string): 'auto' | 'worker' | 'local' {
+  const x = (v === undefined || v === '' ? 'auto' : v);
+  if (x !== 'auto' && x !== 'worker' && x !== 'local') throw new Error('--executor must be auto, worker or local');
+  return x;
+}
+
 export function ownerOr(owner: string | undefined, signer: string): string {
   if (!owner) return signer;
   if (!/^0x[0-9a-fA-F]{40}$/.test(owner)) throw new Error('--owner must be an EIP-55 biowallet address');
@@ -111,10 +121,11 @@ export function buildEvidenceBody(caseId: string, o: NeoantigenEvidenceOptions, 
     min_mapq: parseCount(o.minMapq, 20, 0, 60, '--min-mapq'),
     min_bq: parseCount(o.minBq, 20, 0, 60, '--min-bq'),
     label: o.label || '',
+    executor: parseExecutor(o.executor),
   };
 }
 
-export interface NeoantigenHlaOptions { normal: string; rna?: string; depthCurve?: string; includeUnmapped?: boolean; owner?: string; wait?: boolean; json?: boolean }
+export interface NeoantigenHlaOptions { normal: string; rna?: string; depthCurve?: string; includeUnmapped?: boolean; executor?: string; owner?: string; wait?: boolean; json?: boolean }
 
 /** Fractions of the typed read pairs to retype at (the depth curve), 1 to 5 values strictly between 0 and 1, largest first. */
 export function parseDepthCurve(list: string): number[] {
@@ -130,6 +141,7 @@ export function buildHlaBody(caseId: string, o: NeoantigenHlaOptions, wallet: st
   const body: Record<string, unknown> = {
     wallet: ownerOr(o.owner, wallet), signature, case_id: caseId, normal_biocid: requireBiocid('--normal', o.normal), rna_biocid: o.rna ? requireBiocid('--rna', o.rna) : '',
     include_unmapped: !!o.includeUnmapped,
+    executor: parseExecutor(o.executor),
   };
   if (o.depthCurve !== undefined) body.depth_curve = parseDepthCurve(o.depthCurve);
   return body;
@@ -154,6 +166,7 @@ export function buildDesignBody(caseId: string, o: NeoantigenDesignOptions, wall
     weights: parseWeights(o.weights),
     patient: o.patient || caseId,
     expect_genes: o.expect ? o.expect.split(',').map((s) => s.trim()).filter(Boolean) : [],
+    executor: parseExecutor(o.executor),
   };
 }
 
@@ -184,6 +197,7 @@ async function fetchStatus(kind: Kind, id: string, headers: Record<string, strin
 
 function printSummary(kind: Kind, row: any): void {
   console.log(`${chalk.cyan('Job:')}     ${row[ROUTE[kind].id]}  ${row.status}`);
+  if (row.executor) console.log(`${chalk.cyan('Executor:')} ${row.executor}${row.executor_note ? ` (${row.executor_note})` : ''}`);
   if (row.progress) console.log(`${chalk.cyan('Progress:')} ${JSON.stringify(row.progress)}`);
   if (row.summary) console.log(`${chalk.cyan('Summary:')}  ${JSON.stringify(row.summary)}`);
   if (row.result_biocid) console.log(`${chalk.cyan('Result:')}   ${row.result_biocid}`);
