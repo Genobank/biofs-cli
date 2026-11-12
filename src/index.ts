@@ -4289,7 +4289,9 @@ neoantigenDesignCmd
   .command('submit <caseId>')
   .description('Submit a neoantigen-design job; the evidence result is a biocid')
   .requiredOption('--evidence <biocid>', 'Result biocid of a neoantigen-evidence job')
-  .requiredOption('--hla <alleles>', 'Comma separated class I alleles, for example HLA-A*02:01,HLA-A*29:02,HLA-B*38:01')
+  .option('--hla <alleles>', 'Comma separated class I alleles, for example HLA-A*02:01,HLA-A*29:02,HLA-B*38:01 (or give --hla-from)')
+  .option('--hla-from <biocid>', 'Result biocid of a neoantigen-hla job: the design reads the germline alleles from its report and refuses a low confidence one')
+  .option('--accept-low-confidence', 'With --hla-from: use a report flagged low confidence anyway (the design records that you did)')
   .option('--proteome <biocid>', 'GENCODE protein FASTA (default: the node reference)')
   .option('--n <count>', 'Cassette size, 1 to 50 (default 20)')
   .option('--weights <list>', 'presentation,foreignness,expression,clonality[,evidence] summing to 1 (default 0.45,0.25,0.20,0.10)')
@@ -4308,12 +4310,14 @@ neoantigenDesignCmd
 
 const neoantigenHlaCmd = program
   .command('neoantigen-hla')
-  .description('Class I HLA typing with T1K from the germline BAM (optional tumor RNA cross-check), depth-matched and memory-capped (dispatched through biofs-node)');
+  .description('Class I and II HLA typing with T1K from the HLA gene windows of the germline BAM (optional tumor RNA cross-check, depth curve, unmapped reads), memory-capped (dispatched through biofs-node)');
 neoantigenHlaCmd
   .command('submit <caseId>')
   .description('Submit an HLA typing job; every input is a biocid')
   .requiredOption('--normal <biocid>', 'Aligned germline (matched normal) BAM/CRAM')
   .option('--rna <biocid>', 'Optional tumor RNA BAM for a cross-check')
+  .option('--depth-curve <fractions>', 'Retype at these fractions of the read pairs (1 to 5, for example 0.5,0.25,0.1) to show how much depth the call needs')
+  .option('--include-unmapped', 'Also type with the unmapped reads of the BAM and compare with the windows-only call')
   .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
   .option('--wait', 'Poll until the job finishes')
   .option('--json', 'Emit JSON')
