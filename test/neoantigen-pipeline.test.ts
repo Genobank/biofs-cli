@@ -104,7 +104,7 @@ describe('neoantigen verbs: custodial owner', () => {
   });
 });
 
-import { buildHlaBody, parseDepthCurve } from '../src/commands/neoantigen-pipeline';
+import { buildHlaBody, parseDepthCurve, parseExecutor } from '../src/commands/neoantigen-pipeline';
 describe('neoantigen-hla verb', () => {
   const own = '0xFD1f085f8d10375df8A1c7C9ffA4FD0eB80B0b1d';
   test('germline BAM as a biocid, optional RNA, custodial owner, no raw paths', () => {
@@ -147,5 +147,24 @@ describe('neoantigen-design verb: alleles from a registered HLA report', () => {
     expect(() => buildDesignBody('C1', { evidence }, W, 's')).toThrow(/--hla .* or --hla-from/);
     expect(() => buildDesignBody('C1', { evidence, hlaFrom: 'gs://b/r.json' }, W, 's')).toThrow(/biocid/);
     expect(() => buildDesignBody('C1', { evidence, hla: 'HLA-A*02:01', acceptLowConfidence: true }, W, 's')).toThrow(/only with --hla-from/);
+  });
+});
+
+describe('neoantigen verbs: executor', () => {
+  const ev = { somaticSqlite: bc('sqlite', 's.sqlite'), filteredVcf: bc('vcf', 'f.vcf.gz'), tumor: bc('bam', 't.bam'), normal: bc('bam', 'n.bam') };
+  const evidence = bc('neoantigen_evidence', 'e.json', 'genobank');
+  test('auto by default; worker and local accepted; anything else refused', () => {
+    expect(parseExecutor(undefined)).toBe('auto'); expect(parseExecutor('')).toBe('auto');
+    expect(parseExecutor('worker')).toBe('worker'); expect(parseExecutor('local')).toBe('local');
+    for (const bad of ['gpu', 'Worker', 'worker:x']) expect(() => parseExecutor(bad)).toThrow(/auto, worker or local/);
+  });
+  test('every verb sends it', () => {
+    expect((buildEvidenceBody('C1', ev, W, 's') as any).executor).toBe('auto');
+    expect((buildEvidenceBody('C1', { ...ev, executor: 'worker' }, W, 's') as any).executor).toBe('worker');
+    expect((buildHlaBody('C1', { normal: bc('bam', 'n.bam'), executor: 'local' }, W, 's') as any).executor).toBe('local');
+    expect((buildHlaBody('C1', { normal: bc('bam', 'n.bam') }, W, 's') as any).executor).toBe('auto');
+    expect((buildDesignBody('C1', { evidence, hla: 'HLA-A*02:01', executor: 'worker' }, W, 's') as any).executor).toBe('worker');
+    expect((buildDesignBody('C1', { evidence, hla: 'HLA-A*02:01' }, W, 's') as any).executor).toBe('auto');
+    expect(() => buildDesignBody('C1', { evidence, hla: 'HLA-A*02:01', executor: 'gpu' }, W, 's')).toThrow(/--executor/);
   });
 });
