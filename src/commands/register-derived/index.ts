@@ -8,6 +8,8 @@
  * signer's own prefix. Route: POST /api_biofs_node/register_derived_gcs.
  */
 import axios from 'axios';
+import * as crypto from 'crypto';
+import * as fs from 'fs';
 import chalk from 'chalk';
 import { getCredentials } from '../../lib/auth/credentials';
 import { Logger } from '../../lib/utils/logger';
@@ -55,6 +57,45 @@ export async function registerDerivedGcsCommand(gcsUri: string, options: Registe
     console.log(`  sha256 ${r.data.sha256}  size ${r.data.size}  consent ${r.data.consent_status}`);
   } catch (e: any) {
     Logger.error(`register-derived gcs failed: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+export function validateReadArgs(biocid: string, out?: string): void {
+  if (!BIOCID_RE.test(biocid || '')) throw new Error('the argument must be a biocid (biocid://<bioagent>/<owner wallet>/<biodata type>/<dataset>)');
+  if (out && !/^[^\0]+$/.test(out)) throw new Error('--out must be a file path');
+}
+
+export function sha256Hex(buf: Buffer): string {
+  return crypto.createHash('sha256').update(buf).digest('hex');
+}
+
+/** Read a small derived biofile of your own back through biofs-node (owner match, consent not revoked, 5 MB cap, SHA-256 checked by the node);
+ *  the bytes are checked here against the node's X-Sha256 header before anything is written. Primary biodata is never served this way. */
+export async function readDerivedCommand(biocid: string, options: { out?: string }): Promise<void> {
+  try {
+    validateReadArgs(biocid, options.out);
+    const credentials = await getCredentials();
+    if (!credentials) throw new Error('Not authenticated. Run "biofs login" first.');
+    const r = await axios.get(`${BIOFS_NODE_BASE}/derived_read`, {
+      params: { biocid },
+      headers: { 'X-Biofs-Wallet': credentials.wallet_address, 'X-Biofs-Signature': credentials.user_signature },
+      timeout: 120_000, responseType: 'arraybuffer', validateStatus: (s) => s < 500,
+    });
+    if (r.status >= 400) throw new Error(`${r.status}: ${Buffer.from(r.data).toString('utf8').slice(0, 200)}`);
+    const body = Buffer.from(r.data);
+    const got = sha256Hex(body);
+    const want = String(r.headers['x-sha256'] || '');
+    if (!want) throw new Error('the node sent no X-Sha256: refusing to trust unverified bytes');
+    if (got !== want) throw new Error(`SHA-256 mismatch: node says ${want}, received ${got}`);
+    if (options.out) {
+      fs.writeFileSync(options.out, body, { mode: 0o600 });
+      console.log(`${chalk.green('saved')} ${options.out}  sha256 ${got}  ${body.length} bytes`);
+    } else {
+      process.stdout.write(body.toString('utf8'));
+    }
+  } catch (e: any) {
+    Logger.error(`register-derived read failed: ${e.message}`);
     process.exit(1);
   }
 }

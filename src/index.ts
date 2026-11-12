@@ -133,7 +133,7 @@ import { ontVariantsSubmitCommand, OntVariantsSubmitOptions } from './commands/o
 import { ontVariantsExecCommand, OntVariantsExecOptions } from './commands/ont-variants/exec';
 import { hifiAlignSubmitCommand, HifiAlignSubmitOptions } from './commands/hifi-align/submit';
 import { hifiAlignExecCommand, HifiAlignExecOptions } from './commands/hifi-align/exec';
-import { registerDerivedGcsCommand, RegisterDerivedGcsOptions } from './commands/register-derived';
+import { registerDerivedGcsCommand, readDerivedCommand, RegisterDerivedGcsOptions } from './commands/register-derived';
 import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenStatusCommand, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { pbsvSubmitCommand, PbsvSubmitOptions } from './commands/pbsv/submit';
@@ -4338,6 +4338,11 @@ registerDerivedCmd
   .option('--category <cat>', 'dna | rna | clinical | imaging | protein', 'dna')
   .option('--json', 'Emit JSON')
   .action(async (gsUri: string, options: RegisterDerivedGcsOptions) => { await registerDerivedGcsCommand(gsUri, options); });
+registerDerivedCmd
+  .command('read <biocid>')
+  .description('Read back a small derived biofile of your own (5 MB cap; the node checks owner, consent and SHA-256, and so does this verb)')
+  .option('--out <file>', 'Save to a file (mode 600) instead of printing')
+  .action(async (biocid: string, options: { out?: string }) => { await readDerivedCommand(biocid, options); });
 
 // FLUENCY_LINEAGE_VERBS_20260730: make a genomics store AI-conversable, and report the metamorphosis.
 // Registered with the other groups, BEFORE the welcome banner and program.parse().
