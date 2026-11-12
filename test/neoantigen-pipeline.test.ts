@@ -104,7 +104,7 @@ describe('neoantigen verbs: custodial owner', () => {
   });
 });
 
-import { buildHlaBody, parseDepthCurve, parseExecutor } from '../src/commands/neoantigen-pipeline';
+import { buildHlaBody, parseDepthCurve, parseExecutor, anchorLine } from '../src/commands/neoantigen-pipeline';
 describe('neoantigen-hla verb', () => {
   const own = '0xFD1f085f8d10375df8A1c7C9ffA4FD0eB80B0b1d';
   test('germline BAM as a biocid, optional RNA, custodial owner, no raw paths', () => {
@@ -166,5 +166,35 @@ describe('neoantigen verbs: executor', () => {
     expect((buildDesignBody('C1', { evidence, hla: 'HLA-A*02:01', executor: 'worker' }, W, 's') as any).executor).toBe('worker');
     expect((buildDesignBody('C1', { evidence, hla: 'HLA-A*02:01' }, W, 's') as any).executor).toBe('auto');
     expect(() => buildDesignBody('C1', { evidence, hla: 'HLA-A*02:01', executor: 'gpu' }, W, 's')).toThrow(/--executor/);
+  });
+});
+
+
+describe('anchorLine: the on-chain proof of a finished job is always stated', () => {
+  const done = { status: 'done', manifest_biocid: 'biocid://genobank/0xa/neoantigen-hla-file/neo-1.job_manifest.json' };
+  it('says nothing for a job that is not finished', () => {
+    expect(anchorLine({ status: 'running' })).toBeNull();
+    expect(anchorLine({ status: 'failed' })).toBeNull();
+    expect(anchorLine(null)).toBeNull();
+  });
+  it('states the token, chain, transaction and manifest of an anchored job', () => {
+    const line = anchorLine({ ...done, anchor_request: {}, anchor: { anchored: true, tokenId: '7', chain_id: '15132025', tx: '0xabc' } })!;
+    expect(line).toContain('token 7');
+    expect(line).toContain('15132025');
+    expect(line).toContain('0xabc');
+    expect(line).toContain('neo-1.job_manifest.json');
+  });
+  it('marks an idempotent anchor as already on chain', () => {
+    expect(anchorLine({ ...done, anchor: { anchored: true, tokenId: '3', chain_id: '1', idempotent: true } })).toContain('already on chain');
+  });
+  it('says NOT anchored, with the reason, when the node could not or was not set up to', () => {
+    expect(anchorLine({ ...done, anchor_request: {}, anchor: { anchored: false, reason: 'not configured: set NEO_JOB_ANCHOR_ADDRESS' } })).toBe('NOT anchored: not configured: set NEO_JOB_ANCHOR_ADDRESS');
+    expect(anchorLine({ ...done, anchor: { anchored: false } })).toContain('no reason recorded');
+  });
+  it('says pending for a sealed job the node has not reached yet', () => {
+    expect(anchorLine({ ...done, anchor_request: { manifest_object: 'x' } })).toMatch(/^pending/);
+  });
+  it('never leaves a finished job without a statement: an unsealed job is NOT anchored', () => {
+    expect(anchorLine(done)).toBe('NOT anchored: no manifest was sealed for this job');
   });
 });
