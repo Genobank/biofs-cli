@@ -244,12 +244,16 @@ describe('neoantigen-indel verb', () => {
     expect(g.gtf_biocid).toMatch(/^biocid:/);
     expect((buildIndelBody('C1', { ...base, tpm: bc('expression', 'x.tsv', 'public-r2') }, W, 's') as any).tpm_biocid).toMatch(/^biocid:/);
     expect((buildIndelBody('C1', base, W, 's') as any).tpm_biocid).toBe('');
+    expect((buildIndelBody('C1', { ...base, rna: bc('bam', 'RNA.bam', 'public-r2') }, W, 's') as any).rna_biocid).toMatch(/^biocid:/);
+    expect((buildIndelBody('C1', base, W, 's') as any).rna_biocid).toBe('');
   });
   test('refusals', () => {
     expect(() => buildIndelBody('C1', { ...base, somaticSqlite: '/Users/x/a.sqlite' }, W, 's')).toThrow(/biocid/);
     expect(() => buildIndelBody('C1', { ...base, gtf: 'https://x/g.gtf.gz' }, W, 's')).toThrow(/--gtf/);
     expect(() => buildIndelBody('C1', { ...base, transcripts: 'gs://b/t.fa.gz' }, W, 's')).toThrow(/--transcripts/);
     expect(() => buildIndelBody('C1', { ...base, tpm: 'https://x/e.tsv' }, W, 's')).toThrow(/--tpm/);
+    expect(() => buildIndelBody('C1', { ...base, rna: 'gs://b/RNA.bam' }, W, 's')).toThrow(/--rna/);
+    expect(() => buildIndelBody('C1', { ...base, rna: 'https://storage.googleapis.com/b/RNA.bam?X-Goog-Signature=1' }, W, 's')).toThrow(/--rna/);
     expect(() => buildIndelBody('C1', { ...base, genes: 'TGFBR2,a b' }, W, 's')).toThrow(/gene symbol/);
     expect(() => buildIndelBody('C1', { ...base, genes: Array.from({ length: 51 }, (_, i) => `G${i}`).join(',') }, W, 's')).toThrow(/at most 50/);
     expect(() => buildIndelBody('C1', { ...base, minAlt: '0' }, W, 's')).toThrow(/--min-alt/);
