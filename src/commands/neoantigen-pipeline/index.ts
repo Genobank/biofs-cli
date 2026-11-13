@@ -3,6 +3,8 @@
  * biofs neoantigen-evidence status <job> [--wait]
  * biofs neoantigen-design   submit <caseId> --evidence <biocid> (--hla <alleles> | --hla-from <biocid> [--accept-low-confidence]) [--n 20] [--weights ...]
  * biofs neoantigen-hla      submit <caseId> --normal <biocid> [--rna <biocid>] [--depth-curve 0.5,0.25,0.1] [--include-unmapped]
+ * biofs neoantigen-fusion   submit <caseId> --fusion-evidence <biocid> --five-gene <symbol> --three-gene <symbol> (--hla <alleles> | --hla-from <biocid>) [--min-templates 10]
+ * biofs neoantigen-indel    submit <caseId> --somatic-sqlite <biocid> (--hla <alleles> | --hla-from <biocid>) [--min-alt 8] [--genes TGFBR2,...]
  * every submit verb takes [--executor auto|worker|local]: auto (default) runs on a healthy neoantigen worker agent and otherwise on the node, worker never falls back, local never uses a worker.
  * biofs neoantigen-design   status <job> [--wait]
  *
@@ -14,7 +16,9 @@
  *
  * Every biodata input is a biocid. biofs-node resolves each one through biocid_registry and refuses any it does not find owned by the signer; no read leaves the server.
  * A raw gs:// path, an https URL or a file path is rejected here, before anything is sent. Each result is registered as its own biocid in the signer's biowallet.
- * Decision support for a human review, never a clinical device. Server routes: POST /neoantigen_evidence, /neoantigen_design; GET /neoantigen_evidence_status, /neoantigen_design_status.
+ * Fusion: the junction-spanning peptides of an RNA-confirmed in-frame fusion (reading frame found from the data, hybrid codon kept, proteome-novel peptides only, class I scored).
+ * Indel: the mutant protein of every somatic frameshift and in-frame indel rebuilt from the transcript and checked against the annotation, with NMD flagged and class I scored.
+ * Decision support for a human review, never a clinical device. Server routes: POST /neoantigen_evidence, _hla, _design, _fusion, _indel; GET the same names with _status.
  */
 import axios from 'axios';
 import chalk from 'chalk';
@@ -147,14 +151,65 @@ export function buildHlaBody(caseId: string, o: NeoantigenHlaOptions, wallet: st
   return body;
 }
 
-export function buildDesignBody(caseId: string, o: NeoantigenDesignOptions, wallet: string, signature: string): Record<string, unknown> {
-  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+export const GENE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,19}$/;
+
+/** The HLA part of a request body, shared by design, fusion and indel: --hla (class I alleles) or --hla-from (an HLA typing report biocid), never both, never neither. */
+export function hlaFieldsOf(o: { hla?: string; hlaFrom?: string; acceptLowConfidence?: boolean }): Record<string, unknown> {
   if (o.hla && o.hlaFrom) throw new Error('give --hla or --hla-from, not both');
   if (!o.hla && !o.hlaFrom) throw new Error('--hla (class I alleles) or --hla-from (the biocid of an HLA typing report) is required');
   if (o.acceptLowConfidence && !o.hlaFrom) throw new Error('--accept-low-confidence applies only with --hla-from');
-  const hlaFields = o.hlaFrom
+  return o.hlaFrom
     ? { hla: [] as string[], hla_biocid: requireBiocid('--hla-from', o.hlaFrom), accept_low_confidence: !!o.acceptLowConfidence }
     : { hla: parseHla(o.hla as string) };
+}
+
+export function parseGene(flag: string, v: string | undefined): string {
+  if (!v || !GENE_RE.test(v)) throw new Error(`${flag} must be a gene symbol such as CDH1`);
+  return v;
+}
+
+export function parseGenes(list: string | undefined): string[] {
+  const genes = (list || '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (genes.length > 50) throw new Error('--genes takes at most 50 gene symbols');
+  for (const g of genes) parseGene('--genes', g);
+  return Array.from(new Set(genes));
+}
+
+export interface NeoantigenFusionOptions { fusionEvidence: string; fiveGene: string; threeGene: string; hla?: string; hlaFrom?: string; acceptLowConfidence?: boolean; proteome?: string; minTemplates?: string; executor?: string; owner?: string; wait?: boolean; json?: boolean }
+export interface NeoantigenIndelOptions { somaticSqlite: string; hla?: string; hlaFrom?: string; acceptLowConfidence?: boolean; proteome?: string; gtf?: string; transcripts?: string; minAlt?: string; genes?: string; executor?: string; owner?: string; wait?: boolean; json?: boolean }
+
+export function buildFusionBody(caseId: string, o: NeoantigenFusionOptions, wallet: string, signature: string): Record<string, unknown> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  return {
+    wallet: ownerOr(o.owner, wallet), signature, case_id: caseId,
+    fusion_evidence_biocid: requireBiocid('--fusion-evidence', o.fusionEvidence),
+    five_gene: parseGene('--five-gene', o.fiveGene), three_gene: parseGene('--three-gene', o.threeGene),
+    ...hlaFieldsOf(o),
+    proteome_biocid: o.proteome ? requireBiocid('--proteome', o.proteome) : '',
+    min_templates: parseCount(o.minTemplates, 10, 1, 1000, '--min-templates'),
+    executor: parseExecutor(o.executor),
+  };
+}
+
+export function buildIndelBody(caseId: string, o: NeoantigenIndelOptions, wallet: string, signature: string): Record<string, unknown> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  const body: Record<string, unknown> = {
+    wallet: ownerOr(o.owner, wallet), signature, case_id: caseId,
+    somatic_sqlite_biocid: requireBiocid('--somatic-sqlite', o.somaticSqlite),
+    ...hlaFieldsOf(o),
+    proteome_biocid: o.proteome ? requireBiocid('--proteome', o.proteome) : '',
+    gtf_biocid: o.gtf ? requireBiocid('--gtf', o.gtf) : '',
+    transcripts_biocid: o.transcripts ? requireBiocid('--transcripts', o.transcripts) : '',
+    min_alt: parseCount(o.minAlt, 8, 1, 200, '--min-alt'),
+    executor: parseExecutor(o.executor),
+  };
+  if (o.genes !== undefined) body.genes = parseGenes(o.genes);
+  return body;
+}
+
+export function buildDesignBody(caseId: string, o: NeoantigenDesignOptions, wallet: string, signature: string): Record<string, unknown> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  const hlaFields = hlaFieldsOf(o);
   return {
     wallet: ownerOr(o.owner, wallet),
     signature,
@@ -180,11 +235,13 @@ async function auth() {
   };
 }
 
-type Kind = 'evidence' | 'design' | 'hla';
+type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel';
 const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: string }> = {
   evidence: { post: 'neoantigen_evidence', status: 'neoantigen_evidence_status', id: 'neoantigen_job_id', verb: 'neoantigen-evidence' },
   design: { post: 'neoantigen_design', status: 'neoantigen_design_status', id: 'neoantigen_job_id', verb: 'neoantigen-design' },
   hla: { post: 'neoantigen_hla', status: 'neoantigen_hla_status', id: 'neoantigen_job_id', verb: 'neoantigen-hla' },
+  fusion: { post: 'neoantigen_fusion', status: 'neoantigen_fusion_status', id: 'neoantigen_job_id', verb: 'neoantigen-fusion' },
+  indel: { post: 'neoantigen_indel', status: 'neoantigen_indel_status', id: 'neoantigen_job_id', verb: 'neoantigen-indel' },
 };
 
 async function fetchStatus(kind: Kind, id: string, headers: Record<string, string>): Promise<any> {
@@ -271,6 +328,26 @@ export async function neoantigenHlaSubmitCommand(caseId: string, options: Neoant
     await submit('hla', buildHlaBody(caseId, options, a.wallet, a.signature), a.headers, options);
   } catch (e: any) {
     Logger.error(`neoantigen-hla submit failed: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+export async function neoantigenFusionSubmitCommand(caseId: string, options: NeoantigenFusionOptions): Promise<void> {
+  try {
+    const a = await auth();
+    await submit('fusion', buildFusionBody(caseId, options, a.wallet, a.signature), a.headers, options);
+  } catch (e: any) {
+    Logger.error(`neoantigen-fusion submit failed: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+export async function neoantigenIndelSubmitCommand(caseId: string, options: NeoantigenIndelOptions): Promise<void> {
+  try {
+    const a = await auth();
+    await submit('indel', buildIndelBody(caseId, options, a.wallet, a.signature), a.headers, options);
+  } catch (e: any) {
+    Logger.error(`neoantigen-indel submit failed: ${e.message}`);
     process.exit(1);
   }
 }

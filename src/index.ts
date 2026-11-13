@@ -134,7 +134,7 @@ import { ontVariantsExecCommand, OntVariantsExecOptions } from './commands/ont-v
 import { hifiAlignSubmitCommand, HifiAlignSubmitOptions } from './commands/hifi-align/submit';
 import { hifiAlignExecCommand, HifiAlignExecOptions } from './commands/hifi-align/exec';
 import { registerDerivedGcsCommand, readDerivedCommand, RegisterDerivedGcsOptions } from './commands/register-derived';
-import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenStatusCommand, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions } from './commands/neoantigen-pipeline';
+import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { pbsvSubmitCommand, PbsvSubmitOptions } from './commands/pbsv/submit';
 import { pbsvExecCommand, PbsvExecOptions } from './commands/pbsv/exec';
@@ -4331,6 +4331,59 @@ neoantigenHlaCmd
   .option('--wait', 'Poll until done or failed')
   .option('--json', 'Emit JSON')
   .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('hla', id, options); });
+
+const neoantigenFusionCmd = program
+  .command('neoantigen-fusion')
+  .description('Junction-spanning peptides of an RNA-confirmed in-frame fusion: reading frame found from the data, hybrid codon kept, proteome-novel peptides only, class I scored (dispatched through biofs-node)');
+neoantigenFusionCmd
+  .command('submit <caseId>')
+  .description('Submit a fusion junction peptide job; every input is a biocid')
+  .requiredOption('--fusion-evidence <biocid>', 'Result biocid of a fusion-evidence job (junction sequences and RNA chimeric read support)')
+  .requiredOption('--five-gene <symbol>', "5' partner gene symbol, for example CDH1")
+  .requiredOption('--three-gene <symbol>', "3' partner gene symbol, for example NRG1")
+  .option('--hla <alleles>', 'Comma separated class I alleles (or give --hla-from)')
+  .option('--hla-from <biocid>', 'Result biocid of a neoantigen-hla job: the alleles come from its report, a low confidence one is refused')
+  .option('--accept-low-confidence', 'With --hla-from: use a report flagged low confidence anyway (the job records that you did)')
+  .option('--proteome <biocid>', 'GENCODE protein FASTA (default: the node reference)')
+  .option('--min-templates <n>', 'Minimum chimeric RNA templates for the fusion to count as confirmed, 1 to 1000 (default 10)')
+  .option('--executor <where>', 'auto (default): a healthy neoantigen worker agent, else this node; worker: only a worker, never falls back; local: only this node')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: NeoantigenFusionOptions) => { await neoantigenFusionSubmitCommand(caseId, options); });
+neoantigenFusionCmd
+  .command('status <job>')
+  .description('Show a fusion junction peptide job (only the signer who submitted it can read it)')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('fusion', id, options); });
+
+const neoantigenIndelCmd = program
+  .command('neoantigen-indel')
+  .description('Neoantigen peptides of somatic frameshift and in-frame indel calls: mutant protein rebuilt from the transcript, checked against the annotation, NMD flagged, class I scored (dispatched through biofs-node)');
+neoantigenIndelCmd
+  .command('submit <caseId>')
+  .description('Submit an indel and frameshift peptide job; every input is a biocid')
+  .requiredOption('--somatic-sqlite <biocid>', 'The somatic annotation sqlite of the case')
+  .option('--hla <alleles>', 'Comma separated class I alleles (or give --hla-from)')
+  .option('--hla-from <biocid>', 'Result biocid of a neoantigen-hla job: the alleles come from its report, a low confidence one is refused')
+  .option('--accept-low-confidence', 'With --hla-from: use a report flagged low confidence anyway (the job records that you did)')
+  .option('--proteome <biocid>', 'GENCODE protein FASTA (default: the node reference)')
+  .option('--gtf <biocid>', 'GENCODE annotation GTF (default: the node reference, GENCODE v44)')
+  .option('--transcripts <biocid>', 'GENCODE transcript sequences (default: the node reference, GENCODE v44)')
+  .option('--min-alt <n>', 'Minimum alternate reads in the tumor for a call to be scored, 1 to 200 (default 8)')
+  .option('--genes <symbols>', 'Comma separated gene symbols: restrict the run to these genes (diagnostics)')
+  .option('--executor <where>', 'auto (default): a healthy neoantigen worker agent, else this node; worker: only a worker, never falls back; local: only this node')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: NeoantigenIndelOptions) => { await neoantigenIndelSubmitCommand(caseId, options); });
+neoantigenIndelCmd
+  .command('status <job>')
+  .description('Show an indel and frameshift peptide job (only the signer who submitted it can read it)')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('indel', id, options); });
 
 const registerDerivedCmd = program
   .command('register-derived')
