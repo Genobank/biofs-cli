@@ -4371,6 +4371,7 @@ neoantigenIndelCmd
   .option('--proteome <biocid>', 'GENCODE protein FASTA (default: the node reference)')
   .option('--gtf <biocid>', 'GENCODE annotation GTF (default: the node reference, GENCODE v44)')
   .option('--transcripts <biocid>', 'GENCODE transcript sequences (default: the node reference, GENCODE v44)')
+  .option('--tpm <biocid>', 'Gene expression table (gene, TPM): joined to every call, so frameshift candidates in unexpressed genes can be told apart')
   .option('--min-alt <n>', 'Minimum alternate reads in the tumor for a call to be scored, 1 to 200 (default 8)')
   .option('--genes <symbols>', 'Comma separated gene symbols: restrict the run to these genes (diagnostics)')
   .option('--executor <where>', 'auto (default): a healthy neoantigen worker agent, else this node; worker: only a worker, never falls back; local: only this node')

@@ -242,11 +242,14 @@ describe('neoantigen-indel verb', () => {
     const g: any = buildIndelBody('C1', { ...base, genes: 'TGFBR2, KMT2A,TGFBR2', minAlt: '12', gtf: bc('ref', 'g.gtf.gz', 'genobank'), transcripts: bc('ref', 't.fa.gz', 'genobank') }, W, 's');
     expect([g.genes, g.min_alt]).toEqual([['TGFBR2', 'KMT2A'], 12]);
     expect(g.gtf_biocid).toMatch(/^biocid:/);
+    expect((buildIndelBody('C1', { ...base, tpm: bc('expression', 'x.tsv', 'public-r2') }, W, 's') as any).tpm_biocid).toMatch(/^biocid:/);
+    expect((buildIndelBody('C1', base, W, 's') as any).tpm_biocid).toBe('');
   });
   test('refusals', () => {
     expect(() => buildIndelBody('C1', { ...base, somaticSqlite: '/Users/x/a.sqlite' }, W, 's')).toThrow(/biocid/);
     expect(() => buildIndelBody('C1', { ...base, gtf: 'https://x/g.gtf.gz' }, W, 's')).toThrow(/--gtf/);
     expect(() => buildIndelBody('C1', { ...base, transcripts: 'gs://b/t.fa.gz' }, W, 's')).toThrow(/--transcripts/);
+    expect(() => buildIndelBody('C1', { ...base, tpm: 'https://x/e.tsv' }, W, 's')).toThrow(/--tpm/);
     expect(() => buildIndelBody('C1', { ...base, genes: 'TGFBR2,a b' }, W, 's')).toThrow(/gene symbol/);
     expect(() => buildIndelBody('C1', { ...base, genes: Array.from({ length: 51 }, (_, i) => `G${i}`).join(',') }, W, 's')).toThrow(/at most 50/);
     expect(() => buildIndelBody('C1', { ...base, minAlt: '0' }, W, 's')).toThrow(/--min-alt/);
