@@ -4,7 +4,7 @@
  * biofs neoantigen-design   submit <caseId> --evidence <biocid> (--hla <alleles> | --hla-from <biocid> [--accept-low-confidence]) [--n 20] [--weights ...]
  * biofs neoantigen-hla      submit <caseId> --normal <biocid> [--rna <biocid>] [--depth-curve 0.5,0.25,0.1] [--include-unmapped]
  * biofs neoantigen-fusion   submit <caseId> --fusion-evidence <biocid> --five-gene <symbol> --three-gene <symbol> (--hla <alleles> | --hla-from <biocid>) [--min-templates 10]
- * biofs neoantigen-indel    submit <caseId> --somatic-sqlite <biocid> (--hla <alleles> | --hla-from <biocid>) [--tpm <biocid>] [--min-alt 8] [--genes TGFBR2,...]
+ * biofs neoantigen-indel    submit <caseId> --somatic-sqlite <biocid> (--hla <alleles> | --hla-from <biocid>) [--tpm <biocid>] [--rna <biocid>] [--min-alt 8] [--genes TGFBR2,...]
  * every submit verb takes [--executor auto|worker|local]: auto (default) runs on a healthy neoantigen worker agent and otherwise on the node, worker never falls back, local never uses a worker.
  * biofs neoantigen-design   status <job> [--wait]
  *
@@ -176,7 +176,7 @@ export function parseGenes(list: string | undefined): string[] {
 }
 
 export interface NeoantigenFusionOptions { fusionEvidence: string; fiveGene: string; threeGene: string; hla?: string; hlaFrom?: string; acceptLowConfidence?: boolean; proteome?: string; minTemplates?: string; executor?: string; owner?: string; wait?: boolean; json?: boolean }
-export interface NeoantigenIndelOptions { somaticSqlite: string; hla?: string; hlaFrom?: string; acceptLowConfidence?: boolean; proteome?: string; gtf?: string; transcripts?: string; tpm?: string; minAlt?: string; genes?: string; executor?: string; owner?: string; wait?: boolean; json?: boolean }
+export interface NeoantigenIndelOptions { somaticSqlite: string; hla?: string; hlaFrom?: string; acceptLowConfidence?: boolean; proteome?: string; gtf?: string; transcripts?: string; tpm?: string; rna?: string; minAlt?: string; genes?: string; executor?: string; owner?: string; wait?: boolean; json?: boolean }
 
 export function buildFusionBody(caseId: string, o: NeoantigenFusionOptions, wallet: string, signature: string): Record<string, unknown> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
@@ -201,6 +201,7 @@ export function buildIndelBody(caseId: string, o: NeoantigenIndelOptions, wallet
     gtf_biocid: o.gtf ? requireBiocid('--gtf', o.gtf) : '',
     transcripts_biocid: o.transcripts ? requireBiocid('--transcripts', o.transcripts) : '',
     tpm_biocid: o.tpm ? requireBiocid('--tpm', o.tpm) : '',
+    rna_biocid: o.rna ? requireBiocid('--rna', o.rna) : '',
     min_alt: parseCount(o.minAlt, 8, 1, 200, '--min-alt'),
     executor: parseExecutor(o.executor),
   };
