@@ -104,7 +104,7 @@ describe('neoantigen verbs: custodial owner', () => {
   });
 });
 
-import { buildHlaBody, parseDepthCurve, parseExecutor, anchorLine } from '../src/commands/neoantigen-pipeline';
+import { buildHlaBody, parseDepthCurve, parseExecutor, anchorLine, buildFusionBody, buildIndelBody, parseGene, parseGenes, hlaFieldsOf } from '../src/commands/neoantigen-pipeline';
 describe('neoantigen-hla verb', () => {
   const own = '0xFD1f085f8d10375df8A1c7C9ffA4FD0eB80B0b1d';
   test('germline BAM as a biocid, optional RNA, custodial owner, no raw paths', () => {
@@ -196,5 +196,69 @@ describe('anchorLine: the on-chain proof of a finished job is always stated', ()
   });
   it('never leaves a finished job without a statement: an unsealed job is NOT anchored', () => {
     expect(anchorLine(done)).toBe('NOT anchored: no manifest was sealed for this job');
+  });
+});
+
+describe('neoantigen-fusion verb', () => {
+  const fe = bc('neoantigen_fusion_evidence', 'fe.json', 'genobank');
+  const base = { fusionEvidence: fe, fiveGene: 'CDH1', threeGene: 'NRG1', hla: 'HLA-A*01:01,HLA-B*08:01' };
+  test('body: biocid in, two gene symbols, alleles, defaults', () => {
+    const b: any = buildFusionBody('TN25-112103', base, W, 's');
+    expect([b.five_gene, b.three_gene, b.min_templates, b.executor, b.proteome_biocid]).toEqual(['CDH1', 'NRG1', 10, 'auto', '']);
+    expect(b.hla).toEqual(['HLA-A*01:01', 'HLA-B*08:01']);
+    expect(b.fusion_evidence_biocid).toBe(fe);
+    expect(JSON.stringify(b)).not.toMatch(/gs:\/\//);
+  });
+  test('alleles from a registered HLA report, with the low confidence choice explicit', () => {
+    const rep = bc('neoantigen_hla', 'hla_typing_report.json', 'genobank');
+    const b: any = buildFusionBody('C1', { ...base, hla: undefined, hlaFrom: rep }, W, 's');
+    expect([b.hla, b.hla_biocid, b.accept_low_confidence]).toEqual([[], rep, false]);
+    expect((buildFusionBody('C1', { ...base, hla: undefined, hlaFrom: rep, acceptLowConfidence: true }, W, 's') as any).accept_low_confidence).toBe(true);
+    expect(() => buildFusionBody('C1', { ...base, hlaFrom: rep }, W, 's')).toThrow(/not both/);
+    expect(() => buildFusionBody('C1', { ...base, hla: undefined }, W, 's')).toThrow(/required/);
+    expect(() => buildFusionBody('C1', { ...base, acceptLowConfidence: true }, W, 's')).toThrow(/only with --hla-from/);
+  });
+  test('refusals: raw paths, bad symbols, class II alleles, out of range counts, person-like case ids, custodial owner', () => {
+    expect(() => buildFusionBody('C1', { ...base, fusionEvidence: 'gs://b/f.json' }, W, 's')).toThrow(/biocid/);
+    expect(() => buildFusionBody('C1', { ...base, fiveGene: 'CDH1; ls' }, W, 's')).toThrow(/gene symbol/);
+    expect(() => buildFusionBody('C1', { ...base, threeGene: '' }, W, 's')).toThrow(/gene symbol/);
+    expect(() => buildFusionBody('C1', { ...base, hla: 'HLA-DRB1*03:01' }, W, 's')).toThrow(/class I/);
+    expect(() => buildFusionBody('C1', { ...base, minTemplates: '0' }, W, 's')).toThrow(/--min-templates/);
+    expect(() => buildFusionBody('C1', { ...base, minTemplates: '1001' }, W, 's')).toThrow(/--min-templates/);
+    expect(() => buildFusionBody('C1', { ...base, proteome: '/mnt/x.fa' }, W, 's')).toThrow(/biocid/);
+    expect(() => buildFusionBody('Jane Doe', base, W, 's')).toThrow(/case identifier/);
+    const own = '0xFD1f085f8d10375df8A1c7C9ffA4FD0eB80B0b1d';
+    expect((buildFusionBody('C1', { ...base, owner: own }, W, 's') as any).wallet).toBe(own);
+    expect(() => buildFusionBody('C1', { ...base, owner: '0x123' }, W, 's')).toThrow(/biowallet/);
+  });
+});
+
+describe('neoantigen-indel verb', () => {
+  const sq = bc('sqlite', 'TN25-112103.mutect2.filtered.sqlite', 'genobank');
+  const base = { somaticSqlite: sq, hla: 'HLA-A*01:01,HLA-C*07:02' };
+  test('body: defaults, optional references and genes', () => {
+    const b: any = buildIndelBody('TN25-112103', base, W, 's');
+    expect([b.somatic_sqlite_biocid, b.min_alt, b.executor, b.gtf_biocid, b.transcripts_biocid, b.proteome_biocid, b.genes]).toEqual([sq, 8, 'auto', '', '', '', undefined]);
+    const g: any = buildIndelBody('C1', { ...base, genes: 'TGFBR2, KMT2A,TGFBR2', minAlt: '12', gtf: bc('ref', 'g.gtf.gz', 'genobank'), transcripts: bc('ref', 't.fa.gz', 'genobank') }, W, 's');
+    expect([g.genes, g.min_alt]).toEqual([['TGFBR2', 'KMT2A'], 12]);
+    expect(g.gtf_biocid).toMatch(/^biocid:/);
+  });
+  test('refusals', () => {
+    expect(() => buildIndelBody('C1', { ...base, somaticSqlite: '/Users/x/a.sqlite' }, W, 's')).toThrow(/biocid/);
+    expect(() => buildIndelBody('C1', { ...base, gtf: 'https://x/g.gtf.gz' }, W, 's')).toThrow(/--gtf/);
+    expect(() => buildIndelBody('C1', { ...base, transcripts: 'gs://b/t.fa.gz' }, W, 's')).toThrow(/--transcripts/);
+    expect(() => buildIndelBody('C1', { ...base, genes: 'TGFBR2,a b' }, W, 's')).toThrow(/gene symbol/);
+    expect(() => buildIndelBody('C1', { ...base, genes: Array.from({ length: 51 }, (_, i) => `G${i}`).join(',') }, W, 's')).toThrow(/at most 50/);
+    expect(() => buildIndelBody('C1', { ...base, minAlt: '0' }, W, 's')).toThrow(/--min-alt/);
+    expect(() => buildIndelBody('C1', { ...base, minAlt: '201' }, W, 's')).toThrow(/--min-alt/);
+    expect(() => buildIndelBody('C1', { ...base, hla: undefined }, W, 's')).toThrow(/required/);
+    expect(() => buildIndelBody('C1', { ...base, executor: 'cloud' }, W, 's')).toThrow(/--executor/);
+  });
+  test('shared helpers', () => {
+    expect(() => buildEvidenceBody('C1', { somaticSqlite: 'gs://x/s.sqlite', filteredVcf: bc('vcf', 'f.vcf.gz'), tumor: bc('bam', 't.bam'), normal: bc('bam', 'n.bam') }, W, 's')).toThrow(/--somatic-sqlite must be a biocid/);
+    expect(parseGene('--x', 'HLA-A')).toBe('HLA-A');
+    expect(() => parseGene('--x', undefined)).toThrow();
+    expect(parseGenes(undefined)).toEqual([]);
+    expect(hlaFieldsOf({ hla: 'HLA-A*01:01' })).toEqual({ hla: ['HLA-A*01:01'] });
   });
 });
