@@ -135,6 +135,7 @@ import { hifiAlignSubmitCommand, HifiAlignSubmitOptions } from './commands/hifi-
 import { hifiAlignExecCommand, HifiAlignExecOptions } from './commands/hifi-align/exec';
 import { registerDerivedGcsCommand, readDerivedCommand, RegisterDerivedGcsOptions } from './commands/register-derived';
 import { registerParabricksCommands } from './commands/parabricks';
+import { inventoryRegisterCommand } from './commands/inventory-register';
 import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { pbsvSubmitCommand, PbsvSubmitOptions } from './commands/pbsv/submit';
@@ -4433,6 +4434,16 @@ publicFetchCmd
   .option('--wait', 'Poll until done or failed')
   .option('--json', 'Emit JSON')
   .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('public_fetch', id, options); });
+
+program
+  .command('inventory-register <biocids...>')
+  .description('NODE OPERATOR: copy file rows already in bioroutes.inventory into biocid_registry so jobs can resolve them (owner unchanged, consent custodian, your attestation recorded; dry run unless --yes)')
+  .requiredOption('--attest <text>', 'The basis on which GenoBank.io holds and uses these files (at least 20 characters, recorded with the rows)')
+  .option('--yes', 'Write the rows (default is a dry run that writes nothing)')
+  .option('--json', 'Emit JSON')
+  .action(async (biocids: string[], options: { attest: string; yes?: boolean; json?: boolean }) => {
+    try { await inventoryRegisterCommand(biocids, options); } catch (e: any) { console.error(chalk.red(e.message)); process.exit(1); }
+  });
 
 const teslaGateCmd = program
   .command('tesla-gate')
