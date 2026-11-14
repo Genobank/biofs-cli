@@ -134,7 +134,7 @@ import { ontVariantsExecCommand, OntVariantsExecOptions } from './commands/ont-v
 import { hifiAlignSubmitCommand, HifiAlignSubmitOptions } from './commands/hifi-align/submit';
 import { hifiAlignExecCommand, HifiAlignExecOptions } from './commands/hifi-align/exec';
 import { registerDerivedGcsCommand, readDerivedCommand, RegisterDerivedGcsOptions } from './commands/register-derived';
-import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions } from './commands/neoantigen-pipeline';
+import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, teslaGateSubmitCommand, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { pbsvSubmitCommand, PbsvSubmitOptions } from './commands/pbsv/submit';
 import { pbsvExecCommand, PbsvExecOptions } from './commands/pbsv/exec';
@@ -4386,6 +4386,56 @@ neoantigenIndelCmd
   .option('--wait', 'Poll until done or failed')
   .option('--json', 'Emit JSON')
   .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('indel', id, options); });
+
+const synapsePullCmd = program
+  .command('synapse-pull')
+  .description('Pull controlled-access research data from Synapse onto a worker, into your biowallet, with the Synapse id, version and MD5 as lineage (the Synapse token lives only on the worker; dispatched through biofs-node)');
+synapsePullCmd
+  .command('submit <caseId>')
+  .description('Submit a Synapse pull (or, with --list-only, only list sizes, MD5 and annotations: nothing is downloaded)')
+  .option('--entities <ids>', 'Comma separated Synapse file ids, for example syn101,syn102 (up to 500)')
+  .option('--folder <id>', 'A Synapse folder or project: every file under it (recursive), optionally filtered by --suffixes')
+  .option('--suffixes <list>', 'With --folder: only files whose name ends with one of these, for example .fastq.gz,.bam')
+  .option('--project <id>', 'The Synapse project the files belong to, recorded in the lineage')
+  .option('--list-only', 'Do not download: write a manifest of names, sizes, MD5, versions and annotations (the compute estimate)')
+  .option('--access-basis <text>', 'The approval this job runs under (a download is refused without it), 10 to 300 characters')
+  .option('--max-total-bytes <n>', 'Refuse the job if the files total more than this many bytes (nothing is downloaded)')
+  .option('--executor <where>', 'worker (the only value: the token exists only on a worker)')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: SynapsePullOptions) => { await synapsePullSubmitCommand(caseId, options); });
+synapsePullCmd
+  .command('status <job>')
+  .description('Show a Synapse pull job (only the signer who submitted it can read it)')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('synapse', id, options); });
+
+const teslaGateCmd = program
+  .command('tesla-gate')
+  .description('The registered test of the case 1 evidence gate on the TESLA subjects: join variants to pMHC, apply the frozen gate, exact and permutation statistics (dispatched through biofs-node)');
+teslaGateCmd
+  .command('submit <caseId>')
+  .description('Submit the TESLA gate test; every input is a biocid and the code and protocol hashes must be the registered ones')
+  .requiredOption('--outcomes <biocid>', 'The pMHC outcomes table made from the public TESLA supplement (Tables S4 and S7)')
+  .requiredOption('--features <pairs...>', 'patient=biocid of that subject\'s neoantigen-evidence features table, repeatable: 1=biocid://... 2=biocid://...')
+  .requiredOption('--code-sha256 <hex>', 'SHA-256 of tesla_gate.py as registered; the worker refuses any other code')
+  .requiredOption('--protocol-sha256 <hex>', 'SHA-256 of the registered protocol')
+  .requiredOption('--ledger-record <n>', 'The pre-registration ledger record number')
+  .option('--proteome <biocid>', 'GENCODE protein FASTA (default: the node reference)')
+  .option('--selftest', 'Randomize the labels within subject: proves the plumbing, says nothing about the gate')
+  .option('--executor <where>', 'auto (default): a healthy neoantigen worker agent, else this node; worker: only a worker, never falls back; local: only this node')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: TeslaGateOptions) => { await teslaGateSubmitCommand(caseId, options); });
+teslaGateCmd
+  .command('status <job>')
+  .description('Show a TESLA gate job (only the signer who submitted it can read it)')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('tesla_gate', id, options); });
 
 const registerDerivedCmd = program
   .command('register-derived')

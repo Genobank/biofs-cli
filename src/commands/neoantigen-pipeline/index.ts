@@ -5,6 +5,8 @@
  * biofs neoantigen-hla      submit <caseId> --normal <biocid> [--rna <biocid>] [--depth-curve 0.5,0.25,0.1] [--include-unmapped]
  * biofs neoantigen-fusion   submit <caseId> --fusion-evidence <biocid> --five-gene <symbol> --three-gene <symbol> (--hla <alleles> | --hla-from <biocid>) [--min-templates 10]
  * biofs neoantigen-indel    submit <caseId> --somatic-sqlite <biocid> (--hla <alleles> | --hla-from <biocid>) [--tpm <biocid>] [--rna <biocid>] [--min-alt 8] [--genes TGFBR2,...]
+ * biofs synapse-pull      submit <caseId> (--entities syn1,syn2 | --folder syn123 [--suffixes .fastq.gz,.bam]) [--project syn123] [--list-only] --access-basis "<approval>" [--max-total-bytes N]
+ * biofs tesla-gate         submit <caseId> --outcomes <biocid> --features 1=<biocid> 2=<biocid> ... --code-sha256 <hex> --protocol-sha256 <hex> --ledger-record <n> [--selftest]
  * every submit verb takes [--executor auto|worker|local]: auto (default) runs on a healthy neoantigen worker agent and otherwise on the node, worker never falls back, local never uses a worker.
  * biofs neoantigen-design   status <job> [--wait]
  *
@@ -227,6 +229,118 @@ export function buildDesignBody(caseId: string, o: NeoantigenDesignOptions, wall
   };
 }
 
+export interface SynapsePullOptions {
+  entities?: string;
+  folder?: string;
+  suffixes?: string;
+  project?: string;
+  listOnly?: boolean;
+  accessBasis?: string;
+  maxTotalBytes?: string;
+  executor?: string;
+  owner?: string;
+  wait?: boolean;
+  json?: boolean;
+}
+
+export interface TeslaGateOptions {
+  outcomes: string;
+  features: string[];
+  codeSha256: string;
+  protocolSha256: string;
+  ledgerRecord: string;
+  proteome?: string;
+  selftest?: boolean;
+  executor?: string;
+  owner?: string;
+  wait?: boolean;
+  json?: boolean;
+}
+
+export const SYN_RE = /^syn[0-9]{1,12}$/;
+
+export function parseSynId(flag: string, v: string): string {
+  if (!SYN_RE.test((v || '').trim())) throw new Error(`${flag} must be a Synapse id such as syn21048999; a URL or file path is never accepted`);
+  return v.trim();
+}
+
+export function parseSynIds(list: string | undefined, flag: string): string[] {
+  const ids = (list || '').split(',').map((x) => x.trim()).filter(Boolean).map((x) => parseSynId(flag, x));
+  if (ids.length > 500) throw new Error(`${flag} takes up to 500 Synapse ids per job`);
+  return Array.from(new Set(ids));
+}
+
+export function parseSuffixes(list: string | undefined): string[] {
+  const out = (list || '').split(',').map((x) => x.trim()).filter(Boolean);
+  if (out.length > 10 || out.some((x) => !/^\.[A-Za-z0-9.]{1,20}$/.test(x))) throw new Error('--suffixes takes up to 10 file name endings such as .fastq.gz,.bam');
+  return out;
+}
+
+/** Third-party controlled-access data from Synapse onto a worker: the Synapse token lives only on the worker, never in this request, and the job never runs on the node that holds the registry. */
+export function buildSynapseBody(caseId: string, o: SynapsePullOptions, wallet: string, signature: string): Record<string, unknown> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  if (o.executor !== undefined && o.executor !== '' && o.executor !== 'worker') throw new Error('--executor must be worker for a Synapse pull: the token exists only on a worker');
+  const entities = parseSynIds(o.entities, '--entities');
+  if (!entities.length && !o.folder) throw new Error('give --entities (Synapse file ids) or --folder');
+  const basis = (o.accessBasis || '').trim();
+  if (!o.listOnly && basis.length < 10) throw new Error('--access-basis is required to download controlled-access data: name the approval the job runs under (10 to 300 characters)');
+  if (basis.length > 300) throw new Error('--access-basis is at most 300 characters');
+  const body: Record<string, unknown> = {
+    wallet: ownerOr(o.owner, wallet), signature, case_id: caseId, executor: 'worker', list_only: !!o.listOnly,
+  };
+  if (entities.length) body.entities = entities;
+  if (o.folder) body.folder = parseSynId('--folder', o.folder);
+  if (o.suffixes) body.suffixes = parseSuffixes(o.suffixes);
+  if (o.project) body.project = parseSynId('--project', o.project);
+  if (basis) body.access_basis = basis;
+  if (o.maxTotalBytes !== undefined && o.maxTotalBytes !== '') {
+    const n = Number(o.maxTotalBytes);
+    if (!Number.isInteger(n) || n < 1 || n > 2e12) throw new Error('--max-total-bytes must be a positive integer up to 2000000000000');
+    body.max_total_bytes = n;
+  }
+  return body;
+}
+
+export function parseSha256(flag: string, v: string): string {
+  const x = (v || '').trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(x)) throw new Error(`${flag} must be a SHA-256 (64 hex characters): the registered, frozen value`);
+  return x;
+}
+
+/** "1=biocid://...,2=biocid://..." (repeatable): TESLA patient id to the biocid of that subject's neoantigen-evidence features table. */
+export function parseFeatures(items: string[] | string | undefined): Record<string, string> {
+  const raw = ([] as string[]).concat(items || []).flatMap((x) => String(x).split(/,(?=[A-Za-z0-9_-]{1,16}=)/)).map((x) => x.trim()).filter(Boolean);
+  if (raw.length < 1 || raw.length > 20) throw new Error('--features needs 1 to 20 entries of patient=biocid, for example 1=biocid://genobank/0x.../neoantigen-evidence/...');
+  const out: Record<string, string> = {};
+  for (const r of raw) {
+    const i = r.indexOf('=');
+    const id = r.slice(0, i);
+    if (i < 1 || !/^[A-Za-z0-9_-]{1,16}$/.test(id)) throw new Error(`--features entry "${r}" is not patient=biocid`);
+    if (out[id]) throw new Error(`--features names patient ${id} twice`);
+    out[id] = requireBiocid(`--features ${id}`, r.slice(i + 1));
+  }
+  return out;
+}
+
+/** The registered test of the case 1 evidence gate on the TESLA subjects. The code hash, protocol hash and ledger record must be the frozen ones; the worker refuses code that differs. */
+export function buildTeslaGateBody(caseId: string, o: TeslaGateOptions, wallet: string, signature: string): Record<string, unknown> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  const rec = Number(o.ledgerRecord);
+  if (!Number.isInteger(rec) || rec < 1) throw new Error('--ledger-record must be the pre-registration ledger record number');
+  const body: Record<string, unknown> = {
+    wallet: ownerOr(o.owner, wallet), signature, case_id: caseId,
+    outcomes_biocid: requireBiocid('--outcomes', o.outcomes),
+    features_biocids: parseFeatures(o.features),
+    code_sha256: parseSha256('--code-sha256', o.codeSha256),
+    protocol_sha256: parseSha256('--protocol-sha256', o.protocolSha256),
+    ledger_record: rec,
+    proteome_biocid: o.proteome ? requireBiocid('--proteome', o.proteome) : '',
+    executor: parseExecutor(o.executor),
+  };
+  if (o.selftest) body.selftest = true;
+  return body;
+}
+
 async function auth() {
   const credentials = await getCredentials();
   if (!credentials) throw new Error('Not authenticated. Run "biofs login" first.');
@@ -237,13 +351,15 @@ async function auth() {
   };
 }
 
-type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel';
+type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate';
 const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: string }> = {
   evidence: { post: 'neoantigen_evidence', status: 'neoantigen_evidence_status', id: 'neoantigen_job_id', verb: 'neoantigen-evidence' },
   design: { post: 'neoantigen_design', status: 'neoantigen_design_status', id: 'neoantigen_job_id', verb: 'neoantigen-design' },
   hla: { post: 'neoantigen_hla', status: 'neoantigen_hla_status', id: 'neoantigen_job_id', verb: 'neoantigen-hla' },
   fusion: { post: 'neoantigen_fusion', status: 'neoantigen_fusion_status', id: 'neoantigen_job_id', verb: 'neoantigen-fusion' },
   indel: { post: 'neoantigen_indel', status: 'neoantigen_indel_status', id: 'neoantigen_job_id', verb: 'neoantigen-indel' },
+  synapse: { post: 'neoantigen_synapse', status: 'neoantigen_synapse_status', id: 'neoantigen_job_id', verb: 'synapse-pull' },
+  tesla_gate: { post: 'neoantigen_tesla_gate', status: 'neoantigen_tesla_gate_status', id: 'neoantigen_job_id', verb: 'tesla-gate' },
 };
 
 async function fetchStatus(kind: Kind, id: string, headers: Record<string, string>): Promise<any> {
@@ -350,6 +466,26 @@ export async function neoantigenIndelSubmitCommand(caseId: string, options: Neoa
     await submit('indel', buildIndelBody(caseId, options, a.wallet, a.signature), a.headers, options);
   } catch (e: any) {
     Logger.error(`neoantigen-indel submit failed: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+export async function synapsePullSubmitCommand(caseId: string, options: SynapsePullOptions): Promise<void> {
+  try {
+    const a = await auth();
+    await submit('synapse', buildSynapseBody(caseId, options, a.wallet, a.signature), a.headers, options);
+  } catch (e: any) {
+    Logger.error(`synapse-pull submit failed: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+export async function teslaGateSubmitCommand(caseId: string, options: TeslaGateOptions): Promise<void> {
+  try {
+    const a = await auth();
+    await submit('tesla_gate', buildTeslaGateBody(caseId, options, a.wallet, a.signature), a.headers, options);
+  } catch (e: any) {
+    Logger.error(`tesla-gate submit failed: ${e.message}`);
     process.exit(1);
   }
 }

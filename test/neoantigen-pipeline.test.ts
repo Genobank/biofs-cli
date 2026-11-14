@@ -1,4 +1,4 @@
-import { BIOCID_RE, requireBiocid, parseHla, parseWeights, parseCount, buildEvidenceBody, buildDesignBody } from '../src/commands/neoantigen-pipeline';
+import { BIOCID_RE, requireBiocid, parseHla, parseWeights, parseCount, buildEvidenceBody, buildDesignBody, buildSynapseBody, buildTeslaGateBody, parseFeatures, parseSynIds, parseSuffixes, parseSha256 } from '../src/commands/neoantigen-pipeline';
 
 const W = '0x5f5a60EaEf242c0D51A21c703f520347b96Ed19a';
 const bc = (type: string, name: string, agent = 'natera') => `biocid://${agent}/${W}/${type}/${name}`;
@@ -267,5 +267,69 @@ describe('neoantigen-indel verb', () => {
     expect(() => parseGene('--x', undefined)).toThrow();
     expect(parseGenes(undefined)).toEqual([]);
     expect(hlaFieldsOf({ hla: 'HLA-A*01:01' })).toEqual({ hla: ['HLA-A*01:01'] });
+  });
+});
+
+
+describe('synapse-pull verb', () => {
+  const basis = 'Synapse access approval for syn21048999, data use certificate of the research wallet owner';
+  const o = { entities: 'syn101,syn102,syn101', project: 'syn21048999', accessBasis: basis };
+  test('body: de-duplicated ids, worker only, no token field of any kind', () => {
+    const b: any = buildSynapseBody('TESLA', o, W, '0xsig');
+    expect(b.entities).toEqual(['syn101', 'syn102']);
+    expect(b.executor).toBe('worker');
+    expect(b.list_only).toBe(false);
+    expect(b.access_basis).toBe(basis);
+    expect(b.project).toBe('syn21048999');
+    expect(b.wallet).toBe(W);
+    expect(Object.keys(b).filter((k) => /token|secret|password|pat$/i.test(k))).toEqual([]);
+  });
+  test('a listing needs no access basis; a download does', () => {
+    expect((buildSynapseBody('TESLA', { folder: 'syn21048999', suffixes: '.fastq.gz,.bam', listOnly: true }, W, 's') as any).list_only).toBe(true);
+    expect(() => buildSynapseBody('TESLA', { entities: 'syn1' }, W, 's')).toThrow(/access-basis/);
+    expect(() => buildSynapseBody('TESLA', { entities: 'syn1', accessBasis: 'short' }, W, 's')).toThrow(/access-basis/);
+  });
+  test.each(['https://www.synapse.org/#!Synapse:syn1', 'syn', 'syn1;rm', '/tmp/a.bam', 'gs://b/a'])('refuses %p as a Synapse id', (v) => {
+    expect(() => parseSynIds(v, '--entities')).toThrow(/Synapse id/);
+  });
+  test('refusals: no source, executor other than worker, bad caps, bad suffixes, person-like case ids', () => {
+    expect(() => buildSynapseBody('TESLA', { accessBasis: basis }, W, 's')).toThrow(/--entities .* or --folder/);
+    expect(() => buildSynapseBody('TESLA', { ...o, executor: 'local' }, W, 's')).toThrow(/worker/);
+    expect(() => buildSynapseBody('TESLA', { ...o, maxTotalBytes: '-5' }, W, 's')).toThrow(/max-total-bytes/);
+    expect(() => buildSynapseBody('TESLA', { ...o, maxTotalBytes: '3e12' }, W, 's')).toThrow(/max-total-bytes/);
+    expect((buildSynapseBody('TESLA', { ...o, maxTotalBytes: '400000000000' }, W, 's') as any).max_total_bytes).toBe(400e9);
+    expect(() => parseSuffixes('fastq')).toThrow(/suffixes/);
+    expect(() => buildSynapseBody('Jane Doe', o, W, 's')).toThrow(/case identifier/);
+    expect(() => buildSynapseBody('TESLA', { ...o, owner: 'bob' }, W, 's')).toThrow(/biowallet/);
+  });
+});
+
+describe('tesla-gate verb', () => {
+  const H = 'a'.repeat(64);
+  const f1 = bc('tsv', 'f1.tsv', 'genobank');
+  const f2 = bc('tsv', 'f2.tsv', 'genobank');
+  const base = { outcomes: bc('tsv', 'outcomes.tsv', 'genobank'), features: [`1=${f1}`, `2=${f2}`], codeSha256: H, protocolSha256: 'B'.repeat(64), ledgerRecord: '18' };
+  test('body: features by patient, hashes lower-cased, ledger record, executor auto', () => {
+    const b: any = buildTeslaGateBody('TESLA', base, W, 's');
+    expect(b.features_biocids).toEqual({ '1': f1, '2': f2 });
+    expect(b.protocol_sha256).toBe('b'.repeat(64));
+    expect(b.ledger_record).toBe(18);
+    expect(b.executor).toBe('auto');
+    expect(b.selftest).toBeUndefined();
+    expect((buildTeslaGateBody('TESLA', { ...base, selftest: true }, W, 's') as any).selftest).toBe(true);
+  });
+  test('features parse from one comma list or repeated pairs and refuse anything but a biocid', () => {
+    expect(parseFeatures(`1=${f1},2=${f2}`)).toEqual({ '1': f1, '2': f2 });
+    expect(() => parseFeatures(['1=gs://b/f.tsv'])).toThrow(/biocid/);
+    expect(() => parseFeatures([`1=${f1}`, `1=${f2}`])).toThrow(/twice/);
+    expect(() => parseFeatures(['nobiocid'])).toThrow(/patient=biocid/);
+    expect(() => parseFeatures([])).toThrow(/1 to 20/);
+  });
+  test('refusals: a hash that is not a SHA-256, a missing ledger record, a raw outcomes path', () => {
+    expect(() => parseSha256('--code-sha256', 'abc')).toThrow(/SHA-256/);
+    expect(() => buildTeslaGateBody('TESLA', { ...base, ledgerRecord: '0' }, W, 's')).toThrow(/ledger-record/);
+    expect(() => buildTeslaGateBody('TESLA', { ...base, ledgerRecord: 'x' }, W, 's')).toThrow(/ledger-record/);
+    expect(() => buildTeslaGateBody('TESLA', { ...base, outcomes: '/Users/x/outcomes.tsv' }, W, 's')).toThrow(/biocid/);
+    expect(() => buildTeslaGateBody('TESLA', { ...base, executor: 'cloud' }, W, 's')).toThrow(/executor/);
   });
 });
