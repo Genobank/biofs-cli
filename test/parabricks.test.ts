@@ -159,3 +159,38 @@ describe('from the command line (--check prints the body and sends nothing)', ()
     await expect(check(['bam2fq', 'S1', '--in-bam', bc('bam', 'a.bam'), '--low-memory'])).rejects.toThrow();
   });
 });
+
+
+describe('fq2bam validation options', () => {
+  const pair = { '--in-fq': [bc('fastq', 'r1'), bc('fastq', 'r2')] };
+  const fq = (extra: Partial<PbrunRaw>) => buildParabricksBody('fq2bam', 'T1', { flags: { ...pair }, ref: 'hg38', sampleName: 'T1', acknowledgeUntested: true, ...extra } as PbrunRaw, W, SIG);
+
+  test('no validation, no validation field', () => {
+    expect((fq({}) as any).validation).toBeUndefined();
+  });
+  test('--validate-with-bwa asks for the independent bwa comparison inside the job', () => {
+    expect((fq({ validateWithBwa: true }) as any).validation).toEqual({ bwa: true });
+  });
+  test('--validate-against-bam names an earlier BAM by biocid', () => {
+    expect((fq({ validateAgainstBam: bc('bam', 'prev') }) as any).validation).toEqual({ against_bam: bc('bam', 'prev') });
+  });
+  test('both together', () => {
+    expect((fq({ validateWithBwa: true, validateAgainstBam: bc('bam', 'prev') }) as any).validation).toEqual({ bwa: true, against_bam: bc('bam', 'prev') });
+  });
+  test('a path is not a biocid', () => {
+    expect(() => fq({ validateAgainstBam: '/tmp/prev.bam' })).toThrow(/biocid/);
+  });
+  test('other tools do not take it', () => {
+    expect(() => buildParabricksBody('bam2fq', 'T1', { flags: { '--in-bam': bc('bam', 'x') }, validateWithBwa: true } as PbrunRaw, W, SIG)).toThrow(/only to fq2bam/);
+  });
+  test('the options exist on fq2bam only, and --check prints the validation block', async () => {
+    const body = await check(['fq2bam', 'T1', '--in-fq', bc('fastq', 'r1'), bc('fastq', 'r2'), '--ref', 'hg38', '--sample-name', 'T1', '--acknowledge-untested', '--validate-with-bwa']);
+    expect(body.validation).toEqual({ bwa: true });
+    const p = program();
+    const group = p.commands.find((c) => c.name() === 'pbrun')!;
+    const has = (tool: string, long: string) => !!group.commands.find((c) => c.name() === tool)!.options.find((o) => o.long === long);
+    expect(has('fq2bam', '--validate-with-bwa')).toBe(true);
+    expect(has('fq2bam', '--validate-against-bam')).toBe(true);
+    expect(has('bam2fq', '--validate-with-bwa')).toBe(false);
+  });
+});

@@ -243,6 +243,16 @@ export interface SynapsePullOptions {
   json?: boolean;
 }
 
+export interface PublicFetchOptions {
+  accession?: string;
+  outName?: string;
+  pairs?: string;
+  maxTotalBytes?: string;
+  owner?: string;
+  wait?: boolean;
+  json?: boolean;
+}
+
 export interface TeslaGateOptions {
   outcomes: string;
   features: string[];
@@ -301,6 +311,27 @@ export function buildSynapseBody(caseId: string, o: SynapsePullOptions, wallet: 
   return body;
 }
 
+/** biofs public-fetch: a PUBLIC ENA paired FASTQ run onto a governed worker. The body names an accession and nothing that names a place (no URL, no host): the worker asks the archive. */
+export function buildPublicFetchBody(caseId: string, o: PublicFetchOptions, wallet: string, signature: string): Record<string, unknown> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  const acc = (o.accession || '').trim();
+  if (!/^[SED]RR[0-9]{6,9}$/.test(acc)) throw new Error('--accession must be an ENA run accession like SRR1234567');
+  const body: Record<string, unknown> = { wallet: ownerOr(o.owner, wallet), signature, case_id: caseId, executor: 'worker', accession: acc };
+  if (o.outName) {
+    if (!/^[A-Za-z][A-Za-z0-9_-]{0,40}$/.test(o.outName)) throw new Error('--out-name must be letters, digits, _ or -, starting with a letter, up to 41 characters');
+    body.out_name = o.outName;
+  }
+  if (o.pairs !== undefined && o.pairs !== '') {
+    const n = Number(o.pairs);
+    if (!Number.isInteger(n) || n < 1000 || n > 50_000_000) throw new Error('--pairs must be an integer from 1000 to 50000000');
+    body.subsample_pairs = n;
+  }
+  const cap = Number(o.maxTotalBytes);
+  if (o.maxTotalBytes === undefined || o.maxTotalBytes === '' || !Number.isInteger(cap) || cap < 1 || cap > 2e12) throw new Error('--max-total-bytes is required: a positive integer up to 2000000000000 (the download is refused above it)');
+  body.max_total_bytes = cap;
+  return body;
+}
+
 export function parseSha256(flag: string, v: string): string {
   const x = (v || '').trim().toLowerCase();
   if (!/^[0-9a-f]{64}$/.test(x)) throw new Error(`${flag} must be a SHA-256 (64 hex characters): the registered, frozen value`);
@@ -351,7 +382,7 @@ async function auth() {
   };
 }
 
-type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks';
+type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch';
 const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: string }> = {
   evidence: { post: 'neoantigen_evidence', status: 'neoantigen_evidence_status', id: 'neoantigen_job_id', verb: 'neoantigen-evidence' },
   design: { post: 'neoantigen_design', status: 'neoantigen_design_status', id: 'neoantigen_job_id', verb: 'neoantigen-design' },
@@ -361,6 +392,7 @@ const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: stri
   synapse: { post: 'neoantigen_synapse', status: 'neoantigen_synapse_status', id: 'neoantigen_job_id', verb: 'synapse-pull' },
   tesla_gate: { post: 'neoantigen_tesla_gate', status: 'neoantigen_tesla_gate_status', id: 'neoantigen_job_id', verb: 'tesla-gate' },
   parabricks: { post: 'neoantigen_parabricks', status: 'neoantigen_parabricks_status', id: 'neoantigen_job_id', verb: 'pbrun' },
+  public_fetch: { post: 'neoantigen_public_fetch', status: 'neoantigen_public_fetch_status', id: 'neoantigen_job_id', verb: 'public-fetch' },
 };
 
 async function fetchStatus(kind: Kind, id: string, headers: Record<string, string>): Promise<any> {
@@ -477,6 +509,16 @@ export async function synapsePullSubmitCommand(caseId: string, options: SynapseP
     await submit('synapse', buildSynapseBody(caseId, options, a.wallet, a.signature), a.headers, options);
   } catch (e: any) {
     Logger.error(`synapse-pull submit failed: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+export async function publicFetchSubmitCommand(caseId: string, options: PublicFetchOptions): Promise<void> {
+  try {
+    const a = await auth();
+    await submit('public_fetch', buildPublicFetchBody(caseId, options, a.wallet, a.signature), a.headers, options);
+  } catch (e: any) {
+    Logger.error(`public-fetch submit failed: ${e.message}`);
     process.exit(1);
   }
 }

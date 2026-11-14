@@ -135,7 +135,7 @@ import { hifiAlignSubmitCommand, HifiAlignSubmitOptions } from './commands/hifi-
 import { hifiAlignExecCommand, HifiAlignExecOptions } from './commands/hifi-align/exec';
 import { registerDerivedGcsCommand, readDerivedCommand, RegisterDerivedGcsOptions } from './commands/register-derived';
 import { registerParabricksCommands } from './commands/parabricks';
-import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, teslaGateSubmitCommand, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
+import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { pbsvSubmitCommand, PbsvSubmitOptions } from './commands/pbsv/submit';
 import { pbsvExecCommand, PbsvExecOptions } from './commands/pbsv/exec';
@@ -4412,6 +4412,27 @@ synapsePullCmd
   .option('--wait', 'Poll until done or failed')
   .option('--json', 'Emit JSON')
   .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('synapse', id, options); });
+
+const publicFetchCmd = program
+  .command('public-fetch')
+  .description('Bring a PUBLIC ENA paired FASTQ run (or its first N read pairs) onto a governed worker and into your biowallet, with the archive\'s own size and MD5 as lineage (the job names an accession, never a URL; dispatched through biofs-node)');
+publicFetchCmd
+  .command('submit <caseId>')
+  .description('Submit a public archive fetch; nothing is downloaded by this machine')
+  .requiredOption('--accession <run>', 'ENA run accession, for example SRR1234567 (paired Illumina run)')
+  .requiredOption('--max-total-bytes <n>', 'Refuse the job if the run is larger than this many bytes (nothing is downloaded)')
+  .option('--pairs <n>', 'Keep only the first N read pairs (1000 to 50000000), written with a deterministic gzip; the lineage says so')
+  .option('--out-name <name>', 'Name stem of the two FASTQ files (default: the accession)')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: PublicFetchOptions) => { await publicFetchSubmitCommand(caseId, options); });
+publicFetchCmd
+  .command('status <job>')
+  .description('Show a public fetch job (only the signer who submitted it can read it)')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('public_fetch', id, options); });
 
 const teslaGateCmd = program
   .command('tesla-gate')

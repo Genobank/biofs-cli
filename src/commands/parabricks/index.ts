@@ -27,7 +27,7 @@ export interface PbrunRegistry { schema: string; docs_version: string; image_ver
 export const registry = registryJson as unknown as PbrunRegistry;
 export const REGISTRY_SHA256: string = crypto.createHash('sha256').update(fs.readFileSync(require.resolve('./registry.json'))).digest('hex');
 
-const EXTRA_FLAGS = ['--out-name', '--sample-name', '--library', '--platform', '--tumor-sample', '--normal-sample', '--acknowledge-untested', '--max-read-loss-fraction', '--owner', '--wait', '--json', '--check', '--ref'];
+const EXTRA_FLAGS = ['--out-name', '--sample-name', '--library', '--platform', '--tumor-sample', '--normal-sample', '--acknowledge-untested', '--max-read-loss-fraction', '--owner', '--wait', '--json', '--check', '--ref', '--validate-with-bwa', '--validate-against-bam'];
 const VARIADIC = ['fq_pairs', 'fq_single', 'known_sites', 'intervals'];
 const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const CASE_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -37,6 +37,7 @@ export interface PbrunRaw {
   flags: Record<string, string | string[] | boolean>;
   ref?: string; outName?: string; sampleName?: string; library?: string; platform?: string; tumorSample?: string; normalSample?: string;
   acknowledgeUntested?: boolean; maxReadLossFraction?: string; owner?: string; wait?: boolean; json?: boolean; check?: boolean;
+  validateWithBwa?: boolean; validateAgainstBam?: string;
 }
 
 function biocidOf(flag: string, v: unknown): string {
@@ -95,6 +96,14 @@ export function buildParabricksBody(tool: string, caseId: string, raw: PbrunRaw,
   if (outputs.length) body.outputs = outputs;
   if (Object.keys(passFlags).length) body.flags = passFlags;
   if (raw.acknowledgeUntested) body.acknowledge_untested = true;
+  if (raw.validateWithBwa || raw.validateAgainstBam) {
+    // the comparison of the fq2bam BAM with an independent bwa (and/or an earlier run), run inside the same governed job and sealed with it
+    if (tool !== 'fq2bam') throw new Error('--validate-with-bwa and --validate-against-bam apply only to fq2bam');
+    const v: Record<string, unknown> = {};
+    if (raw.validateWithBwa) v.bwa = true;
+    if (raw.validateAgainstBam) v.against_bam = biocidOf('--validate-against-bam', raw.validateAgainstBam);
+    body.validation = v;
+  }
   if (raw.maxReadLossFraction !== undefined && raw.maxReadLossFraction !== '') {
     const x = Number(raw.maxReadLossFraction);
     if (!isFinite(x) || x < 0 || x > 0.05) throw new Error('--max-read-loss-fraction must be between 0 and 0.05');
@@ -167,6 +176,10 @@ export function addToolOptions(cmd: Command, tool: string, meta: PbrunTool): voi
   }
   if (meta.fastq) { cmd.option('--library <name>', 'Library name (LB), default the sample name'); cmd.option('--platform <name>', 'ILLUMINA (default), ELEMENT, PACBIO or ONT'); }
   if (meta.align || meta.fastq) cmd.option('--max-read-loss-fraction <x>', 'Allow up to this share of FASTQ reads to be missing from the BAM (0 to 0.05; default 0: any loss fails the job)');
+  if (tool === 'fq2bam') {
+    cmd.option('--validate-with-bwa', 'Also run an independent CPU bwa mem 0.7.17 -K 10000000 on the same reads and compare every primary record; the comparison report is a sealed output (one read pair only)');
+    cmd.option('--validate-against-bam <biocid>', 'Also compare the BAM record by record with the BAM of an earlier job of yours (run-to-run determinism)');
+  }
   cmd.option('--acknowledge-untested', 'Run a tool whose real run has not been validated yet; recorded in the run report');
   cmd.option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)');
   cmd.option('--check', 'Validate and print the job body without sending it');
@@ -188,7 +201,7 @@ export function rawFromCommand(cmd: Command, meta: PbrunTool): PbrunRaw {
   }
   return {
     flags, ref: opts.ref, outName: opts.outName, sampleName: opts.sampleName, library: opts.library, platform: opts.platform, tumorSample: opts.tumorSample, normalSample: opts.normalSample,
-    acknowledgeUntested: opts.acknowledgeUntested, maxReadLossFraction: opts.maxReadLossFraction, owner: opts.owner, wait: opts.wait, json: opts.json, check: opts.check,
+    acknowledgeUntested: opts.acknowledgeUntested, validateWithBwa: opts.validateWithBwa, validateAgainstBam: opts.validateAgainstBam, maxReadLossFraction: opts.maxReadLossFraction, owner: opts.owner, wait: opts.wait, json: opts.json, check: opts.check,
   };
 }
 
