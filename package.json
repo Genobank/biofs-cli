@@ -23,7 +23,7 @@
   },
   "homepage": "https://genobank.app/biofs",
   "scripts": {
-    "build": "tsc && mkdir -p dist/lib/bionft && cp src/lib/bionft/BioAssetVault.abi.json src/lib/bionft/BioNFTCredentials.abi.json dist/lib/bionft/ && mkdir -p dist/abi && cp -R src/abi/. dist/abi/ && node validate-commands.mjs",
+    "build": "tsc && mkdir -p dist/lib/bionft && cp src/lib/bionft/BioAssetVault.abi.json src/lib/bionft/BioNFTCredentials.abi.json dist/lib/bionft/ && mkdir -p dist/abi && cp -R src/abi/. dist/abi/ && mkdir -p dist/commands/parabricks && cp src/commands/parabricks/registry.json dist/commands/parabricks/registry.json && node validate-commands.mjs",
     "dev": "ts-node src/index.ts",
     "test": "jest",
     "validate": "node validate-commands.mjs"

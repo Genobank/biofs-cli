@@ -1,0 +1,231 @@
+/**
+ * biofs pbrun <tool> <caseId> [options]       one verb for each NVIDIA Parabricks tool (fq2bam, bqsr, applybqsr, haplotypecaller, deepvariant, deepsomatic, somatic, ...)
+ * biofs pbrun list                            every tool, its family and whether its real run has been validated
+ * biofs pbrun status <job>                    a pbrun job (only the signer who submitted it can read it)
+ *
+ * CLIENT verbs. The options are the ones of NVIDIA's own tool pages (the registry in registry.json is built from them, not typed by hand), with three differences that keep the
+ * protocol rules: (1) every input file is a biocid of yours, never a path; reference data is named (--ref hg38, --knownSites hg38:mills_1000g); (2) output files are never named by
+ * the caller: the job writes them under your biowallet and each becomes its own biocid with the input biocids as parents; the options that ask for an extra output are switches;
+ * (3) FASTQ input needs an explicit sample name (--sample-name), because a default read group would give a tumor and its normal the same name.
+ *
+ * Dispatched through biofs-node to a GPU worker agent (POST /neoantigen_parabricks). The node and the worker validate the job again against their own copy of the registry. A tool whose
+ * real run has not been validated against an independent result is refused unless you pass --acknowledge-untested, which is recorded in the run report. `mutectcaller` is not here: it is
+ * `biofs somatic-mutect`. Decision support for a human review, never a clinical device.
+ */
+import { Command, Option } from 'commander';
+import chalk from 'chalk';
+import * as crypto from 'crypto';
+import * as fs from 'fs';
+import registryJson from './registry.json';
+import { BIOCID_RE, neoantigenStatusCommand, ownerOr, parabricksSubmit } from '../neoantigen-pipeline';
+import { Logger } from '../../lib/utils/logger';
+
+export interface PbrunFlag { class: 'in' | 'out' | 'pass' | 'engine' | 'unsupported'; nargs: number | '*' | null; repeatable: boolean; required: boolean; group: string; metavar: string; aliases: string[]; desc: string; kind?: string; optional?: boolean; needs?: string[]; reason?: string; biodata_type?: string; shape?: string }
+export interface PbrunTool { family: string; main: string | null; fastq: boolean; align: boolean; somatic_fastq: boolean; index_only: boolean; category: string; doc_sha256: string; validation: { status: string; record: string | null }; flags: Record<string, PbrunFlag> }
+export interface PbrunRegistry { schema: string; docs_version: string; image_version: string; references: Record<string, any>; refdirs: Record<string, any>; already_a_verb: Record<string, string>; tools: Record<string, PbrunTool> }
+
+export const registry = registryJson as unknown as PbrunRegistry;
+export const REGISTRY_SHA256: string = crypto.createHash('sha256').update(fs.readFileSync(require.resolve('./registry.json'))).digest('hex');
+
+const EXTRA_FLAGS = ['--out-name', '--sample-name', '--library', '--platform', '--tumor-sample', '--normal-sample', '--acknowledge-untested', '--max-read-loss-fraction', '--owner', '--wait', '--json', '--check', '--ref'];
+const VARIADIC = ['fq_pairs', 'fq_single', 'known_sites', 'intervals'];
+const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+const CASE_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
+export interface PbrunRaw {
+  /** flag as written in NVIDIA's page (--in-fq) -> the value the user gave: a string, an array of strings, or true for a switch */
+  flags: Record<string, string | string[] | boolean>;
+  ref?: string; outName?: string; sampleName?: string; library?: string; platform?: string; tumorSample?: string; normalSample?: string;
+  acknowledgeUntested?: boolean; maxReadLossFraction?: string; owner?: string; wait?: boolean; json?: boolean; check?: boolean;
+}
+
+function biocidOf(flag: string, v: unknown): string {
+  if (typeof v !== 'string' || !BIOCID_RE.test(v)) throw new Error(`${flag} must be a biocid of yours (biocid://...), never a path or a bucket URL`);
+  return v;
+}
+
+/** Build the job body (and, for --check, nothing more) from what was typed. Throws a plain message for anything the registry already shows to be wrong; the node checks the rest. */
+export function buildParabricksBody(tool: string, caseId: string, raw: PbrunRaw, wallet: string, signature: string, reg: PbrunRegistry = registry, sha: string = REGISTRY_SHA256): Record<string, unknown> {
+  if (reg.already_a_verb[tool]) throw new Error(`${tool} is already a verb: use ${reg.already_a_verb[tool]}`);
+  const meta = reg.tools[tool];
+  if (!meta) throw new Error(`unknown pbrun tool ${tool}`);
+  if (!CASE_RE.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  const outName = raw.outName ?? `${caseId}_${tool}`;
+  if (!NAME_RE.test(outName)) throw new Error('--out-name must be letters, digits, _ or - (at most 64)');
+  const inputs: Record<string, unknown> = {};
+  const passFlags: Record<string, unknown> = {};
+  const outputs: string[] = [];
+  for (const [flag, given] of Object.entries(raw.flags)) {
+    const e = meta.flags[flag];
+    if (!e) throw new Error(`${flag} is not an option of pbrun ${tool}`);
+    if (e.class === 'engine' || e.class === 'unsupported') throw new Error(`${flag}: ${e.reason}`);
+    if (e.class === 'in') {
+      const k = e.kind as string;
+      const list = Array.isArray(given) ? given : [given];
+      if (k === 'fq_pairs') {
+        if (list.length % 2 !== 0) throw new Error(`${flag} takes the two mates of each pair: R1 biocid then R2 biocid (an odd number of values was given)`);
+        const pairs: string[][] = [];
+        for (let i = 0; i < list.length; i += 2) pairs.push([biocidOf(flag, list[i]), biocidOf(flag, list[i + 1])]);
+        inputs[flag] = pairs;
+      } else if (k === 'fq_single') {
+        inputs[flag] = list.map((x) => biocidOf(flag, x));
+      } else if (k === 'known_sites') {
+        inputs[flag] = list.map(String);
+      } else if (k === 'intervals') {
+        inputs[flag] = list.map(String);
+      } else if (['bam', 'recal', 'vcf', 'gvcf'].includes(k)) {
+        if (list.length !== 1) throw new Error(`${flag} takes one value`);
+        inputs[flag] = biocidOf(flag, list[0]);
+      } else {
+        if (list.length !== 1) throw new Error(`${flag} takes one value`);
+        inputs[flag] = String(list[0]);
+      }
+    } else if (e.class === 'out') {
+      if (given !== true) throw new Error(`${flag} is a switch: output files are named by the job, not by you`);
+      outputs.push(flag);
+    } else {
+      if (e.nargs === null) passFlags[flag] = true;
+      else passFlags[flag] = Array.isArray(given) ? given.map(String) : String(given);
+    }
+  }
+  const body: Record<string, unknown> = {
+    wallet: ownerOr(raw.owner, wallet), signature, case_id: caseId, executor: 'worker', tool, out_name: outName, registry_sha256: sha, inputs,
+  };
+  if (raw.ref) body.reference = raw.ref;
+  if (outputs.length) body.outputs = outputs;
+  if (Object.keys(passFlags).length) body.flags = passFlags;
+  if (raw.acknowledgeUntested) body.acknowledge_untested = true;
+  if (raw.maxReadLossFraction !== undefined && raw.maxReadLossFraction !== '') {
+    const x = Number(raw.maxReadLossFraction);
+    if (!isFinite(x) || x < 0 || x > 0.05) throw new Error('--max-read-loss-fraction must be between 0 and 0.05');
+    body.max_read_loss_fraction = x;
+  }
+  if (meta.fastq) {
+    const lib = raw.library, plat = raw.platform;
+    if (meta.somatic_fastq) {
+      if (!raw.tumorSample || !raw.normalSample) throw new Error('give --tumor-sample and --normal-sample (a tumor and a normal must not share a sample name)');
+      if (raw.tumorSample === raw.normalSample) throw new Error('--tumor-sample and --normal-sample must differ');
+      body.read_groups = { tumor: rg(raw.tumorSample, lib, plat), normal: rg(raw.normalSample, lib, plat) };
+    } else {
+      if (!raw.sampleName) throw new Error('--sample-name is required for FASTQ input: it becomes the SM of every read group, and a default would give a tumor and its normal the same name');
+      body.read_group = rg(raw.sampleName, lib, plat);
+    }
+  } else if (raw.sampleName || raw.tumorSample || raw.normalSample) {
+    throw new Error('--sample-name, --tumor-sample and --normal-sample apply only to tools that read FASTQ');
+  }
+  return body;
+}
+
+function rg(sample: string, library?: string, platform?: string): Record<string, string> {
+  if (!NAME_RE.test(sample)) throw new Error('a sample name must be letters, digits, _ or - (at most 64)');
+  const out: Record<string, string> = { sample };
+  if (library) out.library = library;
+  if (platform) out.platform = platform;
+  return out;
+}
+
+function describeIn(flag: string, e: PbrunFlag): string {
+  const base = e.desc || '';
+  switch (e.kind) {
+    case 'fq_pairs': return `${base} Give the biocids of each pair: R1 then R2 (repeat the option for more lanes)`;
+    case 'fq_single': return `${base} Biocids of single-end FASTQ files`;
+    case 'known_sites': return `${base} Catalog names like hg38:mills_1000g (or a reference object); repeatable`;
+    case 'intervals': return `${base} A biocid of a BED/interval file, or a reference object; repeatable`;
+    case 'bam': case 'recal': case 'vcf': case 'gvcf': return `${base} A biocid of yours`;
+    case 'file': return `${base} A biocid of yours, or a reference object`;
+    case 'asset': return `${base} A reference object (catalog name or an approved reference path)`;
+    case 'refdir': return `${base} A reference library by name`;
+    default: return base;
+  }
+}
+
+export function addToolOptions(cmd: Command, tool: string, meta: PbrunTool): void {
+  const longs = new Set<string>();
+  for (const [flag, e] of Object.entries(meta.flags)) {
+    if (EXTRA_FLAGS.includes(flag) && flag !== '--ref') throw new Error(`pbrun ${tool} has the option ${flag}, which biofs uses for something else`);
+    if (e.class === 'in') {
+      if (e.kind === 'ref') continue;                 // --ref is added once below
+      const variadic = VARIADIC.includes(e.kind as string);
+      cmd.addOption(new Option(`${flag} ${variadic ? '<values...>' : '<value>'}`, describeIn(flag, e)));
+      longs.add(flag);
+    } else if (e.class === 'out' && e.optional) {
+      cmd.addOption(new Option(flag, `Also write this output (${e.biodata_type})${(e.needs || []).length ? `; needs ${(e.needs || []).join(', ')}` : ''}. ${e.desc}`));
+      longs.add(flag);
+    } else if (e.class === 'pass') {
+      cmd.addOption(new Option(e.nargs === null ? flag : `${flag} <value>`, e.desc));
+      longs.add(flag);
+    }
+  }
+  const hasRef = Object.values(meta.flags).some((e) => e.class === 'in' && e.kind === 'ref');
+  if (hasRef) cmd.addOption(new Option('--ref <build>', `The reference genome: ${Object.keys(registry.references).join(', ')}${meta.align ? ' (alignment needs hg38, the only build with a BWA index)' : ''}`));
+  cmd.option('--out-name <stem>', 'Stem of every output file name (default: <caseId>_<tool>)');
+  if (meta.fastq && meta.somatic_fastq) {
+    cmd.option('--tumor-sample <name>', 'Sample name (SM) of the tumor read groups');
+    cmd.option('--normal-sample <name>', 'Sample name (SM) of the normal read groups, different from the tumor');
+  } else if (meta.fastq) {
+    cmd.option('--sample-name <name>', 'Sample name (SM) of the read groups (required: no default is ever used)');
+  }
+  if (meta.fastq) { cmd.option('--library <name>', 'Library name (LB), default the sample name'); cmd.option('--platform <name>', 'ILLUMINA (default), ELEMENT, PACBIO or ONT'); }
+  if (meta.align || meta.fastq) cmd.option('--max-read-loss-fraction <x>', 'Allow up to this share of FASTQ reads to be missing from the BAM (0 to 0.05; default 0: any loss fails the job)');
+  cmd.option('--acknowledge-untested', 'Run a tool whose real run has not been validated yet; recorded in the run report');
+  cmd.option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)');
+  cmd.option('--check', 'Validate and print the job body without sending it');
+  cmd.option('--wait', 'Poll until the job finishes');
+  cmd.option('--json', 'Emit JSON');
+}
+
+/** Read what the user typed back out of a parsed command, by the flag spelling of NVIDIA's page (never by commander's attribute guess). */
+export function rawFromCommand(cmd: Command, meta: PbrunTool): PbrunRaw {
+  const opts = cmd.opts();
+  const flags: Record<string, string | string[] | boolean> = {};
+  for (const o of cmd.options) {
+    if (!o.long || EXTRA_FLAGS.includes(o.long)) continue;
+    const key = o.attributeName();
+    if (cmd.getOptionValueSource(key) !== 'cli') continue;
+    const v = opts[key];
+    if (!(o.long in meta.flags)) continue;
+    flags[o.long] = v as any;
+  }
+  return {
+    flags, ref: opts.ref, outName: opts.outName, sampleName: opts.sampleName, library: opts.library, platform: opts.platform, tumorSample: opts.tumorSample, normalSample: opts.normalSample,
+    acknowledgeUntested: opts.acknowledgeUntested, maxReadLossFraction: opts.maxReadLossFraction, owner: opts.owner, wait: opts.wait, json: opts.json, check: opts.check,
+  };
+}
+
+export function registerParabricksCommands(program: Command): void {
+  const group = program
+    .command('pbrun')
+    .description('NVIDIA Parabricks (pbrun) tools as biofs verbs: inputs and outputs are biocids, jobs run on a GPU worker through biofs-node. See: biofs pbrun list');
+  group.command('list')
+    .description('Every pbrun tool, its family and whether its real run has been validated against an independent result')
+    .option('--json', 'Emit JSON')
+    .action((o: { json?: boolean }) => {
+      const rows = Object.entries(registry.tools).map(([t, m]) => ({ tool: t, family: m.family, validation: m.validation.status, reads_fastq: m.fastq, aligns: m.align }));
+      if (o.json) { console.log(JSON.stringify({ registry_sha256: REGISTRY_SHA256, docs_version: registry.docs_version, image_version: registry.image_version, tools: rows, already_a_verb: registry.already_a_verb }, null, 2)); return; }
+      for (const r of rows) console.log(`${chalk.cyan(r.tool.padEnd(30))} ${r.family.padEnd(10)} ${r.validation === 'passed' ? chalk.green('validated') : chalk.yellow('untested ')}`);
+      console.log(chalk.gray(`\nregistry ${REGISTRY_SHA256.slice(0, 12)} from NVIDIA Parabricks docs ${registry.docs_version} (image ${registry.image_version}). mutectcaller: use biofs somatic-mutect.`));
+    });
+  group.command('status <job>')
+    .description('Show a pbrun job (only the signer who submitted it can read it)')
+    .option('--wait', 'Poll until done or failed')
+    .option('--json', 'Emit JSON')
+    .action(async (id: string, o: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('parabricks' as any, id, o); });
+  for (const [tool, meta] of Object.entries(registry.tools)) {
+    const cmd = group.command(`${tool} <caseId>`)
+      .description(`pbrun ${tool} (${meta.family}${meta.validation.status === 'passed' ? ', validated' : ', untested: needs --acknowledge-untested'})`);
+    addToolOptions(cmd, tool, meta);
+    cmd.action(async (caseId: string) => {
+      try {
+        const raw = rawFromCommand(cmd, meta);
+        if (raw.check) {
+          console.log(JSON.stringify(buildParabricksBody(tool, caseId, raw, '0x' + '0'.repeat(40), '<signature>'), null, 2));
+          return;
+        }
+        await parabricksSubmit((w, s) => buildParabricksBody(tool, caseId, raw, w, s), raw);
+      } catch (e: any) {
+        Logger.error(`pbrun ${tool} failed: ${e.message}`);
+        process.exit(1);
+      }
+    });
+  }
+}

@@ -351,7 +351,7 @@ async function auth() {
   };
 }
 
-type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate';
+type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks';
 const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: string }> = {
   evidence: { post: 'neoantigen_evidence', status: 'neoantigen_evidence_status', id: 'neoantigen_job_id', verb: 'neoantigen-evidence' },
   design: { post: 'neoantigen_design', status: 'neoantigen_design_status', id: 'neoantigen_job_id', verb: 'neoantigen-design' },
@@ -360,6 +360,7 @@ const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: stri
   indel: { post: 'neoantigen_indel', status: 'neoantigen_indel_status', id: 'neoantigen_job_id', verb: 'neoantigen-indel' },
   synapse: { post: 'neoantigen_synapse', status: 'neoantigen_synapse_status', id: 'neoantigen_job_id', verb: 'synapse-pull' },
   tesla_gate: { post: 'neoantigen_tesla_gate', status: 'neoantigen_tesla_gate_status', id: 'neoantigen_job_id', verb: 'tesla-gate' },
+  parabricks: { post: 'neoantigen_parabricks', status: 'neoantigen_parabricks_status', id: 'neoantigen_job_id', verb: 'pbrun' },
 };
 
 async function fetchStatus(kind: Kind, id: string, headers: Record<string, string>): Promise<any> {
@@ -488,6 +489,12 @@ export async function teslaGateSubmitCommand(caseId: string, options: TeslaGateO
     Logger.error(`tesla-gate submit failed: ${e.message}`);
     process.exit(1);
   }
+}
+
+/** Used by the pbrun verbs (commands/parabricks): sign, submit the job body, optionally wait. The body is built and checked by the caller. */
+export async function parabricksSubmit(buildBody: (wallet: string, signature: string) => Record<string, unknown>, options: { wait?: boolean; json?: boolean }): Promise<void> {
+  const a = await auth();
+  await submit('parabricks', buildBody(a.wallet, a.signature), a.headers, options);
 }
 
 export async function neoantigenStatusCommand(kind: Kind, id: string, options: { wait?: boolean; json?: boolean }): Promise<void> {

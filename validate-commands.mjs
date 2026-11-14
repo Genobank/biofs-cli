@@ -103,6 +103,19 @@ const distOnlyHere = DIST_ONLY_ALLOWLIST.filter(v => distBareSet.has(v) && !srcB
 if (distOnlyHere.length) info(`dist-only on this target (present, no src — expected on prod): ${distOnlyHere.join(', ')}`);
 else info('no dist-only verbs on this target (full source present)');
 
+// The pbrun registry is the client's copy of the node's registry; its SHA-256 travels in every job and the node refuses a different one. tsc re-prints JSON it copies (different bytes,
+// different hash), so the build copies the file verbatim and this check proves dist carries exactly the source bytes.
+{
+  const crypto = await import('node:crypto');
+  const srcReg = path.join(__dirname, 'src', 'commands', 'parabricks', 'registry.json');
+  const distReg = path.join(__dirname, 'dist', 'commands', 'parabricks', 'registry.json');
+  if (fs.existsSync(srcReg)) {
+    const h = f => (fs.existsSync(f) ? crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex') : null);
+    if (h(srcReg) === h(distReg)) ok('pbrun registry in dist is byte-identical to src (sha256 ' + h(srcReg).slice(0, 12) + ')');
+    else fail('pbrun registry in dist differs from src: every pbrun job would be refused by the node as coming from another registry');
+  }
+}
+
 if (failed) {
   console.error('\nvalidate-commands: FAILED — build blocked. A registered or allowlisted verb is missing from dist/index.js.');
   process.exit(1);
