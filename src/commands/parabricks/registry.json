@@ -7,8 +7,8 @@
   "gs://deepvariant-fastq-to-vcf-genobank-app/reference/"
  ],
  "docs_version": "4.8.0",
- "image_version": "4.7.0-1",
- "options_sha256": "1a6ea0ab25f3780fd77208f8bce47f568d4ad64996cc8095b85456e862de98ea",
+ "image_version": "4.8.0-1",
+ "options_sha256": "db1f487096eab42d3c2185343bacc9deded521eeab904c42e215d56f5bb58a5e",
  "refdirs": {
   "ctat_grch38_v37": {
    "env": "PBRUN_CTAT_LIB_DIR",
