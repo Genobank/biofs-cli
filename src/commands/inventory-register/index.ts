@@ -8,6 +8,7 @@
 import axios from 'axios';
 import chalk from 'chalk';
 import { getCredentials } from '../../lib/auth/credentials';
+import { nodeErrorMessage } from '../../lib/utils/node_roles';
 
 const BIOFS_NODE_BASE = process.env.BIOFS_NODE_URL
   || `${process.env.GENOBANK_API_URL || 'https://genobank.app'}/api_biofs_node`;
@@ -33,7 +34,7 @@ export async function inventoryRegisterCommand(biocids: string[], options: Inven
   if (!credentials) throw new Error('Not authenticated. Run "biofs login" first.');
   const headers = { 'X-Biofs-Wallet': credentials.wallet_address, 'X-Biofs-Signature': credentials.user_signature };
   const r = await axios.post(`${BIOFS_NODE_BASE}/inventory_register`, body, { headers, timeout: 60_000, validateStatus: (s) => s < 500 });
-  if (r.status >= 400) throw new Error(`${r.status}: ${r.data?.error || 'unknown'}`);
+  if (r.status >= 400) throw new Error(nodeErrorMessage(r.status, r.data?.error));
   if (options.json) { console.log(JSON.stringify(r.data, null, 2)); return; }
   const d = r.data;
   console.log(chalk.bold(d.dry_run ? 'Dry run: nothing was written. Add --yes to register.' : 'Registered.'));

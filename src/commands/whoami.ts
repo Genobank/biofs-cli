@@ -3,7 +3,12 @@ import { Logger } from '../lib/utils/logger';
 import chalk from 'chalk';
 import { ethers } from 'ethers';
 
+import axios from 'axios';
+import { getActiveProfileName } from '../lib/config/paths';
+import { rolesText, NodeRoles } from '../lib/utils/node_roles';
+
 export interface WhoamiOptions {
+  roles?: boolean;      // ask the node whether this wallet is a node operator (read-only)
   json?: boolean;
   verify?: boolean;     // Verify signature validity
   check?: string;       // Check against specific wallet address
@@ -16,6 +21,20 @@ export async function whoamiCommand(options: WhoamiOptions): Promise<void> {
   if (!creds) {
     Logger.error('Not authenticated. Please run "biofs login" first.');
     process.exit(1);
+  }
+
+  if (options.roles) {
+    const base = process.env.BIOFS_NODE_URL || `${process.env.GENOBANK_API_URL || 'https://genobank.app'}/api_biofs_node`;
+    const r = await axios.get(`${base}/whoami_roles`, {
+      headers: { 'X-Biofs-Wallet': creds.wallet_address, 'X-Biofs-Signature': creds.user_signature },
+      timeout: 30_000, validateStatus: (s) => s < 500,
+    });
+    if (r.status >= 400) throw new Error(`${r.status}: ${r.data?.error || 'unknown'}`);
+    const roles = r.data as NodeRoles;
+    const profile = getActiveProfileName();
+    if (options.json) console.log(JSON.stringify({ ...roles, profile }, null, 2));
+    else for (const l of rolesText(roles, profile)) console.log(l);
+    return;
   }
 
   // Verify signature if requested

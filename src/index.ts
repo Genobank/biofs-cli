@@ -315,6 +315,7 @@ program
   .description('Show current authenticated wallet')
   .option('--json', 'Output as JSON')
   .option('--verify', 'Verify signature validity')
+  .option('--roles', 'Ask the node whether this wallet is a node operator and which profile is active (read-only), with the one-line fix when it is not')
   .option('--check <wallet>', 'Check against specific wallet address (e.g., 0x0000000000000000000000000000000000000000)')
   .action(async (options: WhoamiOptions) => {
     try {

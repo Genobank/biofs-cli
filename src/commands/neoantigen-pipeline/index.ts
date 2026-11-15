@@ -25,6 +25,7 @@
 import axios from 'axios';
 import chalk from 'chalk';
 import { getCredentials } from '../../lib/auth/credentials';
+import { nodeErrorMessage } from '../../lib/utils/node_roles';
 import { Logger } from '../../lib/utils/logger';
 
 const BIOFS_NODE_BASE = process.env.BIOFS_NODE_URL
@@ -440,7 +441,7 @@ async function waitFor(kind: Kind, id: string, headers: Record<string, string>, 
 
 async function submit(kind: Kind, body: Record<string, unknown>, headers: Record<string, string>, opts: { wait?: boolean; json?: boolean }): Promise<void> {
   const r = await axios.post(`${BIOFS_NODE_BASE}/${ROUTE[kind].post}`, body, { headers, timeout: 60_000, validateStatus: (s) => s < 500 });
-  if (r.status >= 400) throw new Error(`${r.status}: ${r.data?.error || 'unknown'}`);
+  if (r.status >= 400) throw new Error(nodeErrorMessage(r.status, r.data?.error, typeof body.wallet === 'string' ? body.wallet : undefined));
   const id = r.data[ROUTE[kind].id];
   if (!opts.wait) {
     if (opts.json) console.log(JSON.stringify(r.data, null, 2));
