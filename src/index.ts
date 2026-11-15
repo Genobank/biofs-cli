@@ -136,6 +136,7 @@ import { hifiAlignExecCommand, HifiAlignExecOptions } from './commands/hifi-alig
 import { registerDerivedGcsCommand, readDerivedCommand, RegisterDerivedGcsOptions } from './commands/register-derived';
 import { registerParabricksCommands } from './commands/parabricks';
 import { inventoryRegisterCommand } from './commands/inventory-register';
+import { inventoryListCommand, InventoryListOptions } from './commands/inventory-list';
 import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { pbsvSubmitCommand, PbsvSubmitOptions } from './commands/pbsv/submit';
@@ -4435,6 +4436,18 @@ publicFetchCmd
   .option('--wait', 'Poll until done or failed')
   .option('--json', 'Emit JSON')
   .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('public_fetch', id, options); });
+
+program
+  .command('inventory-list')
+  .description('NODE OPERATOR, read-only: list the file rows of bioroutes.inventory for sample serials or one lab, grouped by file (never the whole inventory)')
+  .option('--serial <serials...>', 'Sample serial numbers')
+  .option('--lab <name>', 'Origin lab (for example augenomics)')
+  .option('--type <types...>', 'File types (fastq, bam, vcf, gvcf, sqlite, ...)')
+  .option('--limit <n>', 'Maximum rows (default 200, at most 500)')
+  .option('--json', 'Emit JSON with the biocids')
+  .action(async (options: InventoryListOptions) => {
+    try { await inventoryListCommand(options); } catch (e: any) { console.error(chalk.red(e.message)); process.exit(1); }
+  });
 
 program
   .command('inventory-register <biocids...>')
