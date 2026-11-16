@@ -45,10 +45,10 @@ describe('the registry the CLI carries', () => {
 });
 
 describe('commands', () => {
-  test('one command per tool plus list and status', () => {
+  test('one command per tool plus list, logs and status', () => {
     const group = program().commands.find((c) => c.name() === 'pbrun')!;
     const names = group.commands.map((c) => c.name()).sort();
-    expect(names).toEqual([...Object.keys(registry.tools), 'list', 'status'].sort());
+    expect(names).toEqual([...Object.keys(registry.tools), 'list', 'logs', 'status'].sort());
   });
   test('no tool option collides with an option biofs adds', () => {
     expect(() => program()).not.toThrow();
