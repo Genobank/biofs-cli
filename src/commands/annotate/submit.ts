@@ -76,6 +76,17 @@ export function buildAnnotateBody(biosampleSerial: string | undefined, options: 
   const body: Record<string, unknown> = {
     wallet, signature, package: options.package || 'wes_default', max_af: options.maxAf || '0.01',
   };
+  if (options.annotators) {
+    // a chosen annotator set runs as package=custom (the worker reads ANNOTATOR_LIST only for that package); the option used to be accepted and dropped
+    const names = String(options.annotators).split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
+    const bad = names.find((n) => !/^[a-z0-9_]{2,40}$/.test(n));
+    if (!names.length) throw new Error('--annotators: give at least one annotator module name');
+    if (bad) throw new Error(`--annotators: not an annotator module name: ${bad.slice(0, 60)}`);
+    if (new Set(names).size !== names.length) throw new Error('--annotators: duplicate annotator');
+    if (options.package && !['custom', 'rare_coding'].includes(options.package)) throw new Error(`--annotators runs as package custom; it cannot be combined with --package ${options.package}`);
+    body.package = 'custom';
+    body.annotator_list = names.join(' ');
+  }
   if (biosampleSerial) body.biosample_serial = biosampleSerial;
   if (options.vcfBiocid) body.vcf_biocid = options.vcfBiocid;
   if (options.vcfUri) body.vcf_gs_uri = options.vcfUri;

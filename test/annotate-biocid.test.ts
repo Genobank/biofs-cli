@@ -15,4 +15,12 @@ describe('annotate submit input', () => {
     expect(() => buildAnnotateBody(undefined, { vcfBiocid: 'gs://b/x.vcf.gz' }, W, 's')).toThrow(/not a biocid/);
     expect(() => buildAnnotateBody(undefined, { vcfBiocid: 'https://x/y.vcf' }, W, 's')).toThrow(/not a biocid/);
   });
+  it('sends a chosen annotator set as package custom instead of dropping it', () => {
+    const b = buildAnnotateBody(undefined, { vcfBiocid: B, annotators: 'clinvar,revel gnomad4', package: 'rare_coding' }, W, 's');
+    expect(b.package).toBe('custom');
+    expect(b.annotator_list).toBe('clinvar revel gnomad4');
+    expect(() => buildAnnotateBody(undefined, { vcfBiocid: B, annotators: 'clinvar', package: 'wes_default' }, W, 's')).toThrow(/cannot be combined/);
+    expect(() => buildAnnotateBody(undefined, { vcfBiocid: B, annotators: 'clinvar;rm' }, W, 's')).toThrow(/not an annotator module name/);
+    expect(() => buildAnnotateBody(undefined, { vcfBiocid: B, annotators: 'clinvar,clinvar' }, W, 's')).toThrow(/duplicate/);
+  });
 });
