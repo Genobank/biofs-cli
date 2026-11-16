@@ -136,6 +136,7 @@ import { hifiAlignExecCommand, HifiAlignExecOptions } from './commands/hifi-alig
 import { registerDerivedGcsCommand, readDerivedCommand, RegisterDerivedGcsOptions } from './commands/register-derived';
 import { registerParabricksCommands } from './commands/parabricks';
 import { inventoryRegisterCommand } from './commands/inventory-register';
+import { inventoryDelegateCommand, DelegateOptions } from './commands/inventory-delegate';
 import { inventoryListCommand, InventoryListOptions } from './commands/inventory-list';
 import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
@@ -4457,6 +4458,23 @@ program
   .option('--json', 'Emit JSON')
   .action(async (biocids: string[], options: { attest: string; yes?: boolean; json?: boolean }) => {
     try { await inventoryRegisterCommand(biocids, options); } catch (e: any) { console.error(chalk.red(e.message)); process.exit(1); }
+  });
+
+program
+  .command('inventory-delegate <biocids...>')
+  .description('OWNER SIGNATURE: the current owner (MetaMask) signs a message that hands the named biofiles to a new owner wallet while the named operators keep the right to run pipelines and deliver results to the new owner. Step 1 prints the message to sign; step 2 sends it with --signature (dry run unless --yes)')
+  .requiredOption('--from <wallet>', 'The current owner wallet that signs (must equal the rows\' present owner)')
+  .requiredOption('--to <wallet>', 'The new owner wallet')
+  .requiredOption('--attest <text>', 'The basis on which the owner hands these files over (20 to 600 characters, signed and recorded)')
+  .option('--operator <wallets...>', 'Operator wallets that keep pipeline rights (default: the owner and your signed-in wallet)')
+  .option('--signature <hex>', 'The personal_sign signature of the message printed by step 1')
+  .option('--nonce <hex>', 'The nonce printed by step 1 (required with --signature)')
+  .option('--expires <iso>', 'The expiry printed by step 1 (required with --signature)')
+  .option('--expires-hours <n>', 'Step 1 only: validity in hours (default 24, at most 168)')
+  .option('--yes', 'Write the change (default is a dry run that writes nothing)')
+  .option('--json', 'Emit JSON')
+  .action(async (biocids: string[], options: DelegateOptions) => {
+    try { await inventoryDelegateCommand(biocids, options); } catch (e: any) { console.error(chalk.red(e.message)); process.exit(1); }
   });
 
 const teslaGateCmd = program
