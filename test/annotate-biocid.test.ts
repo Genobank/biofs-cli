@@ -1,4 +1,5 @@
 import { buildAnnotateBody } from '../src/commands/annotate/submit';
+import { signedHeaders } from '../src/commands/annotate/signed_headers';
 const W = '0x01a2d260d2fe8cc13ae70b6868deb4f3ddcdb797';
 const B = `biocid://genobank/${W}/gvcf/neo-6e9f.AD3L13972_dv_wes.g.vcf.gz`;
 describe('annotate submit input', () => {
@@ -22,5 +23,9 @@ describe('annotate submit input', () => {
     expect(() => buildAnnotateBody(undefined, { vcfBiocid: B, annotators: 'clinvar', package: 'wes_default' }, W, 's')).toThrow(/cannot be combined/);
     expect(() => buildAnnotateBody(undefined, { vcfBiocid: B, annotators: 'clinvar;rm' }, W, 's')).toThrow(/not an annotator module name/);
     expect(() => buildAnnotateBody(undefined, { vcfBiocid: B, annotators: 'clinvar,clinvar' }, W, 's')).toThrow(/duplicate/);
+  });
+  it('signs the status read; an unauthenticated caller is refused before any request', () => {
+    expect(signedHeaders({ wallet_address: W, user_signature: '0xsig' })).toEqual({ 'X-Biofs-Wallet': W, 'X-Biofs-Signature': '0xsig' });
+    expect(() => signedHeaders(null)).toThrow(/Not authenticated/);
   });
 });

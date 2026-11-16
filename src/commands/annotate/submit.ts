@@ -22,6 +22,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import axios from 'axios';
 import { getCredentials } from '../../lib/auth/credentials';
+import { signedHeaders } from './signed_headers';
 import { Logger } from '../../lib/utils/logger';
 
 export interface AnnotateSubmitOptions {
@@ -143,6 +144,7 @@ export async function annotateSubmitCommand(
           `${BIOFS_NODE_BASE}/cravat_status`,
           {
             params: { oc_job_id: submit.oc_job_id },
+            headers: signedHeaders(credentials),
             timeout: 30_000,
             validateStatus: (s) => s < 500,
           },

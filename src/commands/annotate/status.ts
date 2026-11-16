@@ -12,6 +12,8 @@ import chalk from 'chalk';
 import ora from 'ora';
 import axios from 'axios';
 import { Logger } from '../../lib/utils/logger';
+import { getCredentials } from '../../lib/auth/credentials';
+import { signedHeaders } from './signed_headers';
 
 export interface AnnotateStatusOptions {
   json?: boolean;
@@ -40,8 +42,10 @@ interface StatusRow {
 }
 
 async function fetchStatus(ocJobId: string): Promise<StatusRow | null> {
+  const headers = signedHeaders(await getCredentials());     // the node answers only a signed read (owner or node admin)
   const r = await axios.get<StatusRow>(`${BIOFS_NODE_BASE}/cravat_status`, {
     params: { oc_job_id: ocJobId },
+    headers,
     timeout: 30_000,
     validateStatus: (s) => s < 500,
   });
