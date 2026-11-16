@@ -32,4 +32,19 @@ describe('acmg-triage body', () => {
     expect(() => buildAcmgBody('x', { ...base, codeSha256: 'abc' }, W, 's')).toThrow();
     expect(() => buildAcmgBody('Maria Lopez', base, W, 's')).toThrow(/case identifier/);
   });
+  it('coverage mode needs a BAM and a pinned gene annotation, not a sqlite', () => {
+    const BAM = `biocid://genobank/${OWNER.toLowerCase()}/bam/neo-5fc194a4.AD3IND_pooled_try1_fq2bam.bam`;
+    const cov = { coverage: true, bam: BAM, gtfBucket: 'deepvariant-fastq-to-vcf-genobank-app', gtfObject: 'reference/gencode/gencode_v44.gtf.gz', gtfSha256: H, hpo: ['HP:0002659'], panel: 'skeletal_dysplasia', hpoRelease: '2026-09-01', codeSha256: H, owner: OWNER, genes: ['COL1A1,COL1A2'] };
+    const b = buildAcmgBody('AD3COV', cov, W, '0xsig');
+    expect(b.mode).toBe('coverage');
+    expect(b.bam_biocid).toBe(BAM);
+    expect(b.sqlite_biocid).toBeUndefined();
+    expect(b.genes).toEqual(['COL1A1', 'COL1A2']);
+    expect(b.max_af).toBeUndefined();
+    expect(() => buildAcmgBody('x', { ...cov, bam: undefined }, W, 's')).toThrow(/--bam/);
+    expect(() => buildAcmgBody('x', { ...cov, gtfObject: undefined }, W, 's')).toThrow(/--gtf-object/);
+    expect(() => buildAcmgBody('x', { ...cov, gtfSha256: 'abc' }, W, 's')).toThrow();
+    expect(() => buildAcmgBody('x', { ...cov, schema: true }, W, 's')).toThrow(/different modes/);
+    expect(() => buildAcmgBody('x', { ...base, sqlite: undefined }, W, 's')).toThrow(/--sqlite/);
+  });
 });

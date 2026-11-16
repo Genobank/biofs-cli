@@ -70,7 +70,7 @@ export interface NeoantigenDesignOptions {
   json?: boolean;
 }
 
-export function requireBiocid(flag: string, value: string): string {
+export function requireBiocid(flag: string, value: string | undefined): string {
   if (!value || !BIOCID_RE.test(value)) {
     throw new Error(`${flag} must be a biocid (biocid://<bioagent>/<owner wallet>/<biodata type>/<dataset>); a gs:// path, URL or file path is never accepted`);
   }
@@ -661,7 +661,13 @@ export const HPO_RELEASES: Record<string, { obo: string; genes: string }> = {
 };
 
 export interface AcmgOptions {
-  sqlite: string;
+  sqlite?: string;
+  coverage?: boolean;
+  bam?: string;
+  gtfBucket?: string;
+  gtfObject?: string;
+  gtfSha256?: string;
+  genes?: string[];
   vcf?: string;
   schema?: boolean;
   hpo?: string[];
@@ -681,22 +687,33 @@ export interface AcmgOptions {
 /** Phenotype-driven variant triage with an ACMG/AMP points classification over an annotation sqlite (and its VCF). --schema only profiles the sqlite's columns and classifies nothing. */
 export function buildAcmgBody(caseId: string, o: AcmgOptions, wallet: string, signature: string): Record<string, unknown> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  if (o.coverage && o.schema) throw new Error('--coverage and --schema are different modes: give one');
   const body: Record<string, unknown> = {
     wallet: ownerOr(o.owner, wallet), signature, case_id: caseId,
-    sqlite_biocid: requireBiocid('--sqlite', o.sqlite),
     code_sha256: parseSha256('--code-sha256', o.codeSha256),
     executor: parseExecutor(o.executor),
-    mode: o.schema ? 'schema' : 'classify',
+    mode: o.coverage ? 'coverage' : o.schema ? 'schema' : 'classify',
   };
+  if (o.coverage) {
+    body.bam_biocid = requireBiocid('--bam', o.bam);
+    if (!o.gtfBucket || !o.gtfObject) throw new Error('--gtf-bucket and --gtf-object name the pinned gene annotation (a reference object)');
+    body.gtf_bucket = o.gtfBucket;
+    body.gtf_object = o.gtfObject;
+    body.gtf_sha256 = parseSha256('--gtf-sha256', o.gtfSha256 as string);
+    const genes = ([] as string[]).concat(o.genes || []).flatMap((x) => String(x).split(',')).map((x) => x.trim()).filter(Boolean);
+    if (genes.length) body.genes = genes;
+  } else {
+    body.sqlite_biocid = requireBiocid('--sqlite', o.sqlite);
+  }
   if (o.schema) return body;
-  if (o.vcf) body.vcf_biocid = requireBiocid('--vcf', o.vcf);
+  if (o.vcf && !o.coverage) body.vcf_biocid = requireBiocid('--vcf', o.vcf);
   const terms = ([] as string[]).concat(o.hpo || []).flatMap((x) => String(x).split(',')).map((x) => x.trim()).filter(Boolean);
   if (!terms.length) throw new Error('give the patient HPO terms with --hpo HP:0002757,HP:0000924');
   for (const t of terms) if (!/^HP:[0-9]{7}$/.test(t)) throw new Error(`--hpo ${t} is not an HPO id like HP:0002757`);
   if (new Set(terms).size !== terms.length) throw new Error('--hpo lists a term twice');
   body.hpo_terms = terms;
   body.panel = o.panel || 'none';
-  if (o.maxAf !== undefined) {
+  if (o.maxAf !== undefined && !o.coverage) {
     const m = Number(o.maxAf);
     if (!(m > 0 && m <= 0.5)) throw new Error('--max-af must be above 0 and at most 0.5');
     body.max_af = m;
