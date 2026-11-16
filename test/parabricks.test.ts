@@ -8,7 +8,7 @@ const W = '0x5f5a60EaEf242c0D51A21c703f520347b96Ed19a';
 const bc = (type: string, name: string) => `biocid://genobank/${W}/${type}/${name}`;
 const SIG = '0xsig';
 const NODE_REGISTRY = path.join(__dirname, '..', '..', 'biofs-node-sync-20261107', 'repo', 'neoantigen', 'pbrun_registry.json');
-const EXPECTED_SHA = 'af1892869397b4d81f5919f2d214ab4db72bad1a2a420e0a21d441a170880e19';
+const EXPECTED_SHA = '404e9042f4e1dff59cb3c93cc68127135dfb2983c9105325a55d54af40dd78f6';
 
 function program(): Command {
   const p = new Command();
@@ -192,5 +192,20 @@ describe('fq2bam validation options', () => {
     expect(has('fq2bam', '--validate-with-bwa')).toBe(true);
     expect(has('fq2bam', '--validate-against-bam')).toBe(true);
     expect(has('bam2fq', '--validate-with-bwa')).toBe(false);
+  });
+});
+
+describe('fq2bam is validated (ledger record 21)', () => {
+  const W0 = '0x01a2d260d2fe8cc13ae70b6868deb4f3ddcdb797';
+  const pair = { '--in-fq': [`biocid://augenomics/${W0}/fastq/a/x_R1.fastq.gz`, `biocid://augenomics/${W0}/fastq/b/x_R2.fastq.gz`] } as any;
+  it('is listed as passed in the registry with its record, and no other tool is', () => {
+    const passed = Object.entries(registry.tools).filter(([, m]) => m.validation.status === 'passed').map(([t]) => t);
+    expect(passed).toEqual(['fq2bam']);
+    expect((registry.tools as any).fq2bam.validation.record.image).toBe('nvcr.io/nvidia/clara/clara-parabricks:4.8.0-1');
+  });
+  it('a job body for fq2bam needs no acknowledgement', () => {
+    const body: any = buildParabricksBody('fq2bam', 'T1', { flags: pair, ref: 'hg38', sampleName: 'S1' } as any, W0, '0xsig');
+    expect(body.acknowledge_untested).toBeUndefined();
+    expect(body.registry_sha256).toBe(REGISTRY_SHA256);
   });
 });

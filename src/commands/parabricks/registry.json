@@ -4933,8 +4933,16 @@
    "main": "--out-bam",
    "somatic_fastq": false,
    "validation": {
-    "record": null,
-    "status": "untested"
+    "record": {
+     "at": "2026-11-16T04:53:06Z",
+     "comparator": "bwa-mem 0.7.17 -K 10000000 on CPU (independent), plus determinism against an earlier run of the same job (neo-9ff9e6e3-5c90-4553-8df2-d5c5ff1fd456, report sha256 847e8470d4796167a3bdc0c31a5cd806f25f2531c6f0fe90cdf7bad5cb2fce38, position 1.0, MAPQ 1.0, 70742060 records)",
+     "image": "nvcr.io/nvidia/clara/clara-parabricks:4.8.0-1",
+     "job": "neo-540be9aa-4917-4486-afe1-ac8021dd7485",
+     "protocol_sha256": "27d383fcfc262dc95d7405bdf8dedb7f63535a5c760288291350f763186ddb3b",
+     "report_sha256": "0ea05293f7c13942270d2231da5bfbc32805371ad65fef13b7f0197ba558a50e",
+     "validated_by": "claude-sonnet-5-5-session, approved by the operator"
+    },
+    "status": "passed"
    }
   },
   "fq2bam_meth": {
