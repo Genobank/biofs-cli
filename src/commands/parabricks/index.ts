@@ -19,6 +19,7 @@ import * as fs from 'fs';
 import registryJson from './registry.json';
 import { BIOCID_RE, neoantigenStatusCommand, ownerOr, parabricksSubmit } from '../neoantigen-pipeline';
 import { Logger } from '../../lib/utils/logger';
+import { jobLogCommand } from '../job-view';
 
 export interface PbrunFlag { class: 'in' | 'out' | 'pass' | 'engine' | 'unsupported'; nargs: number | '*' | null; repeatable: boolean; required: boolean; group: string; metavar: string; aliases: string[]; desc: string; kind?: string; optional?: boolean; needs?: string[]; reason?: string; biodata_type?: string; shape?: string }
 export interface PbrunTool { family: string; main: string | null; fastq: boolean; align: boolean; somatic_fastq: boolean; index_only: boolean; category: string; doc_sha256: string; validation: { status: string; record: string | null }; flags: Record<string, PbrunFlag> }
@@ -223,6 +224,14 @@ export function registerParabricksCommands(program: Command): void {
     .option('--wait', 'Poll until done or failed')
     .option('--json', 'Emit JSON')
     .action(async (id: string, o: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('parabricks' as any, id, o); });
+  group.command('logs <job>')
+    .description('The run log of a pbrun job (pbrun\'s own output), live with --follow')
+    .option('--follow', 'Stream until the job ends')
+    .option('--from <n>', 'Byte offset to start from (the next offset of the previous call)')
+    .option('--json', 'Emit JSON lines')
+    .action(async (id: string, o: { follow?: boolean; from?: string; json?: boolean }) => {
+      try { await jobLogCommand(id, o); } catch (e: any) { Logger.error(`pbrun logs failed: ${e.message}`); process.exit(1); }
+    });
   for (const [tool, meta] of Object.entries(registry.tools)) {
     const cmd = group.command(`${tool} <caseId>`)
       .description(`pbrun ${tool} (${meta.family}${meta.validation.status === 'passed' ? ', validated' : ', untested: needs --acknowledge-untested'})`);

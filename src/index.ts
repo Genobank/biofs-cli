@@ -137,6 +137,7 @@ import { registerDerivedGcsCommand, readDerivedCommand, RegisterDerivedGcsOption
 import { registerParabricksCommands } from './commands/parabricks';
 import { inventoryRegisterCommand } from './commands/inventory-register';
 import { inventoryDelegateCommand, DelegateOptions } from './commands/inventory-delegate';
+import { jobsCommand, jobLogCommand, JobsOptions, JobLogOptions } from './commands/job-view';
 import { inventoryListCommand, InventoryListOptions } from './commands/inventory-list';
 import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
@@ -4458,6 +4459,25 @@ program
   .option('--json', 'Emit JSON')
   .action(async (biocids: string[], options: { attest: string; yes?: boolean; json?: boolean }) => {
     try { await inventoryRegisterCommand(biocids, options); } catch (e: any) { console.error(chalk.red(e.message)); process.exit(1); }
+  });
+
+program
+  .command('jobs')
+  .description('The governed jobs you may see (as owner, submitter, node operator or read-only viewer), newest first, with status, stage and elapsed time')
+  .option('--limit <n>', 'How many (default 25, at most 100)')
+  .option('--json', 'Emit JSON')
+  .action(async (options: JobsOptions) => {
+    try { await jobsCommand(options); } catch (e: any) { console.error(chalk.red(e.message)); process.exit(1); }
+  });
+
+program
+  .command('job-log <job>')
+  .description('The run log of a governed job (pbrun\'s own output); --follow streams it live until the job ends')
+  .option('--follow', 'Stream until the job ends')
+  .option('--from <n>', 'Byte offset to start from (the next offset of the previous call)')
+  .option('--json', 'Emit JSON lines')
+  .action(async (job: string, options: JobLogOptions) => {
+    try { await jobLogCommand(job, options); } catch (e: any) { console.error(chalk.red(e.message)); process.exit(1); }
   });
 
 program
