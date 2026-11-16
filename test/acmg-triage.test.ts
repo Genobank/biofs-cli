@@ -64,3 +64,21 @@ describe('reference-index body', () => {
     expect(() => buildRefIndexBody('Maria Lopez', { reference: 'hg38_noalt', codeSha256: H }, W, 's')).toThrow(/case identifier/);
   });
 });
+
+describe('acmg-triage --smn body', () => {
+  const BAM = `biocid://genobank/${OWNER.toLowerCase()}/bam/neo-5fc194a4.AD3IND_pooled_try1_fq2bam.bam`;
+  const o = { smn: true, bam: BAM, reference: 'hg38_noalt', gtfBucket: 'deepvariant-fastq-to-vcf-genobank-app', gtfObject: 'reference/gencode/g.gtf.gz', gtfSha256: H, codeSha256: H, owner: OWNER };
+  it('is the BAM, the reference, the pinned annotation and no phenotype', () => {
+    const b = buildAcmgBody('AD3SMN', o, W, '0xsig');
+    expect(b.mode).toBe('smn');
+    expect(b.reference).toBe('hg38_noalt');
+    expect(b.panel).toBe('skeletal_dysplasia');
+    expect(b.hpo_terms).toBeUndefined();
+    expect(b.sqlite_biocid).toBeUndefined();
+  });
+  it('refuses another reference and mixed modes', () => {
+    expect(() => buildAcmgBody('x', { ...o, reference: 'hg38' }, W, 's')).toThrow(/hg38_noalt/);
+    expect(() => buildAcmgBody('x', { ...o, coverage: true }, W, 's')).toThrow(/different modes/);
+    expect(() => buildAcmgBody('x', { ...o, bam: undefined }, W, 's')).toThrow(/--bam/);
+  });
+});
