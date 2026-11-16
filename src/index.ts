@@ -139,7 +139,7 @@ import { inventoryRegisterCommand } from './commands/inventory-register';
 import { inventoryDelegateCommand, DelegateOptions } from './commands/inventory-delegate';
 import { jobsCommand, jobLogCommand, JobsOptions, JobLogOptions } from './commands/job-view';
 import { inventoryListCommand, InventoryListOptions } from './commands/inventory-list';
-import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
+import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { pbsvSubmitCommand, PbsvSubmitOptions } from './commands/pbsv/submit';
 import { pbsvExecCommand, PbsvExecOptions } from './commands/pbsv/exec';
@@ -4521,6 +4521,30 @@ teslaGateCmd
   .option('--wait', 'Poll until done or failed')
   .option('--json', 'Emit JSON')
   .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('tesla_gate', id, options); });
+
+const identityCmd = program
+  .command('identity-concordance')
+  .description('Are these samples the same individual? Pairwise genotype concordance and KING-robust kinship from the samples\' gVCFs under the registered identity protocol; gates any pooling or merging (dispatched through biofs-node, decision support only)');
+identityCmd
+  .command('submit <caseId>')
+  .description('Submit the identity comparison; every input is a gVCF biocid and the code and protocol hashes must be the registered ones')
+  .requiredOption('--sample <pairs...>', 'label=biocid of a sample\'s gVCF, 2 to 8, repeatable: L13972=biocid://genobank/0x.../gvcf/...')
+  .requiredOption('--code-sha256 <hex>', 'SHA-256 of identity_concordance.py as registered; the worker refuses any other code')
+  .requiredOption('--protocol-sha256 <hex>', 'SHA-256 of the registered protocol')
+  .requiredOption('--ledger-record <n>', 'The pre-registration ledger record number')
+  .option('--min-depth <n>', 'Minimum depth of a confident genotype (default 10)')
+  .option('--min-gq <n>', 'Minimum genotype quality (default 20)')
+  .option('--executor <where>', 'auto (default): a healthy neoantigen worker agent, else this node; worker: only a worker, never falls back; local: only this node')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: IdentityOptions) => { await identitySubmitCommand(caseId, options); });
+identityCmd
+  .command('status <job>')
+  .description('Show an identity job (only the signer who submitted it can read it)')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('identity' as any, id, options); });
 
 // pbrun: one verb for each NVIDIA Parabricks tool, generated from the registry (src/commands/parabricks/registry.json)
 registerParabricksCommands(program);

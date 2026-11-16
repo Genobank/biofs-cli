@@ -6,6 +6,7 @@
  * biofs neoantigen-fusion   submit <caseId> --fusion-evidence <biocid> --five-gene <symbol> --three-gene <symbol> (--hla <alleles> | --hla-from <biocid>) [--min-templates 10]
  * biofs neoantigen-indel    submit <caseId> --somatic-sqlite <biocid> (--hla <alleles> | --hla-from <biocid>) [--tpm <biocid>] [--rna <biocid>] [--min-alt 8] [--genes TGFBR2,...]
  * biofs synapse-pull      submit <caseId> (--entities syn1,syn2 | --folder syn123 [--suffixes .fastq.gz,.bam]) [--project syn123] [--list-only] --access-basis "<approval>" [--max-total-bytes N]
+ * biofs identity-concordance submit <caseId> --sample label=<gvcf biocid> ... --code-sha256 <hex> --protocol-sha256 <hex> --ledger-record <n>   are these samples the same individual (decision support)
  * biofs tesla-gate         submit <caseId> --outcomes <biocid> --features 1=<biocid> 2=<biocid> ... --code-sha256 <hex> --protocol-sha256 <hex> --ledger-record <n> [--selftest]
  * every submit verb takes [--executor auto|worker|local]: auto (default) runs on a healthy neoantigen worker agent and otherwise on the node, worker never falls back, local never uses a worker.
  * biofs neoantigen-design   status <job> [--wait]
@@ -383,7 +384,7 @@ async function auth() {
   };
 }
 
-type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch';
+type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity';
 const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: string }> = {
   evidence: { post: 'neoantigen_evidence', status: 'neoantigen_evidence_status', id: 'neoantigen_job_id', verb: 'neoantigen-evidence' },
   design: { post: 'neoantigen_design', status: 'neoantigen_design_status', id: 'neoantigen_job_id', verb: 'neoantigen-design' },
@@ -394,6 +395,7 @@ const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: stri
   tesla_gate: { post: 'neoantigen_tesla_gate', status: 'neoantigen_tesla_gate_status', id: 'neoantigen_job_id', verb: 'tesla-gate' },
   parabricks: { post: 'neoantigen_parabricks', status: 'neoantigen_parabricks_status', id: 'neoantigen_job_id', verb: 'pbrun' },
   public_fetch: { post: 'neoantigen_public_fetch', status: 'neoantigen_public_fetch_status', id: 'neoantigen_job_id', verb: 'public-fetch' },
+  identity: { post: 'neoantigen_identity', status: 'neoantigen_identity_status', id: 'neoantigen_job_id', verb: 'identity-concordance' },
 };
 
 async function fetchStatus(kind: Kind, id: string, headers: Record<string, string>): Promise<any> {
@@ -520,6 +522,69 @@ export async function publicFetchSubmitCommand(caseId: string, options: PublicFe
     await submit('public_fetch', buildPublicFetchBody(caseId, options, a.wallet, a.signature), a.headers, options);
   } catch (e: any) {
     Logger.error(`public-fetch submit failed: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+export interface IdentityOptions {
+  sample: string[];
+  codeSha256: string;
+  protocolSha256: string;
+  ledgerRecord: string;
+  minDepth?: string;
+  minGq?: string;
+  executor?: string;
+  owner?: string;
+  wait?: boolean;
+  json?: boolean;
+}
+
+/** label=biocid entries, 2 to 8, labels of letters, digits, _ and - (never a person name), no biocid twice. */
+export function parseSamples(items: string[] | string | undefined): Record<string, string> {
+  const raw = ([] as string[]).concat(items || []).flatMap((x) => String(x).split(/,(?=[A-Za-z0-9_-]{1,32}=)/)).map((x) => x.trim()).filter(Boolean);
+  if (raw.length < 2 || raw.length > 8) throw new Error('--sample needs 2 to 8 entries of label=biocid, for example L13972=biocid://genobank/0x.../gvcf/neo-....g.vcf.gz');
+  const out: Record<string, string> = {};
+  const seen = new Set<string>();
+  for (const r of raw) {
+    const i = r.indexOf('=');
+    const id = r.slice(0, i);
+    if (i < 1 || !/^[A-Za-z0-9_-]{1,32}$/.test(id)) throw new Error(`--sample entry "${r}" is not label=biocid (letters, digits, _ and - only)`);
+    if (out[id]) throw new Error(`--sample names label ${id} twice`);
+    const b = requireBiocid(`--sample ${id}`, r.slice(i + 1));
+    if (seen.has(b.toLowerCase())) throw new Error(`--sample lists the same biocid twice (${id})`);
+    seen.add(b.toLowerCase());
+    out[id] = b;
+  }
+  return out;
+}
+
+/** Are these samples the same individual? The registered identity protocol: the code hash, protocol hash and ledger record must be the frozen ones; the worker refuses code that differs. */
+export function buildIdentityBody(caseId: string, o: IdentityOptions, wallet: string, signature: string): Record<string, unknown> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  const rec = Number(o.ledgerRecord);
+  if (!Number.isInteger(rec) || rec < 1) throw new Error('--ledger-record must be the pre-registration ledger record number');
+  const num = (name: string, v: string | undefined, lo: number, hi: number, def: number): number => {
+    const n = v === undefined ? def : Number(v);
+    if (!Number.isInteger(n) || n < lo || n > hi) throw new Error(`${name} must be an integer from ${lo} to ${hi}`);
+    return n;
+  };
+  return {
+    wallet: ownerOr(o.owner, wallet), signature, case_id: caseId,
+    samples_biocids: parseSamples(o.sample),
+    min_depth: num('--min-depth', o.minDepth, 1, 200, 10), min_gq: num('--min-gq', o.minGq, 0, 99, 20),
+    code_sha256: parseSha256('--code-sha256', o.codeSha256),
+    protocol_sha256: parseSha256('--protocol-sha256', o.protocolSha256),
+    ledger_record: rec,
+    executor: parseExecutor(o.executor),
+  };
+}
+
+export async function identitySubmitCommand(caseId: string, options: IdentityOptions): Promise<void> {
+  try {
+    const a = await auth();
+    await submit('identity', buildIdentityBody(caseId, options, a.wallet, a.signature), a.headers, options);
+  } catch (e: any) {
+    Logger.error(`identity-concordance submit failed: ${e.message}`);
     process.exit(1);
   }
 }
