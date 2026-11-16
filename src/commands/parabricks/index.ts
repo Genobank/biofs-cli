@@ -172,7 +172,7 @@ export function addToolOptions(cmd: Command, tool: string, meta: PbrunTool): voi
     }
   }
   const hasRef = Object.values(meta.flags).some((e) => e.class === 'in' && e.kind === 'ref');
-  if (hasRef) cmd.addOption(new Option('--ref <build>', `The reference genome: ${Object.keys(registry.references).join(', ')}${meta.align ? ' (alignment needs hg38, the only build with a BWA index)' : ''}`));
+  if (hasRef) cmd.addOption(new Option('--ref <build>', `The reference genome: ${Object.keys(registry.references).join(', ')}${meta.align ? ` (alignment needs a build with a BWA index: ${Object.entries(registry.references).filter(([, r]: [string, any]) => r.bwa_index).map(([k]) => k).join(', ')})` : ''}`));
   cmd.option('--out-name <stem>', 'Stem of every output file name (default: <caseId>_<tool>)');
   if (meta.fastq && meta.somatic_fastq) {
     cmd.option('--tumor-sample <name>', 'Sample name (SM) of the tumor read groups');
