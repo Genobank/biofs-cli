@@ -103,3 +103,15 @@ describe('vcf-compare body', () => {
     expect(() => buildVcfCompareBody('x', { ...o, codeSha256: 'abc' }, W, 's')).toThrow();
   });
 });
+
+describe('acmg-triage constraint file', () => {
+  it('carries the pinned constraint file into a classify body', () => {
+    const b = buildAcmgBody('AD3ACMG', { ...base, constraintObject: 'gnomad_constraint/4.1/gnomad.v4.1.constraint_metrics.tsv', constraintSha256: H }, W, '0xsig');
+    expect(b.constraint_object).toBe('gnomad_constraint/4.1/gnomad.v4.1.constraint_metrics.tsv');
+    expect(b.constraint_sha256).toBe(H);
+  });
+  it('refuses an object without its hash and a hash without its object', () => {
+    expect(() => buildAcmgBody('x', { ...base, constraintObject: 'gnomad_constraint/4.1/x.tsv' }, W, 's')).toThrow();
+    expect(() => buildAcmgBody('x', { ...base, constraintSha256: H }, W, 's')).toThrow(/--constraint-object/);
+  });
+});

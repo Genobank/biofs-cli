@@ -666,6 +666,8 @@ export interface AcmgOptions {
   sqlite?: string;
   coverage?: boolean;
   smn?: boolean;
+  constraintObject?: string;
+  constraintSha256?: string;
   reference?: string;
   bam?: string;
   gtfBucket?: string;
@@ -736,6 +738,12 @@ export function buildAcmgBody(caseId: string, o: AcmgOptions, wallet: string, si
   const obo = o.hpoOboSha256 || (known && known.obo);
   const genes = o.hpoGenesSha256 || (known && known.genes);
   if (!obo || !genes) throw new Error(`HPO release ${rel} has no recorded file hashes: give --hpo-obo-sha256 and --hpo-genes-sha256`);
+  if (o.constraintObject) {
+    body.constraint_object = o.constraintObject;
+    body.constraint_sha256 = parseSha256('--constraint-sha256', o.constraintSha256 as string);
+  } else if (o.constraintSha256) {
+    throw new Error('--constraint-sha256 needs --constraint-object');
+  }
   body.hpo_release = rel;
   body.hpo_obo_sha256 = parseSha256('--hpo-obo-sha256', obo);
   body.hpo_genes_sha256 = parseSha256('--hpo-genes-sha256', genes);

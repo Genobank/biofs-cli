@@ -4622,6 +4622,8 @@ acmgCmd
   .description('Submit the triage; --schema only reads the sqlite\'s real columns and value formats and classifies nothing')
   .option('--sqlite <biocid>', 'The annotation sqlite biocid (classify and schema modes)')
   .option('--coverage', 'Coverage mode: per-gene coding depth of --bam over the panel, the specific --hpo terms and --genes (classifies nothing)')
+  .option('--constraint-object <path>', 'Gene constraint (pLI, LOEUF) from this pinned .tsv in genobank-references, for example gnomad_constraint/4.1/gnomad.v4.1.constraint_metrics.tsv (classify mode)')
+  .option('--constraint-sha256 <hex>', 'SHA-256 of the constraint file')
   .option('--smn', 'SMN1 and SMN2 copy number mode: counts the paralog-specific coding base in --bam at any mapping quality (needs --reference and the pinned --gtf-*)')
   .option('--reference <name>', 'Catalog reference whose FASTA is used by --smn: hg38_noalt')
   .option('--bam <biocid>', 'The alignment biocid (coverage mode)')
