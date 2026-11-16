@@ -8,7 +8,7 @@ const W = '0x5f5a60EaEf242c0D51A21c703f520347b96Ed19a';
 const bc = (type: string, name: string) => `biocid://genobank/${W}/${type}/${name}`;
 const SIG = '0xsig';
 const NODE_REGISTRY = path.join(__dirname, '..', '..', 'biofs-node-sync-20261107', 'repo', 'neoantigen', 'pbrun_registry.json');
-const EXPECTED_SHA = '404e9042f4e1dff59cb3c93cc68127135dfb2983c9105325a55d54af40dd78f6';
+const EXPECTED_SHA = 'f7674bf963719adca16cb86e45ebb88d015c7cc87041af3f9c623c55b61f9025';
 
 function program(): Command {
   const p = new Command();

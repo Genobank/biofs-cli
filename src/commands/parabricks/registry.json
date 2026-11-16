@@ -78,6 +78,23 @@
    "fasta": "Homo_sapiens_assembly38.fasta",
    "prefix": "hg38/"
   },
+  "hg38_noalt": {
+   "alt_file": null,
+   "assets": {},
+   "bucket": "deepvariant-fastq-to-vcf-genobank-app",
+   "build": "hg38",
+   "bwa_index": [
+    ".amb",
+    ".ann",
+    ".bwt",
+    ".pac",
+    ".sa"
+   ],
+   "chr1_length": 248956422,
+   "dict": "human_GRCh38_no_alt_analysis_set.dict",
+   "fasta": "human_GRCh38_no_alt_analysis_set.fasta",
+   "prefix": "reference/pacbio/human_GRCh38_no_alt_analysis_set/"
+  },
   "hs37d5": {
    "alt_file": null,
    "assets": {

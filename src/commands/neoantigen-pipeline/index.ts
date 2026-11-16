@@ -386,7 +386,7 @@ async function auth() {
   };
 }
 
-type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture' | 'windows' | 'rescore' | 'acmg';
+type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture' | 'windows' | 'rescore' | 'acmg' | 'refindex';
 const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: string }> = {
   evidence: { post: 'neoantigen_evidence', status: 'neoantigen_evidence_status', id: 'neoantigen_job_id', verb: 'neoantigen-evidence' },
   design: { post: 'neoantigen_design', status: 'neoantigen_design_status', id: 'neoantigen_job_id', verb: 'neoantigen-design' },
@@ -402,6 +402,7 @@ const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: stri
   windows: { post: 'neoantigen_windows', status: 'neoantigen_windows_status', id: 'neoantigen_job_id', verb: 'windows-geometry' },
   rescore: { post: 'neoantigen_rescore', status: 'neoantigen_rescore_status', id: 'neoantigen_job_id', verb: 'rescore' },
   acmg: { post: 'neoantigen_acmg', status: 'neoantigen_acmg_status', id: 'neoantigen_job_id', verb: 'acmg-triage' },
+  refindex: { post: 'neoantigen_refindex', status: 'neoantigen_refindex_status', id: 'neoantigen_job_id', verb: 'reference-index' },
 };
 
 async function fetchStatus(kind: Kind, id: string, headers: Record<string, string>): Promise<any> {
@@ -737,6 +738,32 @@ export async function acmgSubmitCommand(caseId: string, options: AcmgOptions): P
     await submit('acmg', buildAcmgBody(caseId, options, a.wallet, a.signature), a.headers, options);
   } catch (e: any) {
     Logger.error(`acmg-triage submit failed: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+export interface RefIndexOptions {
+  reference: string;
+  codeSha256: string;
+  executor?: string;
+  owner?: string;
+  wait?: boolean;
+  json?: boolean;
+}
+
+/** Build and verify the BWA-MEM index and sequence dictionary of a catalog reference that has none (a node operator only: it writes beside the reference FASTA, create-only). */
+export function buildRefIndexBody(caseId: string, o: RefIndexOptions, wallet: string, signature: string): Record<string, unknown> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or -');
+  if (!['hg38_noalt'].includes(String(o.reference))) throw new Error('--reference must be a catalog reference without an index: hg38_noalt');
+  return { wallet: ownerOr(o.owner, wallet), signature, case_id: caseId, reference: o.reference, code_sha256: parseSha256('--code-sha256', o.codeSha256), executor: 'worker' };
+}
+
+export async function refIndexSubmitCommand(caseId: string, options: RefIndexOptions): Promise<void> {
+  try {
+    const a = await auth();
+    await submit('refindex', buildRefIndexBody(caseId, options, a.wallet, a.signature), a.headers, options);
+  } catch (e: any) {
+    Logger.error(`reference-index submit failed: ${e.message}`);
     process.exit(1);
   }
 }

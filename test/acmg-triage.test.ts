@@ -1,4 +1,4 @@
-import { buildAcmgBody, HPO_RELEASES } from '../src/commands/neoantigen-pipeline';
+import { buildAcmgBody, buildRefIndexBody, HPO_RELEASES } from '../src/commands/neoantigen-pipeline';
 
 const W = '0x5f5a60EaEf242c0D51A21c703f520347b96Ed19a';
 const OWNER = '0x01a2D260d2fE8cc13AE70b6868dEB4F3DdCDb797';
@@ -46,5 +46,21 @@ describe('acmg-triage body', () => {
     expect(() => buildAcmgBody('x', { ...cov, gtfSha256: 'abc' }, W, 's')).toThrow();
     expect(() => buildAcmgBody('x', { ...cov, schema: true }, W, 's')).toThrow(/different modes/);
     expect(() => buildAcmgBody('x', { ...base, sqlite: undefined }, W, 's')).toThrow(/--sqlite/);
+  });
+});
+
+describe('reference-index body', () => {
+  it('is the reference name, the code hash and a worker, nothing that names a place', () => {
+    const b = buildRefIndexBody('REFNOALT', { reference: 'hg38_noalt', codeSha256: H, owner: OWNER }, W, '0xsig');
+    expect(b.reference).toBe('hg38_noalt');
+    expect(b.executor).toBe('worker');
+    expect(b.wallet).toBe(OWNER);
+    expect(Object.keys(b).sort()).toEqual(['case_id', 'code_sha256', 'executor', 'reference', 'signature', 'wallet']);
+  });
+  it('refuses any reference outside the catalog and a bad hash', () => {
+    expect(() => buildRefIndexBody('x', { reference: 'hg19', codeSha256: H }, W, 's')).toThrow(/hg38_noalt/);
+    expect(() => buildRefIndexBody('x', { reference: 'gs://b/x.fasta', codeSha256: H }, W, 's')).toThrow();
+    expect(() => buildRefIndexBody('x', { reference: 'hg38_noalt', codeSha256: 'abc' }, W, 's')).toThrow();
+    expect(() => buildRefIndexBody('Maria Lopez', { reference: 'hg38_noalt', codeSha256: H }, W, 's')).toThrow(/case identifier/);
   });
 });
