@@ -140,7 +140,7 @@ import { inventoryRegisterCommand } from './commands/inventory-register';
 import { inventoryDelegateCommand, DelegateOptions } from './commands/inventory-delegate';
 import { jobsCommand, jobLogCommand, JobsOptions, JobLogOptions } from './commands/job-view';
 import { inventoryListCommand, InventoryListOptions } from './commands/inventory-list';
-import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, captureSubmitCommand, CaptureOptions, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
+import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, captureSubmitCommand, CaptureOptions, windowsSubmitCommand, WindowsOptions, rescoreSubmitCommand, RescoreOptions, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { pbsvSubmitCommand, PbsvSubmitOptions } from './commands/pbsv/submit';
 import { pbsvExecCommand, PbsvExecOptions } from './commands/pbsv/exec';
@@ -396,11 +396,18 @@ program
 program
   .command('upload <file>')
   .alias('put')
-  .description('Upload a file to GenoBank')
-  .option('--type <type>', 'File type (vcf, fastq, bam, pdf)')
-  .option('--tokenize', 'Mint as NFT after upload')
-  .option('--share-with <lab>', 'Share with lab after upload')
-  .option('--public', 'Make publicly discoverable')
+  .description('Resumable upload of a BAM, CRAM, FASTQ or VCF into your vault under your wallet; the node verifies size and md5 and registers the biocid (replaces the removed chunk upload)')
+  .option('--type <type>', 'File type (bam, cram, fastq, vcf, gvcf); guessed from the file name when omitted')
+  .requiredOption('--biosample <serial>', 'Origin sample serial from the lab (required; never UNKNOWN)')
+  .requiredOption('--originlab <lab>', 'Lab of origin, for example signios (required; never UNKNOWN)')
+  .option('--data-category <cat>', 'dna, rna, cdna or other (default dna)')
+  .option('--lab-nft <serial>', 'Serial of the lab\'s LabNFT, recorded on the rows for provenance')
+  .option('--owner <wallet>', 'Owner wallet (default: the signing wallet; a node operator may name another)')
+  .option('--chunk-mb <n>', 'Chunk size in MiB for the resumable upload (default 64)')
+  .option('--dry-run', 'Hash the file and print what would be uploaded; send nothing')
+  .option('--tokenize', 'Removed: tokenize the registered biocid with its own verb')
+  .option('--share-with <lab>', 'Removed: share the registered biocid with its own verb')
+  .option('--public', 'Removed')
   .option('--quiet', 'No progress output')
   .action(async (filePath: string, options: UploadOptions) => {
     try {
@@ -4606,6 +4613,53 @@ captureCmd
   .option('--wait', 'Poll until done or failed')
   .option('--json', 'Emit JSON')
   .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('capture' as any, id, options); });
+
+const windowsCmd = program
+  .command('windows-geometry')
+  .description('GENCODE protein window, CDS nucleotides and exon geometry for a list of substitutions, under the registered window_geometry protocol (dispatched through biofs-node)');
+windowsCmd
+  .command('submit <caseId>')
+  .description('Submit the list; items is a local JSON file of {id, gene, change}, and the code and protocol hashes must be the registered ones')
+  .requiredOption('--items <file>', 'JSON file: a list of {id, gene, change}, for example {"id":"TBKBP1","gene":"TBKBP1","change":"D607N"}')
+  .option('--flank <n>', 'Residues on each side of the substitution (default 40)')
+  .requiredOption('--code-sha256 <hex>', 'SHA-256 of window_geometry.py as registered; the worker refuses any other code')
+  .requiredOption('--protocol-sha256 <hex>', 'SHA-256 of the registered protocol')
+  .requiredOption('--ledger-record <n>', 'The pre-registration ledger record number')
+  .option('--executor <where>', 'auto (default): a healthy neoantigen worker agent, else this node; worker: only a worker, never falls back; local: only this node')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: WindowsOptions) => { await windowsSubmitCommand(caseId, options); });
+windowsCmd
+  .command('status <job>')
+  .description('Show a windows-geometry job (only the signer who submitted it can read it)')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('windows' as any, id, options); });
+
+const rescoreCmd = program
+  .command('rescore')
+  .description('Binding of caller-supplied peptides on caller-supplied HLA alleles (MHCflurry class I) and molecules (MHCnuggets class II), under the registered rescore protocol (dispatched through biofs-node)');
+rescoreCmd
+  .command('submit <caseId>')
+  .description('Submit the peptide list; it is hash-pinned, a known-answer self test runs first, and an unsupported allele is named, never replaced')
+  .requiredOption('--peptides <file>', 'TSV with the header peptide_id<TAB>peptide')
+  .option('--class1 <alleles...>', 'Class I alleles, for example HLA-A*02:01 (comma separated or repeated)')
+  .option('--class2 <molecules...>', 'Class II molecules in MHCnuggets names, for example HLA-DRB104:02 or HLA-DPA101:03-DPB102:01')
+  .requiredOption('--code-sha256 <hex>', 'SHA-256 of rescore.py as registered; the worker refuses any other code')
+  .requiredOption('--protocol-sha256 <hex>', 'SHA-256 of the registered protocol')
+  .requiredOption('--ledger-record <n>', 'The pre-registration ledger record number')
+  .option('--executor <where>', 'auto (default): a healthy neoantigen worker agent, else this node; worker: only a worker, never falls back; local: only this node')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: RescoreOptions) => { await rescoreSubmitCommand(caseId, options); });
+rescoreCmd
+  .command('status <job>')
+  .description('Show a rescore job (only the signer who submitted it can read it)')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('rescore' as any, id, options); });
 
 // pbrun: one verb for each NVIDIA Parabricks tool, generated from the registry (src/commands/parabricks/registry.json)
 registerParabricksCommands(program);

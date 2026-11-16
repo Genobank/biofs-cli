@@ -24,6 +24,8 @@
  * Decision support for a human review, never a clinical device. Server routes: POST /neoantigen_evidence, _hla, _design, _fusion, _indel; GET the same names with _status.
  */
 import axios from 'axios';
+import * as fs from 'fs';
+import { createHash } from 'crypto';
 import chalk from 'chalk';
 import { getCredentials } from '../../lib/auth/credentials';
 import { nodeErrorMessage } from '../../lib/utils/node_roles';
@@ -384,7 +386,7 @@ async function auth() {
   };
 }
 
-type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture';
+type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture' | 'windows' | 'rescore';
 const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: string }> = {
   evidence: { post: 'neoantigen_evidence', status: 'neoantigen_evidence_status', id: 'neoantigen_job_id', verb: 'neoantigen-evidence' },
   design: { post: 'neoantigen_design', status: 'neoantigen_design_status', id: 'neoantigen_job_id', verb: 'neoantigen-design' },
@@ -397,6 +399,8 @@ const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: stri
   public_fetch: { post: 'neoantigen_public_fetch', status: 'neoantigen_public_fetch_status', id: 'neoantigen_job_id', verb: 'public-fetch' },
   identity: { post: 'neoantigen_identity', status: 'neoantigen_identity_status', id: 'neoantigen_job_id', verb: 'identity-concordance' },
   capture: { post: 'neoantigen_capture', status: 'neoantigen_capture_status', id: 'neoantigen_job_id', verb: 'capture-compare' },
+  windows: { post: 'neoantigen_windows', status: 'neoantigen_windows_status', id: 'neoantigen_job_id', verb: 'windows-geometry' },
+  rescore: { post: 'neoantigen_rescore', status: 'neoantigen_rescore_status', id: 'neoantigen_job_id', verb: 'rescore' },
 };
 
 async function fetchStatus(kind: Kind, id: string, headers: Record<string, string>): Promise<any> {
@@ -646,6 +650,110 @@ export async function captureSubmitCommand(caseId: string, options: CaptureOptio
     await submit('capture', buildCaptureBody(caseId, options, a.wallet, a.signature), a.headers, options);
   } catch (e: any) {
     Logger.error(`capture-compare submit failed: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+export interface WindowsOptions {
+  items: string;
+  flank?: string;
+  codeSha256: string;
+  protocolSha256: string;
+  ledgerRecord: string;
+  executor?: string;
+  owner?: string;
+  wait?: boolean;
+  json?: boolean;
+}
+
+/** The GENCODE window, CDS and exon geometry of a list of substitutions (the registered window_geometry code). items: [{id, gene, change}] read from a local JSON file. */
+export function buildWindowsBody(caseId: string, o: WindowsOptions, wallet: string, signature: string, items: unknown): Record<string, unknown> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  if (!Array.isArray(items) || items.length < 1 || items.length > 200) throw new Error('--items must be a JSON file holding a list of 1 to 200 {id, gene, change}');
+  const flank = o.flank === undefined ? 40 : Number(o.flank);
+  if (!Number.isInteger(flank) || flank < 1 || flank > 100) throw new Error('--flank must be an integer from 1 to 100');
+  const rec = Number(o.ledgerRecord);
+  if (!Number.isInteger(rec) || rec < 1) throw new Error('--ledger-record must be the pre-registration ledger record number');
+  return {
+    wallet: ownerOr(o.owner, wallet), signature, case_id: caseId,
+    items: (items as any[]).map((i) => ({ id: String(i.id), gene: String(i.gene), change: String(i.change) })), flank,
+    code_sha256: parseSha256('--code-sha256', o.codeSha256),
+    protocol_sha256: parseSha256('--protocol-sha256', o.protocolSha256),
+    ledger_record: rec,
+    executor: parseExecutor(o.executor),
+  };
+}
+
+export async function windowsSubmitCommand(caseId: string, options: WindowsOptions): Promise<void> {
+  try {
+    const a = await auth();
+    let items: unknown;
+    try { items = JSON.parse(fs.readFileSync(options.items, 'utf8')); } catch (e: any) { throw new Error(`--items could not be read as JSON: ${e.message}`); }
+    await submit('windows', buildWindowsBody(caseId, options, a.wallet, a.signature, items), a.headers, options);
+  } catch (e: any) {
+    Logger.error(`windows-geometry submit failed: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+export interface RescoreOptions {
+  peptides: string;
+  class1?: string[];
+  class2?: string[];
+  codeSha256: string;
+  protocolSha256: string;
+  ledgerRecord: string;
+  executor?: string;
+  owner?: string;
+  wait?: boolean;
+  json?: boolean;
+}
+
+/** Peptides from a TSV with the header peptide_id<TAB>peptide. Nothing is repaired: a malformed row is an error. */
+export function parsePeptidesTsv(text: string): { id: string; peptide: string }[] {
+  const lines = text.split(/\r?\n/).filter((l) => l.length > 0);
+  if (lines.length < 2) throw new Error('--peptides must be a TSV with the header peptide_id<TAB>peptide and at least one row');
+  const head = lines[0].split('\t');
+  if (head[0] !== 'peptide_id' || head[1] !== 'peptide') throw new Error('--peptides: the first line must be the header peptide_id<TAB>peptide');
+  return lines.slice(1).map((l, i) => {
+    const f = l.split('\t');
+    if (f.length < 2 || !f[0] || !f[1]) throw new Error(`--peptides: row ${i + 2} has no peptide_id and peptide`);
+    return { id: f[0], peptide: f[1].trim().toUpperCase() };
+  });
+}
+
+/** SHA-256 of the distinct peptide strings, sorted, one per line: the same value the worker recomputes (rescore.peptides_sha256). */
+export function peptidesSha256(peps: { peptide: string }[]): string {
+  const h = createHash('sha256');
+  for (const p of [...new Set(peps.map((q) => q.peptide))].sort()) h.update(`${p}\n`);
+  return h.digest('hex');
+}
+
+/** Binding of caller peptides on caller alleles (MHCflurry class I) and molecules (MHCnuggets class II), under the registered rescore protocol. */
+export function buildRescoreBody(caseId: string, o: RescoreOptions, wallet: string, signature: string, peps: { id: string; peptide: string }[]): Record<string, unknown> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  const split = (v?: string[]) => ([] as string[]).concat(v || []).flatMap((x) => String(x).split(',')).map((x) => x.trim()).filter(Boolean);
+  const c1 = split(o.class1), c2 = split(o.class2);
+  if (c1.length + c2.length < 1) throw new Error('give at least one --class1 allele (HLA-A*02:01) or --class2 molecule (HLA-DRB104:02)');
+  const rec = Number(o.ledgerRecord);
+  if (!Number.isInteger(rec) || rec < 1) throw new Error('--ledger-record must be the pre-registration ledger record number');
+  return {
+    wallet: ownerOr(o.owner, wallet), signature, case_id: caseId,
+    peptides: peps, peptides_sha256: peptidesSha256(peps), class1_alleles: c1, class2_molecules: c2,
+    code_sha256: parseSha256('--code-sha256', o.codeSha256),
+    protocol_sha256: parseSha256('--protocol-sha256', o.protocolSha256),
+    ledger_record: rec,
+    executor: parseExecutor(o.executor),
+  };
+}
+
+export async function rescoreSubmitCommand(caseId: string, options: RescoreOptions): Promise<void> {
+  try {
+    const a = await auth();
+    const peps = parsePeptidesTsv(fs.readFileSync(options.peptides, 'utf8'));
+    await submit('rescore', buildRescoreBody(caseId, options, a.wallet, a.signature, peps), a.headers, options);
+  } catch (e: any) {
+    Logger.error(`rescore submit failed: ${e.message}`);
     process.exit(1);
   }
 }
