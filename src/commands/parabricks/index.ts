@@ -28,7 +28,7 @@ export interface PbrunRegistry { schema: string; docs_version: string; image_ver
 export const registry = registryJson as unknown as PbrunRegistry;
 export const REGISTRY_SHA256: string = crypto.createHash('sha256').update(fs.readFileSync(require.resolve('./registry.json'))).digest('hex');
 
-const EXTRA_FLAGS = ['--out-name', '--sample-name', '--library', '--platform', '--tumor-sample', '--normal-sample', '--acknowledge-untested', '--max-read-loss-fraction', '--owner', '--wait', '--json', '--check', '--ref', '--validate-with-bwa', '--validate-against-bam'];
+const EXTRA_FLAGS = ['--out-name', '--sample-name', '--library', '--library-per-pair', '--platform', '--tumor-sample', '--normal-sample', '--acknowledge-untested', '--max-read-loss-fraction', '--owner', '--wait', '--json', '--check', '--ref', '--validate-with-bwa', '--validate-against-bam'];
 const VARIADIC = ['fq_pairs', 'fq_single', 'known_sites', 'intervals'];
 const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const CASE_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -36,7 +36,7 @@ const CASE_RE = /^[A-Za-z0-9_-]{1,64}$/;
 export interface PbrunRaw {
   /** flag as written in NVIDIA's page (--in-fq) -> the value the user gave: a string, an array of strings, or true for a switch */
   flags: Record<string, string | string[] | boolean>;
-  ref?: string; outName?: string; sampleName?: string; library?: string; platform?: string; tumorSample?: string; normalSample?: string;
+  ref?: string; outName?: string; sampleName?: string; library?: string; libraryPerPair?: string[]; platform?: string; tumorSample?: string; normalSample?: string;
   acknowledgeUntested?: boolean; maxReadLossFraction?: string; owner?: string; wait?: boolean; json?: boolean; check?: boolean;
   validateWithBwa?: boolean; validateAgainstBam?: string;
 }
@@ -119,6 +119,11 @@ export function buildParabricksBody(tool: string, caseId: string, raw: PbrunRaw,
     } else {
       if (!raw.sampleName) throw new Error('--sample-name is required for FASTQ input: it becomes the SM of every read group, and a default would give a tumor and its normal the same name');
       body.read_group = rg(raw.sampleName, lib, plat);
+      if (raw.libraryPerPair && raw.libraryPerPair.length) {
+        const names = ([] as string[]).concat(raw.libraryPerPair).flatMap((x) => String(x).split(',')).map((x) => x.trim()).filter(Boolean);
+        for (const n of names) if (!NAME_RE.test(n)) throw new Error(`--library-per-pair ${n}: letters, digits, _ or - only`);
+        body.pair_libraries = names;
+      }
     }
   } else if (raw.sampleName || raw.tumorSample || raw.normalSample) {
     throw new Error('--sample-name, --tumor-sample and --normal-sample apply only to tools that read FASTQ');
@@ -175,7 +180,7 @@ export function addToolOptions(cmd: Command, tool: string, meta: PbrunTool): voi
   } else if (meta.fastq) {
     cmd.option('--sample-name <name>', 'Sample name (SM) of the read groups (required: no default is ever used)');
   }
-  if (meta.fastq) { cmd.option('--library <name>', 'Library name (LB), default the sample name'); cmd.option('--platform <name>', 'ILLUMINA (default), ELEMENT, PACBIO or ONT'); }
+  if (meta.fastq) { cmd.option('--library <name>', 'Library name (LB), default the sample name'); if (!meta.somatic_fastq) cmd.option('--library-per-pair <names...>', 'One library name (LB) for each --in-fq pair, in order (lanes of one library share a name): duplicates are then marked within each library, never across independent libraries aligned in one run'); cmd.option('--platform <name>', 'ILLUMINA (default), ELEMENT, PACBIO or ONT'); }
   if (meta.align || meta.fastq) cmd.option('--max-read-loss-fraction <x>', 'Allow up to this share of FASTQ reads to be missing from the BAM (0 to 0.05; default 0: any loss fails the job)');
   if (tool === 'fq2bam') {
     cmd.option('--validate-with-bwa', 'Also run an independent CPU bwa mem 0.7.17 -K 10000000 on the same reads and compare every primary record; the comparison report is a sealed output (one read pair only)');

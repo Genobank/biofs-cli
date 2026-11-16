@@ -209,3 +209,15 @@ describe('fq2bam is validated (ledger record 21)', () => {
     expect(body.registry_sha256).toBe(REGISTRY_SHA256);
   });
 });
+
+describe('fq2bam library per pair', () => {
+  const base = (over: Partial<PbrunRaw> = {}): PbrunRaw => ({ flags: {}, ...over });
+  const flags = { '--in-fq': [bc('fastq', 'a'), bc('fastq', 'b'), bc('fastq', 'c'), bc('fastq', 'd')] };
+  it('carries one library name per pair into the body', () => {
+    const body: any = buildParabricksBody('fq2bam', 'C1', base({ ref: 'hg38', sampleName: 'S', libraryPerPair: ['LA,LB'], flags }), W, SIG);
+    expect(body.pair_libraries).toEqual(['LA', 'LB']);
+    expect(body.read_group.sample).toBe('S');
+    expect(buildParabricksBody('fq2bam', 'C1', base({ ref: 'hg38', sampleName: 'S', flags }), W, SIG).pair_libraries).toBeUndefined();
+    expect(() => buildParabricksBody('fq2bam', 'C1', base({ ref: 'hg38', sampleName: 'S', libraryPerPair: ['L B'], flags }), W, SIG)).toThrow(/letters, digits/);
+  });
+});
