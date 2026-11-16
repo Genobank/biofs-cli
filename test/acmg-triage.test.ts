@@ -1,4 +1,4 @@
-import { buildAcmgBody, buildRefIndexBody, HPO_RELEASES } from '../src/commands/neoantigen-pipeline';
+import { buildAcmgBody, buildRefIndexBody, buildVcfCompareBody, HPO_RELEASES } from '../src/commands/neoantigen-pipeline';
 
 const W = '0x5f5a60EaEf242c0D51A21c703f520347b96Ed19a';
 const OWNER = '0x01a2D260d2fE8cc13AE70b6868dEB4F3DdCDb797';
@@ -80,5 +80,26 @@ describe('acmg-triage --smn body', () => {
     expect(() => buildAcmgBody('x', { ...o, reference: 'hg38' }, W, 's')).toThrow(/hg38_noalt/);
     expect(() => buildAcmgBody('x', { ...o, coverage: true }, W, 's')).toThrow(/different modes/);
     expect(() => buildAcmgBody('x', { ...o, bam: undefined }, W, 's')).toThrow(/--bam/);
+  });
+});
+
+describe('vcf-compare body', () => {
+  const A = `biocid://genobank/${OWNER.toLowerCase()}/vcf/neo-a.dv.vcf.gz`;
+  const B = `biocid://genobank/${OWNER.toLowerCase()}/vcf/neo-b.hc.vcf.gz`;
+  const o = { a: A, b: B, labelA: 'deepvariant', labelB: 'haplotypecaller', codeSha256: H, owner: OWNER };
+  it('is two VCF biocids, two labels and the pinned code', () => {
+    const b = buildVcfCompareBody('CMP1', { ...o, minDp: '15', minGq: '30', bed: `biocid://genobank/${OWNER.toLowerCase()}/neoantigen-capture-file/neo-x.bed` }, W, '0xsig');
+    expect(b.vcf_a_biocid).toBe(A);
+    expect(b.label_b).toBe('haplotypecaller');
+    expect(b.min_dp).toBe(15);
+    expect(b.min_gq).toBe(30);
+    expect(String(b.bed_biocid)).toContain('neoantigen-capture-file');
+  });
+  it('refuses the same file twice, equal labels, a path, a bad threshold', () => {
+    expect(() => buildVcfCompareBody('x', { ...o, b: A }, W, 's')).toThrow(/same file/);
+    expect(() => buildVcfCompareBody('x', { ...o, labelB: 'deepvariant' }, W, 's')).toThrow(/differ/);
+    expect(() => buildVcfCompareBody('x', { ...o, a: 'gs://b/a.vcf' }, W, 's')).toThrow(/biocid/);
+    expect(() => buildVcfCompareBody('x', { ...o, minDp: '-3' }, W, 's')).toThrow(/--min-dp/);
+    expect(() => buildVcfCompareBody('x', { ...o, codeSha256: 'abc' }, W, 's')).toThrow();
   });
 });

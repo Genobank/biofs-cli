@@ -386,7 +386,7 @@ async function auth() {
   };
 }
 
-type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture' | 'windows' | 'rescore' | 'acmg' | 'refindex';
+type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture' | 'windows' | 'rescore' | 'acmg' | 'refindex' | 'vcfcompare';
 const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: string }> = {
   evidence: { post: 'neoantigen_evidence', status: 'neoantigen_evidence_status', id: 'neoantigen_job_id', verb: 'neoantigen-evidence' },
   design: { post: 'neoantigen_design', status: 'neoantigen_design_status', id: 'neoantigen_job_id', verb: 'neoantigen-design' },
@@ -403,6 +403,7 @@ const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: stri
   rescore: { post: 'neoantigen_rescore', status: 'neoantigen_rescore_status', id: 'neoantigen_job_id', verb: 'rescore' },
   acmg: { post: 'neoantigen_acmg', status: 'neoantigen_acmg_status', id: 'neoantigen_job_id', verb: 'acmg-triage' },
   refindex: { post: 'neoantigen_refindex', status: 'neoantigen_refindex_status', id: 'neoantigen_job_id', verb: 'reference-index' },
+  vcfcompare: { post: 'neoantigen_vcfcompare', status: 'neoantigen_vcfcompare_status', id: 'neoantigen_job_id', verb: 'vcf-compare' },
 };
 
 async function fetchStatus(kind: Kind, id: string, headers: Record<string, string>): Promise<any> {
@@ -748,6 +749,54 @@ export async function acmgSubmitCommand(caseId: string, options: AcmgOptions): P
     await submit('acmg', buildAcmgBody(caseId, options, a.wallet, a.signature), a.headers, options);
   } catch (e: any) {
     Logger.error(`acmg-triage submit failed: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+export interface VcfCompareOptions {
+  a: string;
+  b: string;
+  labelA?: string;
+  labelB?: string;
+  bed?: string;
+  minDp?: string;
+  minGq?: string;
+  codeSha256: string;
+  executor?: string;
+  owner?: string;
+  wait?: boolean;
+  json?: boolean;
+}
+
+/** How two callers' VCFs of one sample agree (shared and private calls, genotype concordance, Ti/Tv, the evidence of every private call). Descriptive: it never says which caller is right. */
+export function buildVcfCompareBody(caseId: string, o: VcfCompareOptions, wallet: string, signature: string): Record<string, unknown> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  const body: Record<string, unknown> = {
+    wallet: ownerOr(o.owner, wallet), signature, case_id: caseId,
+    vcf_a_biocid: requireBiocid('--a', o.a), vcf_b_biocid: requireBiocid('--b', o.b),
+    label_a: o.labelA || 'a', label_b: o.labelB || 'b',
+    code_sha256: parseSha256('--code-sha256', o.codeSha256), executor: parseExecutor(o.executor),
+  };
+  if (body.vcf_a_biocid === body.vcf_b_biocid) throw new Error('--a and --b are the same file');
+  if (!/^[A-Za-z0-9_-]{1,30}$/.test(String(body.label_a)) || !/^[A-Za-z0-9_-]{1,30}$/.test(String(body.label_b))) throw new Error('labels are letters, digits, _ or - (up to 30)');
+  if (body.label_a === body.label_b) throw new Error('--label-a and --label-b must differ');
+  if (o.bed) body.bed_biocid = requireBiocid('--bed', o.bed);
+  for (const [flag, key, v] of [['--min-dp', 'min_dp', o.minDp], ['--min-gq', 'min_gq', o.minGq]] as const) {
+    if (v !== undefined) {
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < 0 || n > 200) throw new Error(`${flag} must be an integer from 0 to 200`);
+      body[key] = n;
+    }
+  }
+  return body;
+}
+
+export async function vcfCompareSubmitCommand(caseId: string, options: VcfCompareOptions): Promise<void> {
+  try {
+    const a = await auth();
+    await submit('vcfcompare', buildVcfCompareBody(caseId, options, a.wallet, a.signature), a.headers, options);
+  } catch (e: any) {
+    Logger.error(`vcf-compare submit failed: ${e.message}`);
     process.exit(1);
   }
 }

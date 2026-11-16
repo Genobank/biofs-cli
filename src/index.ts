@@ -140,7 +140,7 @@ import { inventoryRegisterCommand } from './commands/inventory-register';
 import { inventoryDelegateCommand, DelegateOptions } from './commands/inventory-delegate';
 import { jobsCommand, jobLogCommand, JobsOptions, JobLogOptions } from './commands/job-view';
 import { inventoryListCommand, InventoryListOptions } from './commands/inventory-list';
-import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, captureSubmitCommand, CaptureOptions, acmgSubmitCommand, AcmgOptions, refIndexSubmitCommand, RefIndexOptions, windowsSubmitCommand, WindowsOptions, rescoreSubmitCommand, RescoreOptions, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
+import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, captureSubmitCommand, CaptureOptions, acmgSubmitCommand, AcmgOptions, refIndexSubmitCommand, RefIndexOptions, vcfCompareSubmitCommand, VcfCompareOptions, windowsSubmitCommand, WindowsOptions, rescoreSubmitCommand, RescoreOptions, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { pbsvSubmitCommand, PbsvSubmitOptions } from './commands/pbsv/submit';
 import { pbsvExecCommand, PbsvExecOptions } from './commands/pbsv/exec';
@@ -4650,6 +4650,32 @@ acmgCmd
   .option('--wait', 'Poll until done or failed')
   .option('--json', 'Emit JSON')
   .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('acmg' as any, id, options); });
+
+const vcfCompareCmd = program
+  .command('vcf-compare')
+  .description('How two callers\' VCFs of one sample agree (for example DeepVariant and HaplotypeCaller): shared and private calls by type, genotype concordance, Ti/Tv, the evidence of every private call; descriptive, never says which caller is right (dispatched through biofs-node)');
+vcfCompareCmd
+  .command('submit <caseId>')
+  .description('Submit the comparison')
+  .requiredOption('--a <biocid>', 'The first caller\'s VCF')
+  .requiredOption('--b <biocid>', 'The second caller\'s VCF')
+  .option('--label-a <name>', 'Name of the first caller in the report (default a)')
+  .option('--label-b <name>', 'Name of the second caller in the report (default b)')
+  .option('--bed <biocid>', 'Compare only inside these regions (a BED)')
+  .option('--min-dp <n>', 'Depth under which a call counts as low confidence (default 10)')
+  .option('--min-gq <n>', 'Genotype quality under which a call counts as low confidence (default 20)')
+  .requiredOption('--code-sha256 <hex>', 'SHA-256 of vcfcompare.py as pinned; the worker refuses any other code')
+  .option('--executor <where>', 'auto (default): a healthy worker, else this node; worker: only a worker; local: only this node')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: VcfCompareOptions) => { await vcfCompareSubmitCommand(caseId, options); });
+vcfCompareCmd
+  .command('status <job>')
+  .description('Show a vcf-compare job')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('vcfcompare' as any, id, options); });
 
 const refIndexCmd = program
   .command('reference-index')
