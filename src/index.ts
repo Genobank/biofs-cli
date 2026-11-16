@@ -140,7 +140,7 @@ import { inventoryRegisterCommand } from './commands/inventory-register';
 import { inventoryDelegateCommand, DelegateOptions } from './commands/inventory-delegate';
 import { jobsCommand, jobLogCommand, JobsOptions, JobLogOptions } from './commands/job-view';
 import { inventoryListCommand, InventoryListOptions } from './commands/inventory-list';
-import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, captureSubmitCommand, CaptureOptions, windowsSubmitCommand, WindowsOptions, rescoreSubmitCommand, RescoreOptions, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
+import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, captureSubmitCommand, CaptureOptions, acmgSubmitCommand, AcmgOptions, windowsSubmitCommand, WindowsOptions, rescoreSubmitCommand, RescoreOptions, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { pbsvSubmitCommand, PbsvSubmitOptions } from './commands/pbsv/submit';
 import { pbsvExecCommand, PbsvExecOptions } from './commands/pbsv/exec';
@@ -4613,6 +4613,35 @@ captureCmd
   .option('--wait', 'Poll until done or failed')
   .option('--json', 'Emit JSON')
   .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('capture' as any, id, options); });
+
+const acmgCmd = program
+  .command('acmg-triage')
+  .description('Phenotype-driven variant triage with an ACMG/AMP points classification over an OpenCRAVAT annotation sqlite and its VCF (single calibrated predictor, ClinVar reported not counted); decision support, never a diagnosis (dispatched through biofs-node)');
+acmgCmd
+  .command('submit <caseId>')
+  .description('Submit the triage; --schema only reads the sqlite\'s real columns and value formats and classifies nothing')
+  .requiredOption('--sqlite <biocid>', 'The annotation sqlite biocid')
+  .option('--vcf <biocid>', 'The VCF the annotation was made from (gives zygosity and read support)')
+  .option('--schema', 'Profile the sqlite only')
+  .option('--hpo <ids...>', 'Patient HPO terms, for example HP:0002757,HP:0000924')
+  .option('--panel <name>', 'Gene panel: skeletal_dysplasia or none (default none)')
+  .option('--max-af <af>', 'Population frequency ceiling for non-ClinVar candidates (default 0.01)')
+  .option('--hpo-release <date>', 'HPO release folder under genobank-references/hpo, for example 2026-09-01')
+  .option('--hpo-obo-sha256 <hex>', 'SHA-256 of hp.obo when the release is not in the built-in table')
+  .option('--hpo-genes-sha256 <hex>', 'SHA-256 of genes_to_phenotype.txt when the release is not in the built-in table')
+  .requiredOption('--code-sha256 <hex>', 'SHA-256 of acmg_triage.py as pinned; the worker refuses any other code')
+  .option('--case-label <label>', 'Privacy-safe label for the report (never a person name)')
+  .option('--executor <where>', 'auto (default): a healthy neoantigen worker agent, else this node; worker: only a worker, never falls back; local: only this node')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: AcmgOptions) => { await acmgSubmitCommand(caseId, options); });
+acmgCmd
+  .command('status <job>')
+  .description('Show a triage job (only the signer who submitted it can read it)')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('acmg' as any, id, options); });
 
 const windowsCmd = program
   .command('windows-geometry')

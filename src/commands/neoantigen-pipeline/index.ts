@@ -386,7 +386,7 @@ async function auth() {
   };
 }
 
-type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture' | 'windows' | 'rescore';
+type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture' | 'windows' | 'rescore' | 'acmg';
 const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: string }> = {
   evidence: { post: 'neoantigen_evidence', status: 'neoantigen_evidence_status', id: 'neoantigen_job_id', verb: 'neoantigen-evidence' },
   design: { post: 'neoantigen_design', status: 'neoantigen_design_status', id: 'neoantigen_job_id', verb: 'neoantigen-design' },
@@ -401,6 +401,7 @@ const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: stri
   capture: { post: 'neoantigen_capture', status: 'neoantigen_capture_status', id: 'neoantigen_job_id', verb: 'capture-compare' },
   windows: { post: 'neoantigen_windows', status: 'neoantigen_windows_status', id: 'neoantigen_job_id', verb: 'windows-geometry' },
   rescore: { post: 'neoantigen_rescore', status: 'neoantigen_rescore_status', id: 'neoantigen_job_id', verb: 'rescore' },
+  acmg: { post: 'neoantigen_acmg', status: 'neoantigen_acmg_status', id: 'neoantigen_job_id', verb: 'acmg-triage' },
 };
 
 async function fetchStatus(kind: Kind, id: string, headers: Record<string, string>): Promise<any> {
@@ -650,6 +651,75 @@ export async function captureSubmitCommand(caseId: string, options: CaptureOptio
     await submit('capture', buildCaptureBody(caseId, options, a.wallet, a.signature), a.headers, options);
   } catch (e: any) {
     Logger.error(`capture-compare submit failed: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+/** The HPO releases whose files are in gs://genobank-references/hpo/<release>/, with the SHA-256 of each file as read in the session that uploaded them. A release not listed needs both hashes on the command line. */
+export const HPO_RELEASES: Record<string, { obo: string; genes: string }> = {
+  '2026-09-01': { obo: '93dace952fcb3ec4728818857f6ba76bc2d5312f4d83266519b8694b8e798f22', genes: '507a17bff9c49e6329fbd88b1f91734fa7e9fdea5c06304044c0892eb6ab248c' },
+};
+
+export interface AcmgOptions {
+  sqlite: string;
+  vcf?: string;
+  schema?: boolean;
+  hpo?: string[];
+  panel?: string;
+  maxAf?: string;
+  hpoRelease?: string;
+  hpoOboSha256?: string;
+  hpoGenesSha256?: string;
+  codeSha256: string;
+  caseLabel?: string;
+  executor?: string;
+  owner?: string;
+  wait?: boolean;
+  json?: boolean;
+}
+
+/** Phenotype-driven variant triage with an ACMG/AMP points classification over an annotation sqlite (and its VCF). --schema only profiles the sqlite's columns and classifies nothing. */
+export function buildAcmgBody(caseId: string, o: AcmgOptions, wallet: string, signature: string): Record<string, unknown> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  const body: Record<string, unknown> = {
+    wallet: ownerOr(o.owner, wallet), signature, case_id: caseId,
+    sqlite_biocid: requireBiocid('--sqlite', o.sqlite),
+    code_sha256: parseSha256('--code-sha256', o.codeSha256),
+    executor: parseExecutor(o.executor),
+    mode: o.schema ? 'schema' : 'classify',
+  };
+  if (o.schema) return body;
+  if (o.vcf) body.vcf_biocid = requireBiocid('--vcf', o.vcf);
+  const terms = ([] as string[]).concat(o.hpo || []).flatMap((x) => String(x).split(',')).map((x) => x.trim()).filter(Boolean);
+  if (!terms.length) throw new Error('give the patient HPO terms with --hpo HP:0002757,HP:0000924');
+  for (const t of terms) if (!/^HP:[0-9]{7}$/.test(t)) throw new Error(`--hpo ${t} is not an HPO id like HP:0002757`);
+  if (new Set(terms).size !== terms.length) throw new Error('--hpo lists a term twice');
+  body.hpo_terms = terms;
+  body.panel = o.panel || 'none';
+  if (o.maxAf !== undefined) {
+    const m = Number(o.maxAf);
+    if (!(m > 0 && m <= 0.5)) throw new Error('--max-af must be above 0 and at most 0.5');
+    body.max_af = m;
+  }
+  const rel = o.hpoRelease;
+  if (!rel) throw new Error('--hpo-release is required (the folder under genobank-references/hpo, for example 2026-09-01)');
+  const known = HPO_RELEASES[rel];
+  const obo = o.hpoOboSha256 || (known && known.obo);
+  const genes = o.hpoGenesSha256 || (known && known.genes);
+  if (!obo || !genes) throw new Error(`HPO release ${rel} has no recorded file hashes: give --hpo-obo-sha256 and --hpo-genes-sha256`);
+  body.hpo_release = rel;
+  body.hpo_obo_sha256 = parseSha256('--hpo-obo-sha256', obo);
+  body.hpo_genes_sha256 = parseSha256('--hpo-genes-sha256', genes);
+  body.case_label = o.caseLabel || caseId;
+  return body;
+}
+
+export async function acmgSubmitCommand(caseId: string, options: AcmgOptions): Promise<void> {
+  try {
+    const a = await auth();
+    await submit('acmg', buildAcmgBody(caseId, options, a.wallet, a.signature), a.headers, options);
+  } catch (e: any) {
+    Logger.error(`acmg-triage submit failed: ${e.message}`);
     process.exit(1);
   }
 }
