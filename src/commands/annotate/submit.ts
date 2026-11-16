@@ -26,7 +26,8 @@ import { Logger } from '../../lib/utils/logger';
 
 export interface AnnotateSubmitOptions {
   vcfPath?: string;   // legacy; ignored (biofs-node resolves from inventory)
-  vcfUri?: string;    // explicit gs:// override; passes through as vcf_gs_uri
+  vcfUri?: string;    // explicit gs:// override; passes through as vcf_gs_uri (discouraged: biodata is named by biocid)
+  vcfBiocid?: string; // the input named by its biocid; biofs-node resolves it through biocid_registry
   annotators?: string;
   assembly?: string;
   quiet?: boolean;
@@ -65,12 +66,28 @@ interface StatusResponse {
   dest_gs_uri?: string;
 }
 
+const BIOCID_RE = /^biocid:\/\/[A-Za-z0-9_-]+\/0x[0-9a-fA-F]{40}\/[A-Za-z0-9_-]+\/\S+$/;
+
+/** The request body. Exactly one way to name the input: a sample serial, or a biocid (never a storage path). */
+export function buildAnnotateBody(biosampleSerial: string | undefined, options: AnnotateSubmitOptions, wallet: string, signature: string): Record<string, unknown> {
+  if (options.vcfBiocid && !BIOCID_RE.test(options.vcfBiocid)) throw new Error(`--vcf-biocid is not a biocid (a gs:// path, URL or file name is never accepted): ${options.vcfBiocid}`);
+  if (!biosampleSerial && !options.vcfBiocid) throw new Error('give a sample serial or --vcf-biocid');
+  if (options.vcfBiocid && options.vcfUri) throw new Error('give --vcf-biocid or --vcf-uri, not both');
+  const body: Record<string, unknown> = {
+    wallet, signature, package: options.package || 'wes_default', max_af: options.maxAf || '0.01',
+  };
+  if (biosampleSerial) body.biosample_serial = biosampleSerial;
+  if (options.vcfBiocid) body.vcf_biocid = options.vcfBiocid;
+  if (options.vcfUri) body.vcf_gs_uri = options.vcfUri;
+  return body;
+}
+
 export async function annotateSubmitCommand(
-  biosampleSerial: string,
+  biosampleSerial: string | undefined,
   options: AnnotateSubmitOptions = {}
 ): Promise<string | null> {
   const spinner = options.quiet ? null
-    : ora(`biofs annotate submit ${biosampleSerial} → biofs-node v0.4`).start();
+    : ora(`biofs annotate submit ${biosampleSerial || options.vcfBiocid} → biofs-node v0.4`).start();
   try {
     const credentials = await getCredentials();
     if (!credentials) {
@@ -78,15 +95,7 @@ export async function annotateSubmitCommand(
       process.exit(1);
     }
 
-    const pkg = options.package || 'wes_default';
-    const body: Record<string, unknown> = {
-      biosample_serial: biosampleSerial,
-      wallet:           credentials.wallet_address,
-      signature:        credentials.user_signature,
-      package:          pkg,
-      max_af:           options.maxAf || '0.01',
-    };
-    if (options.vcfUri) body.vcf_gs_uri = options.vcfUri;
+    const body = buildAnnotateBody(biosampleSerial, options, credentials.wallet_address, credentials.user_signature);
 
     if (spinner) spinner.text = 'submitting to biofs-node /agent/submit_cravat ...';
     if (process.env.BIOFS_DEBUG) {

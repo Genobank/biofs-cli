@@ -1199,8 +1199,9 @@ const annotateCmd = program
 
 // annotate submit - Submit VCF for annotation
 annotateCmd
-  .command('submit <biosample_serial>')
-  .description('Submit VCF to OpenCRAVAT for annotation with all 146 annotators')
+  .command('submit [biosample_serial]')
+  .description('Submit VCF to OpenCRAVAT for annotation with all 146 annotators (name the input by sample serial, or by --vcf-biocid)')
+  .option('--vcf-biocid <biocid>', 'The biocid of the VCF or gVCF to annotate (resolved through biocid_registry; the owner is the registry owner)')
   .option('--vcf-path <path>', 'Manual VCF path override')
   .option('--vcf-uri <uri>', 'GCS or S3 URI for a freshly-minted VCF (skips discovery; used by biofs pipeline)')
   .option('--annotators <list>', 'Custom annotators (comma-separated), defaults to all 146')
@@ -1210,7 +1211,7 @@ annotateCmd
   .option('--wait', 'Wait for job to complete')
   .option('--quiet', 'Suppress progress output')
   .option('--json', 'Output as JSON')
-  .action(async (biosampleSerial: string, options: AnnotateSubmitOptions) => {
+  .action(async (biosampleSerial: string | undefined, options: AnnotateSubmitOptions) => {
     try {
       await annotateSubmitCommand(biosampleSerial, options);
     } catch (error) {
