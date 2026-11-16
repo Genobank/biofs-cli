@@ -206,7 +206,7 @@ export function rawFromCommand(cmd: Command, meta: PbrunTool): PbrunRaw {
     flags[o.long] = v as any;
   }
   return {
-    flags, ref: opts.ref, outName: opts.outName, sampleName: opts.sampleName, library: opts.library, platform: opts.platform, tumorSample: opts.tumorSample, normalSample: opts.normalSample,
+    flags, ref: opts.ref, outName: opts.outName, sampleName: opts.sampleName, library: opts.library, libraryPerPair: opts.libraryPerPair, platform: opts.platform, tumorSample: opts.tumorSample, normalSample: opts.normalSample,
     acknowledgeUntested: opts.acknowledgeUntested, validateWithBwa: opts.validateWithBwa, validateAgainstBam: opts.validateAgainstBam, maxReadLossFraction: opts.maxReadLossFraction, owner: opts.owner, wait: opts.wait, json: opts.json, check: opts.check,
   };
 }

@@ -134,6 +134,11 @@ describe('from the command line (--check prints the body and sends nothing)', ()
     expect(body.inputs['--knownSites']).toEqual(['hg38:mills_1000g', 'hg38:known_indels']);
     expect(body).toMatchObject({ tool: 'fq2bam', reference: 'hg38', outputs: ['--out-recal-file'], flags: { '--low-memory': true, '--bwa-options': '-K 10000000' }, read_group: { sample: 'T1_tumor' }, acknowledge_untested: true });
   });
+  test('--library-per-pair reaches the body through commander (a silently dropped option would pool libraries under one tag)', async () => {
+    const body = await check(['fq2bam', 'T1', '--in-fq', bc('fastq', 'r1'), bc('fastq', 'r2'), '--in-fq', bc('fastq', 'r3'), bc('fastq', 'r4'), '--in-fq', bc('fastq', 'r5'), bc('fastq', 'r6'),
+      '--ref', 'hg38', '--sample-name', 'S', '--library-per-pair', 'LA,LA,LB']);
+    expect(body.pair_libraries).toEqual(['LA', 'LA', 'LB']);
+  });
   test('two lanes by repeating the option', async () => {
     const body = await check(['fq2bam', 'T1', '--in-fq', bc('fastq', 'r1'), bc('fastq', 'r2'), '--in-fq', bc('fastq', 'r3'), bc('fastq', 'r4'), '--ref', 'hg38', '--sample-name', 'S']);
     expect(body.inputs['--in-fq']).toHaveLength(2);
