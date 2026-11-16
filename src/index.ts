@@ -140,7 +140,7 @@ import { inventoryRegisterCommand } from './commands/inventory-register';
 import { inventoryDelegateCommand, DelegateOptions } from './commands/inventory-delegate';
 import { jobsCommand, jobLogCommand, JobsOptions, JobLogOptions } from './commands/job-view';
 import { inventoryListCommand, InventoryListOptions } from './commands/inventory-list';
-import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
+import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, captureSubmitCommand, CaptureOptions, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { pbsvSubmitCommand, PbsvSubmitOptions } from './commands/pbsv/submit';
 import { pbsvExecCommand, PbsvExecOptions } from './commands/pbsv/exec';
@@ -4581,6 +4581,31 @@ identityCmd
   .option('--wait', 'Poll until done or failed')
   .option('--json', 'Emit JSON')
   .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('identity' as any, id, options); });
+
+const captureCmd = program
+  .command('capture-compare')
+  .description('Which capture design (exome kit) does this alignment come from? One BAM against candidate target-region designs and its own enrichment map, under the registered capture protocol (dispatched through biofs-node, decision support only)');
+captureCmd
+  .command('submit <caseId>')
+  .description('Submit the comparison; the alignment is a BAM biocid, the candidates are catalog designs and/or BED biocids, and the code and protocol hashes must be the registered ones')
+  .requiredOption('--bam <biocid>', 'The BAM biocid to test (its index must sit beside it, as pbrun writes it)')
+  .option('--design <names...>', 'Catalog design names (BED files under genobank-references/capture/hg38), for example twist_core_exome')
+  .option('--design-biocid <pairs...>', 'label=biocid of a BED file you own, repeatable')
+  .option('--pad <bp>', 'Padding added to every target region (default 0)')
+  .requiredOption('--code-sha256 <hex>', 'SHA-256 of capture_compare.py as registered; the worker refuses any other code')
+  .requiredOption('--protocol-sha256 <hex>', 'SHA-256 of the registered protocol')
+  .requiredOption('--ledger-record <n>', 'The pre-registration ledger record number')
+  .option('--executor <where>', 'auto (default): a healthy neoantigen worker agent, else this node; worker: only a worker, never falls back; local: only this node')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: CaptureOptions) => { await captureSubmitCommand(caseId, options); });
+captureCmd
+  .command('status <job>')
+  .description('Show a capture job (only the signer who submitted it can read it)')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('capture' as any, id, options); });
 
 // pbrun: one verb for each NVIDIA Parabricks tool, generated from the registry (src/commands/parabricks/registry.json)
 registerParabricksCommands(program);

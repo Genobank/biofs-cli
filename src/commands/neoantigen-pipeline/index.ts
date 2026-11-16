@@ -384,7 +384,7 @@ async function auth() {
   };
 }
 
-type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity';
+type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture';
 const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: string }> = {
   evidence: { post: 'neoantigen_evidence', status: 'neoantigen_evidence_status', id: 'neoantigen_job_id', verb: 'neoantigen-evidence' },
   design: { post: 'neoantigen_design', status: 'neoantigen_design_status', id: 'neoantigen_job_id', verb: 'neoantigen-design' },
@@ -396,6 +396,7 @@ const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: stri
   parabricks: { post: 'neoantigen_parabricks', status: 'neoantigen_parabricks_status', id: 'neoantigen_job_id', verb: 'pbrun' },
   public_fetch: { post: 'neoantigen_public_fetch', status: 'neoantigen_public_fetch_status', id: 'neoantigen_job_id', verb: 'public-fetch' },
   identity: { post: 'neoantigen_identity', status: 'neoantigen_identity_status', id: 'neoantigen_job_id', verb: 'identity-concordance' },
+  capture: { post: 'neoantigen_capture', status: 'neoantigen_capture_status', id: 'neoantigen_job_id', verb: 'capture-compare' },
 };
 
 async function fetchStatus(kind: Kind, id: string, headers: Record<string, string>): Promise<any> {
@@ -585,6 +586,66 @@ export async function identitySubmitCommand(caseId: string, options: IdentityOpt
     await submit('identity', buildIdentityBody(caseId, options, a.wallet, a.signature), a.headers, options);
   } catch (e: any) {
     Logger.error(`identity-concordance submit failed: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+export interface CaptureOptions {
+  bam: string;
+  design?: string[];
+  designBiocid?: string[];
+  pad?: string;
+  codeSha256: string;
+  protocolSha256: string;
+  ledgerRecord: string;
+  executor?: string;
+  owner?: string;
+  wait?: boolean;
+  json?: boolean;
+}
+
+/** label=biocid entries for BED designs (labels of letters, digits, _ and -). */
+export function parseDesignBiocids(items: string[] | string | undefined): Record<string, string> {
+  const raw = ([] as string[]).concat(items || []).map((x) => String(x).trim()).filter(Boolean);
+  const out: Record<string, string> = {};
+  for (const r of raw) {
+    const i = r.indexOf('=');
+    const id = r.slice(0, i);
+    if (i < 1 || !/^[A-Za-z0-9_-]{1,32}$/.test(id)) throw new Error(`--design-biocid entry "${r}" is not label=biocid (letters, digits, _ and - only)`);
+    if (out[id]) throw new Error(`--design-biocid names label ${id} twice`);
+    out[id] = requireBiocid(`--design-biocid ${id}`, r.slice(i + 1));
+  }
+  return out;
+}
+
+/** Which capture design does this alignment come from? The registered protocol capture_compare_v1: the code hash, protocol hash and ledger record must be the frozen ones. */
+export function buildCaptureBody(caseId: string, o: CaptureOptions, wallet: string, signature: string): Record<string, unknown> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  const rec = Number(o.ledgerRecord);
+  if (!Number.isInteger(rec) || rec < 1) throw new Error('--ledger-record must be the pre-registration ledger record number');
+  const designs = ([] as string[]).concat(o.design || []).flatMap((x) => String(x).split(',')).map((x) => x.trim()).filter(Boolean);
+  for (const d of designs) if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(d)) throw new Error(`--design ${d} is not a catalog design name`);
+  if (new Set(designs).size !== designs.length) throw new Error('--design lists a name twice');
+  const db = parseDesignBiocids(o.designBiocid);
+  if (designs.length + Object.keys(db).length < 1) throw new Error('give at least one candidate design (--design <catalog name> or --design-biocid label=biocid)');
+  const pad = o.pad === undefined ? 0 : Number(o.pad);
+  if (!Number.isInteger(pad) || pad < 0 || pad > 1000) throw new Error('--pad must be an integer from 0 to 1000');
+  return {
+    wallet: ownerOr(o.owner, wallet), signature, case_id: caseId,
+    bam_biocid: requireBiocid('--bam', o.bam), designs, designs_biocids: db, pad,
+    code_sha256: parseSha256('--code-sha256', o.codeSha256),
+    protocol_sha256: parseSha256('--protocol-sha256', o.protocolSha256),
+    ledger_record: rec,
+    executor: parseExecutor(o.executor),
+  };
+}
+
+export async function captureSubmitCommand(caseId: string, options: CaptureOptions): Promise<void> {
+  try {
+    const a = await auth();
+    await submit('capture', buildCaptureBody(caseId, options, a.wallet, a.signature), a.headers, options);
+  } catch (e: any) {
+    Logger.error(`capture-compare submit failed: ${e.message}`);
     process.exit(1);
   }
 }
