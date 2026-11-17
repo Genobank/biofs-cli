@@ -137,6 +137,7 @@ import { hifiAlignExecCommand, HifiAlignExecOptions } from './commands/hifi-alig
 import { registerDerivedGcsCommand, readDerivedCommand, RegisterDerivedGcsOptions } from './commands/register-derived';
 import { registerParabricksCommands } from './commands/parabricks';
 import { inventoryRegisterCommand } from './commands/inventory-register';
+import { alphagenomeScoreCommand, AlphaGenomeOptions } from './commands/alphagenome';
 import { inventoryDelegateCommand, DelegateOptions } from './commands/inventory-delegate';
 import { jobsCommand, jobLogCommand, JobsOptions, JobLogOptions } from './commands/job-view';
 import { inventoryListCommand, InventoryListOptions } from './commands/inventory-list';
@@ -4502,6 +4503,24 @@ program
   .option('--json', 'Emit JSON')
   .action(async (biocids: string[], options: { attest: string; yes?: boolean; json?: boolean }) => {
     try { await inventoryRegisterCommand(biocids, options); } catch (e: any) { console.error(chalk.red(e.message)); process.exit(1); }
+  });
+
+const alphagenomeGroup = program.command('alphagenome').description('AlphaGenome variant-effect prediction through the GenoBank.io service (research only, never a diagnosis)');
+alphagenomeGroup
+  .command('score')
+  .description('Score variants (chr:pos:ref:alt, VCF form) with AlphaGenome; only coordinates and alleles leave GenoBank.io, the lineage source is a biocid')
+  .requiredOption('--variant <variants...>', 'Variants as chr:pos:ref:alt (left-anchored for indels)')
+  .requiredOption('--ontology <terms...>', 'Tissue or cell-type ontology terms the prediction is made for')
+  .requiredOption('--source-biocid <biocid>', 'The biocid of the VCF these variants come from (lineage)')
+  .option('--outputs <types...>', 'Output types (default RNA_SEQ)')
+  .option('--interval-length <bp>', 'Window around the variant: 2048, 16384, 131072 (default), 524288 or 1048576')
+  .option('--accept-alphagenome-terms', 'Accept the Google AlphaGenome terms (non-commercial research, no clinical use)')
+  .option('--out <file>', 'Write the full results JSON here (mode 600)')
+  .option('--poll-seconds <n>', 'Seconds between status polls (default 5)')
+  .option('--timeout-minutes <n>', 'Give up on a job after this many minutes (default 20)')
+  .option('--json', 'Emit JSON')
+  .action(async (options: AlphaGenomeOptions) => {
+    try { await alphagenomeScoreCommand(options); } catch (e: any) { console.error(chalk.red(e.message)); process.exit(1); }
   });
 
 program
