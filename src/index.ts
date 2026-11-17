@@ -4643,6 +4643,7 @@ acmgCmd
   .option('--coverage', 'Coverage mode: per-gene coding depth of --bam over the panel, the specific --hpo terms and --genes (classifies nothing)')
   .option('--constraint-object <path>', 'Gene constraint (pLI, LOEUF) from this pinned .tsv in genobank-references, for example gnomad_constraint/4.1/gnomad.v4.1.constraint_metrics.tsv (classify mode)')
   .option('--constraint-sha256 <hex>', 'SHA-256 of the constraint file')
+  .option('--list-all', 'Classify mode: list every candidate in the report (default lists tiers 1 to 3 only; counts are unchanged)')
   .option('--smn', 'SMN1 and SMN2 copy number mode: counts the paralog-specific coding base in --bam at any mapping quality (needs --reference and the pinned --gtf-*)')
   .option('--support', 'Read support mode: for every variant of a classification report, counts the reads by allele, strand, mapping quality and library in --bam (needs --report-biocid and --reference)')
   .option('--report-biocid <biocid>', 'The classification report biocid whose variants --support counts reads for')

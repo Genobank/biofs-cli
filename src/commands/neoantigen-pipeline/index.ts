@@ -667,6 +667,7 @@ export interface AcmgOptions {
   coverage?: boolean;
   smn?: boolean;
   support?: boolean;
+  listAll?: boolean;
   reportBiocid?: string;
   scope?: string;
   constraintObject?: string;
@@ -757,6 +758,7 @@ export function buildAcmgBody(caseId: string, o: AcmgOptions, wallet: string, si
   } else if (o.constraintSha256) {
     throw new Error('--constraint-sha256 needs --constraint-object');
   }
+  if (o.listAll) body.list_all = true;
   body.hpo_release = rel;
   body.hpo_obo_sha256 = parseSha256('--hpo-obo-sha256', obo);
   body.hpo_genes_sha256 = parseSha256('--hpo-genes-sha256', genes);

@@ -135,3 +135,12 @@ describe('acmg-triage --support body', () => {
     expect(() => buildAcmgBody('x', { ...o, reportBiocid: undefined }, W, 's')).toThrow(/--report-biocid/);
   });
 });
+
+describe('acmg-triage --list-all', () => {
+  const SQ = `biocid://genobank/${OWNER.toLowerCase()}/sqlite/AD3_hc.sqlite`;
+  const o = { sqlite: SQ, hpo: ['HP:0002757'], hpoRelease: '2026-09-01', codeSha256: H, owner: OWNER };
+  it('is off by default and sends list_all only when asked', () => {
+    expect(buildAcmgBody('AD3', o, W, 's').list_all).toBeUndefined();
+    expect(buildAcmgBody('AD3', { ...o, listAll: true }, W, 's').list_all).toBe(true);
+  });
+});
