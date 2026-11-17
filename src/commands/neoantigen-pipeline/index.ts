@@ -666,6 +666,9 @@ export interface AcmgOptions {
   sqlite?: string;
   coverage?: boolean;
   smn?: boolean;
+  support?: boolean;
+  reportBiocid?: string;
+  scope?: string;
   constraintObject?: string;
   constraintSha256?: string;
   reference?: string;
@@ -693,13 +696,23 @@ export interface AcmgOptions {
 /** Phenotype-driven variant triage with an ACMG/AMP points classification over an annotation sqlite (and its VCF). --schema only profiles the sqlite's columns and classifies nothing. */
 export function buildAcmgBody(caseId: string, o: AcmgOptions, wallet: string, signature: string): Record<string, unknown> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
-  if ([o.coverage, o.schema, o.smn].filter(Boolean).length > 1) throw new Error('--coverage, --schema and --smn are different modes: give one');
+  if ([o.coverage, o.schema, o.smn, o.support].filter(Boolean).length > 1) throw new Error('--coverage, --schema, --smn and --support are different modes: give one');
   const body: Record<string, unknown> = {
     wallet: ownerOr(o.owner, wallet), signature, case_id: caseId,
     code_sha256: parseSha256('--code-sha256', o.codeSha256),
     executor: parseExecutor(o.executor),
-    mode: o.smn ? 'smn' : o.coverage ? 'coverage' : o.schema ? 'schema' : 'classify',
+    mode: o.support ? 'support' : o.smn ? 'smn' : o.coverage ? 'coverage' : o.schema ? 'schema' : 'classify',
   };
+  if (o.support) {
+    body.bam_biocid = requireBiocid('--bam', o.bam);
+    body.report_biocid = requireBiocid('--report-biocid', o.reportBiocid);
+    if (o.reference !== 'hg38_noalt') throw new Error('--reference must be hg38_noalt (the catalog reference whose FASTA is checked by its recorded MD5)');
+    body.reference = o.reference;
+    if (o.scope !== undefined && !['all', 'vus'].includes(o.scope)) throw new Error('--scope must be all or vus');
+    body.scope = o.scope || 'all';
+    body.case_label = o.caseLabel || caseId;
+    return body;
+  }
   if (o.coverage || o.smn) {
     body.bam_biocid = requireBiocid('--bam', o.bam);
     if (!o.gtfBucket || !o.gtfObject) throw new Error('--gtf-bucket and --gtf-object name the pinned gene annotation (a reference object)');

@@ -115,3 +115,23 @@ describe('acmg-triage constraint file', () => {
     expect(() => buildAcmgBody('x', { ...base, constraintSha256: H }, W, 's')).toThrow(/--constraint-object/);
   });
 });
+
+describe('acmg-triage --support body', () => {
+  const BAM = `biocid://genobank/${OWNER.toLowerCase()}/bam/neo-5fc194a4.AD3IND_pooled_try1_fq2bam.bam`;
+  const REP = `biocid://genobank/${OWNER.toLowerCase()}/classification-report/neo-f0ee7a9a.AD3NOALTHCCLS.json`;
+  const o = { support: true, bam: BAM, reportBiocid: REP, reference: 'hg38_noalt', codeSha256: H, owner: OWNER };
+  it('is the BAM, the classification report, the reference and no phenotype', () => {
+    const b = buildAcmgBody('AD3SUP', o, W, '0xsig');
+    expect(b.mode).toBe('support');
+    expect(b.report_biocid).toBe(REP);
+    expect(b.scope).toBe('all');
+    expect(b.hpo_terms).toBeUndefined();
+  });
+  it('refuses a storage path, another reference, a bad scope and mixed modes', () => {
+    expect(() => buildAcmgBody('x', { ...o, reportBiocid: 'gs://b/r.json' }, W, 's')).toThrow(/biocid/);
+    expect(() => buildAcmgBody('x', { ...o, reference: 'hg38' }, W, 's')).toThrow(/hg38_noalt/);
+    expect(() => buildAcmgBody('x', { ...o, scope: 'some' }, W, 's')).toThrow(/--scope/);
+    expect(() => buildAcmgBody('x', { ...o, smn: true }, W, 's')).toThrow(/different modes/);
+    expect(() => buildAcmgBody('x', { ...o, reportBiocid: undefined }, W, 's')).toThrow(/--report-biocid/);
+  });
+});
