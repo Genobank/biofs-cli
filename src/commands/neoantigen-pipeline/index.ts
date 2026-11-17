@@ -386,7 +386,7 @@ async function auth() {
   };
 }
 
-type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture' | 'windows' | 'rescore' | 'acmg' | 'refindex' | 'vcfcompare';
+type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture' | 'windows' | 'rescore' | 'acmg' | 'refindex' | 'vcfcompare' | 'alphagenome';
 const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: string }> = {
   evidence: { post: 'neoantigen_evidence', status: 'neoantigen_evidence_status', id: 'neoantigen_job_id', verb: 'neoantigen-evidence' },
   design: { post: 'neoantigen_design', status: 'neoantigen_design_status', id: 'neoantigen_job_id', verb: 'neoantigen-design' },
@@ -404,6 +404,7 @@ const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: stri
   acmg: { post: 'neoantigen_acmg', status: 'neoantigen_acmg_status', id: 'neoantigen_job_id', verb: 'acmg-triage' },
   refindex: { post: 'neoantigen_refindex', status: 'neoantigen_refindex_status', id: 'neoantigen_job_id', verb: 'reference-index' },
   vcfcompare: { post: 'neoantigen_vcfcompare', status: 'neoantigen_vcfcompare_status', id: 'neoantigen_job_id', verb: 'vcf-compare' },
+  alphagenome: { post: 'neoantigen_alphagenome', status: 'neoantigen_alphagenome_status', id: 'neoantigen_job_id', verb: 'alphagenome' },
 };
 
 async function fetchStatus(kind: Kind, id: string, headers: Record<string, string>): Promise<any> {
@@ -978,6 +979,17 @@ export async function neoantigenStatusCommand(kind: Kind, id: string, options: {
     if (options.json) console.log(JSON.stringify(row, null, 2)); else printSummary(kind, row);
   } catch (e: any) {
     Logger.error(`${ROUTE[kind].verb} status failed: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+/** Submit a job of any kind with the signer's credentials; the body builder gets the signer's wallet and signature. Used by verbs that live in their own module. */
+export async function submitKindCommand(kind: Kind, build: (wallet: string, signature: string) => Record<string, unknown>, options: { wait?: boolean; json?: boolean }): Promise<void> {
+  try {
+    const a = await auth();
+    await submit(kind, build(a.wallet, a.signature), a.headers, options);
+  } catch (e: any) {
+    Logger.error(`${ROUTE[kind].verb} submit failed: ${e.message}`);
     process.exit(1);
   }
 }
