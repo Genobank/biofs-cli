@@ -4513,7 +4513,7 @@ alphagenomeGroup
   .requiredOption('--ontology <terms...>', 'Tissue or cell-type ontology terms the prediction is made for')
   .requiredOption('--source-biocid <biocid>', 'The biocid of the VCF these variants come from (lineage)')
   .option('--outputs <types...>', 'Output types (default RNA_SEQ)')
-  .option('--interval-length <bp>', 'Window around the variant: 2048, 16384, 131072 (default), 524288 or 1048576')
+  .option('--interval-length <bp>', 'Window around the variant: 16384, 131072 (default), 524288 or 1048576')
   .option('--accept-alphagenome-terms', 'Accept the Google AlphaGenome terms (non-commercial research, no clinical use)')
   .option('--out <file>', 'Write the full results JSON here (mode 600)')
   .option('--poll-seconds <n>', 'Seconds between status polls (default 5)')

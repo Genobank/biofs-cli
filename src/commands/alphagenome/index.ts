@@ -14,7 +14,7 @@ import { getCredentials } from '../../lib/auth/credentials';
 const API_BASE = process.env.GENOBANK_API_URL || 'https://genobank.app';
 const BIOCID_RE = /^biocid:\/\/[A-Za-z0-9_-]+\/0x[0-9a-fA-F]{40}\/[A-Za-z0-9_-]+\/\S+$/;
 const CHROMS = new Set([...Array.from({ length: 22 }, (_, i) => `chr${i + 1}`), 'chrX', 'chrY', 'chrM']);
-export const INTERVAL_LENGTHS = [2048, 16384, 131072, 524288, 1048576];
+export const INTERVAL_LENGTHS = [16384, 131072, 524288, 1048576];
 export const OUTPUTS = ['RNA_SEQ', 'CAGE', 'DNASE', 'ATAC', 'CHIP_HISTONE', 'CHIP_TF', 'SPLICE_SITES', 'SPLICE_SITE_USAGE', 'SPLICE_JUNCTIONS', 'CONTACT_MAPS', 'PROCAP'];
 
 export interface Variant { chromosome: string; position: number; reference_bases: string; alternate_bases: string }
@@ -133,7 +133,9 @@ export async function alphagenomeScoreCommand(options: AlphaGenomeOptions): Prom
     for (const r of results) {
       const colour = r.status === 'completed' ? chalk.green : chalk.red;
       console.log(colour(`${r.variant}  ${r.status}${r.message ? '  ' + r.message : ''}`));
-      for (const [k, p] of Object.entries<any>(r.results?.predictions || {})) console.log(`   ${k}: effect_size ${p.effect_size} direction ${p.effect_direction} significant ${p.significant}`);
+      const sc = r.results?.scores || {};
+      if (sc.n_rows !== undefined) console.log(`   ${sc.n_rows} score rows; strongest in the requested tissues (quantile score, raw score):`);
+      for (const x of (sc.top_requested_ontology || sc.top_overall || []).slice(0, 6)) console.log(`     ${x.output_type} ${x.gene_name || ''} ${x.biosample_name || ''} q=${Number(x.quantile_score).toFixed(3)} raw=${Number(x.raw_score).toFixed(3)}`);
     }
     if (options.out) console.log(chalk.gray(`full results written to ${options.out}`));
   }
