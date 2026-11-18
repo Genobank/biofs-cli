@@ -259,6 +259,7 @@ import { jobReconcileCommand, JobReconcileOptions } from './commands/job/reconci
 import { cohortPipelineCommand, CohortPipelineOptions } from './commands/cohort-pipeline';
 import { dedupCommand, DedupOptions } from './commands/dedup';
 import { claimCommand, ClaimOptions } from './commands/claim';
+import { reconcileOwnersCommand, ReconcileOwnersOptions } from './commands/reconcile-owners';
 import { fingerprintCommand, FingerprintOptions } from './commands/fingerprint';
 import { researcherRegisterCommand, ResearcherRegisterOptions } from './commands/researcher/register';
 import { researcherStatusCommand, ResearcherStatusOptions } from './commands/researcher/status';
@@ -1402,6 +1403,24 @@ program
       await claimCommand(options);
     } catch (error) {
       Logger.error(`Claim failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Reconcile-owners command - give every ownerless inventory row its true owner (admin; dry run by default)
+program
+  .command('reconcile-owners')
+  .description('NODE OPERATOR: give inventory rows with no owner their true owner (vault path, registry, serial or fingerprint); never invents an owner, leaves the unresolved untouched; dry run unless --apply')
+  .option('--owner <wallet>', 'Only rows that resolve to this wallet (default: any)')
+  .option('--prefix <path>', 'Only rows whose object path starts with this prefix (e.g. a wallet vault path)')
+  .option('--limit <n>', 'Maximum rows examined (default 500, at most 5000)')
+  .option('--apply', 'Actually write the owner (default is dry-run)')
+  .option('--json', 'Output as JSON')
+  .action(async (options: ReconcileOwnersOptions) => {
+    try {
+      await reconcileOwnersCommand(options);
+    } catch (error: any) {
+      Logger.error(`reconcile-owners failed: ${error?.message || error}`);
       process.exit(1);
     }
   });
