@@ -386,7 +386,7 @@ async function auth() {
   };
 }
 
-type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture' | 'windows' | 'rescore' | 'acmg' | 'refindex' | 'vcfcompare' | 'alphagenome';
+type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture' | 'windows' | 'rescore' | 'acmg' | 'refindex' | 'vcfcompare' | 'alphagenome' | 'twin';
 const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: string }> = {
   evidence: { post: 'neoantigen_evidence', status: 'neoantigen_evidence_status', id: 'neoantigen_job_id', verb: 'neoantigen-evidence' },
   design: { post: 'neoantigen_design', status: 'neoantigen_design_status', id: 'neoantigen_job_id', verb: 'neoantigen-design' },
@@ -405,6 +405,7 @@ const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: stri
   refindex: { post: 'neoantigen_refindex', status: 'neoantigen_refindex_status', id: 'neoantigen_job_id', verb: 'reference-index' },
   vcfcompare: { post: 'neoantigen_vcfcompare', status: 'neoantigen_vcfcompare_status', id: 'neoantigen_job_id', verb: 'vcf-compare' },
   alphagenome: { post: 'neoantigen_alphagenome', status: 'neoantigen_alphagenome_status', id: 'neoantigen_job_id', verb: 'alphagenome' },
+  twin: { post: 'neoantigen_twin', status: 'neoantigen_twin_status', id: 'neoantigen_job_id', verb: 'twin' },
 };
 
 async function fetchStatus(kind: Kind, id: string, headers: Record<string, string>): Promise<any> {
@@ -861,6 +862,36 @@ export async function refIndexSubmitCommand(caseId: string, options: RefIndexOpt
     await submit('refindex', buildRefIndexBody(caseId, options, a.wallet, a.signature), a.headers, options);
   } catch (e: any) {
     Logger.error(`reference-index submit failed: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+export interface TwinOptions {
+  apply?: boolean;
+  codeSha256: string;
+  owner?: string;
+  wait?: boolean;
+  json?: boolean;
+}
+
+/** Classify every object of a vault into the patient-owned cancer digital twin (layer, specimen, timepoint, matched set) and compute the vaccine-readiness table.
+ *  Report only unless --apply writes the twin block onto the owner's rows. Runs on the node that holds the registry (executor local), never on a worker. */
+export function buildTwinBody(caseId: string, o: TwinOptions, wallet: string, signature: string): Record<string, unknown> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  return {
+    wallet: ownerOr(o.owner, wallet), signature, case_id: caseId,
+    apply: o.apply === true,
+    code_sha256: parseSha256('--code-sha256', o.codeSha256),
+    executor: 'local',
+  };
+}
+
+export async function twinClassifySubmitCommand(caseId: string, options: TwinOptions): Promise<void> {
+  try {
+    const a = await auth();
+    await submit('twin', buildTwinBody(caseId, options, a.wallet, a.signature), a.headers, options);
+  } catch (e: any) {
+    Logger.error(`twin classify submit failed: ${e.message}`);
     process.exit(1);
   }
 }

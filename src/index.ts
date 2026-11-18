@@ -162,7 +162,7 @@ import { alphagenomeSubmitCommand, AlphaGenomeOptions } from './commands/alphage
 import { inventoryDelegateCommand, DelegateOptions } from './commands/inventory-delegate';
 import { jobsCommand, jobLogCommand, JobsOptions, JobLogOptions } from './commands/job-view';
 import { inventoryListCommand, InventoryListOptions } from './commands/inventory-list';
-import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, captureSubmitCommand, CaptureOptions, acmgSubmitCommand, AcmgOptions, refIndexSubmitCommand, RefIndexOptions, vcfCompareSubmitCommand, VcfCompareOptions, windowsSubmitCommand, WindowsOptions, rescoreSubmitCommand, RescoreOptions, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
+import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, captureSubmitCommand, CaptureOptions, acmgSubmitCommand, AcmgOptions, refIndexSubmitCommand, RefIndexOptions, twinClassifySubmitCommand, TwinOptions, vcfCompareSubmitCommand, VcfCompareOptions, windowsSubmitCommand, WindowsOptions, rescoreSubmitCommand, RescoreOptions, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { neoantigenFabricateCommand, NeoantigenFabricateOptions } from './commands/neoantigen/fabricate';
 import { neoantigenStatusCommand as neoantigenSomaticStatusCommand } from './commands/neoantigen/status';
@@ -5273,6 +5273,25 @@ refIndexCmd
   .option('--wait', 'Poll until done or failed')
   .option('--json', 'Emit JSON')
   .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('refindex' as any, id, options); });
+
+const twinCmd = program
+  .command('twin')
+  .description('Patient-owned cancer digital twin: classify every object of a vault into its data layer, specimen, timepoint and matched set, and compute the vaccine-readiness table (dispatched through biofs-node; runs on the node that holds the registry)');
+twinCmd
+  .command('classify <caseId>')
+  .description('Classify the owner\'s inventory rows; report only unless --apply writes the twin block onto the rows (only that field is ever written)')
+  .option('--apply', 'Write the classification onto bioroutes.inventory and biocid_registry rows (default: report only)')
+  .requiredOption('--code-sha256 <hex>', 'SHA-256 of twin_classify.py as pinned; the node refuses any other code')
+  .option('--owner <biowallet>', 'Owner biowallet when a node operator runs the job for another wallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: TwinOptions) => { await twinClassifySubmitCommand(caseId, options); });
+twinCmd
+  .command('status <job>')
+  .description('Show a twin classify job (only the signer who submitted it can read it)')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('twin' as any, id, options); });
 
 const windowsCmd = program
   .command('windows-geometry')
