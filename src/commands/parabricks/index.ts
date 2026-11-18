@@ -4,7 +4,8 @@
  * biofs pbrun status <job>                    a pbrun job (only the signer who submitted it can read it)
  *
  * CLIENT verbs. The options are the ones of NVIDIA's own tool pages (the registry in registry.json is built from them, not typed by hand), with three differences that keep the
- * protocol rules: (1) every input file is a biocid of yours, never a path; reference data is named (--ref hg38, --knownSites hg38:mills_1000g); (2) output files are never named by
+ * protocol rules: (1) every input file is a biocid of yours, never a path; reference data is named by the biocid of its catalog entry (or by its catalog name: --ref hg38_noalt,
+ * --knownSites hg38:mills_1000g), each biocid pinned to the MD5 of its objects; (2) output files are never named by
  * the caller: the job writes them under your biowallet and each becomes its own biocid with the input biocids as parents; the options that ask for an extra output are switches;
  * (3) FASTQ input needs an explicit sample name (--sample-name), because a default read group would give a tumor and its normal the same name.
  *
@@ -144,8 +145,8 @@ function describeIn(flag: string, e: PbrunFlag): string {
   switch (e.kind) {
     case 'fq_pairs': return `${base} Give the biocids of each pair: R1 then R2 (repeat the option for more lanes)`;
     case 'fq_single': return `${base} Biocids of single-end FASTQ files`;
-    case 'known_sites': return `${base} Catalog names like hg38:mills_1000g (or a reference object); repeatable`;
-    case 'intervals': return `${base} A biocid of a BED/interval file, or a reference object; repeatable`;
+    case 'known_sites': return `${base} The biocid of a known-sites dataset of the reference catalog (biofs reference-register lists them), or its catalog name like hg38:mills_1000g; repeatable`;
+    case 'intervals': return `${base} The biocid of a capture design of the reference catalog, or a biocid of a BED/interval file of yours; repeatable`;
     case 'bam': case 'recal': case 'vcf': case 'gvcf': return `${base} A biocid of yours`;
     case 'file': return `${base} A biocid of yours, or a reference object`;
     case 'asset': return `${base} A reference object (catalog name or an approved reference path)`;
@@ -172,7 +173,7 @@ export function addToolOptions(cmd: Command, tool: string, meta: PbrunTool): voi
     }
   }
   const hasRef = Object.values(meta.flags).some((e) => e.class === 'in' && e.kind === 'ref');
-  if (hasRef) cmd.addOption(new Option('--ref <build>', `The reference genome: ${Object.keys(registry.references).join(', ')}${meta.align ? ` (alignment needs a build with a BWA index: ${Object.entries(registry.references).filter(([, r]: [string, any]) => r.bwa_index).map(([k]) => k).join(', ')})` : ''}`));
+  if (hasRef) cmd.addOption(new Option('--ref <genome>', `The reference genome, by the biocid of a reference genome of the catalog (biofs reference-register lists them) or by its catalog name: ${Object.keys(registry.references).join(', ')}${meta.align ? ` (alignment needs a build with a BWA index: ${Object.entries(registry.references).filter(([, r]: [string, any]) => r.bwa_index).map(([k]) => k).join(', ')})` : ''}`));
   cmd.option('--out-name <stem>', 'Stem of every output file name (default: <caseId>_<tool>)');
   if (meta.fastq && meta.somatic_fastq) {
     cmd.option('--tumor-sample <name>', 'Sample name (SM) of the tumor read groups');

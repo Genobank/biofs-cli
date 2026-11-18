@@ -8,7 +8,7 @@ const W = '0x5f5a60EaEf242c0D51A21c703f520347b96Ed19a';
 const bc = (type: string, name: string) => `biocid://genobank/${W}/${type}/${name}`;
 const SIG = '0xsig';
 const NODE_REGISTRY = path.join(__dirname, '..', '..', 'biofs-node-sync-20261107', 'repo', 'neoantigen', 'pbrun_registry.json');
-const EXPECTED_SHA = 'f7674bf963719adca16cb86e45ebb88d015c7cc87041af3f9c623c55b61f9025';
+const EXPECTED_SHA = '314b63c4802c5cede75b4fc8cd14dabfd355ba39966d4e201fd7ec248b3cacaa';     // 17 November 2026: reference datasets by biocid, pinned to their MD5s
 
 function program(): Command {
   const p = new Command();
@@ -224,5 +224,31 @@ describe('fq2bam library per pair', () => {
     expect(body.read_group.sample).toBe('S');
     expect(buildParabricksBody('fq2bam', 'C1', base({ ref: 'hg38', sampleName: 'S', flags }), W, SIG).pair_libraries).toBeUndefined();
     expect(() => buildParabricksBody('fq2bam', 'C1', base({ ref: 'hg38', sampleName: 'S', libraryPerPair: ['L B'], flags }), W, SIG)).toThrow(/letters, digits/);
+  });
+});
+
+
+describe('reference datasets by biocid (17 November 2026)', () => {
+  const C = registry.reference_custodian as string;
+  const ref = (type: string, name: string) => `biocid://genobank/${C}/${type}/${name}`;
+  const G = ref('reference-genome', 'human_GRCh38_no_alt_analysis_set.fasta');
+  const BED = ref('target-intervals', 'Agilent_SureSelect_V8_S33266436_Regions_hg38.bed');
+  const KS = [ref('known-sites', 'Homo_sapiens_assembly38.dbsnp138.vcf'), ref('known-sites', 'Homo_sapiens_assembly38.known_indels.vcf.gz'), ref('known-sites', 'Mills_and_1000G_gold_standard.indels.hg38.vcf.gz')];
+  test('the catalog carries the 5 datasets of the WES template under the custodian, each pinned', () => {
+    const refs = registry.references as any;
+    expect(C).toBe('0xf54d5ea2eb0e93d46e8bd925e0104162b8737722');
+    expect(refs.hg38_noalt.biocid).toBe(G);
+    expect(Object.keys(refs.hg38_noalt.md5)).toHaveLength(8);
+    expect(refs.hg38.assets.agilent_v8_regions.biocid).toBe(BED);
+    expect([refs.hg38.assets.dbsnp138.biocid, refs.hg38.assets.known_indels.biocid, refs.hg38.assets.mills_1000g.biocid]).toEqual(KS);
+  });
+  test('the WES template with every reference by biocid reaches the body unchanged', async () => {
+    const body = await check(['deepvariant_germline', 'WES1', '--in-fq', bc('fastq', 'r1'), bc('fastq', 'r2'), '--ref', G, '--sample-name', 'S1', '--library', 'L1', '--library-per-pair', 'L1',
+      '--platform', 'ILLUMINA', '--interval-file', BED, '--knownSites', ...KS, '--out-recal-file', '--use-wes-model', '--normalize-reads', '--min-mapping-quality', '10',
+      '--min-base-quality', '10', '--gvcf', '--fix-mate', '--out-name', 'WES1_germline', '--acknowledge-untested']);
+    expect(body).toMatchObject({ tool: 'deepvariant_germline', reference: G, outputs: ['--out-recal-file'], read_group: { sample: 'S1', library: 'L1', platform: 'ILLUMINA' }, pair_libraries: ['L1'] });
+    expect(body.inputs['--knownSites']).toEqual(KS);
+    expect(body.inputs['--interval-file']).toEqual([BED]);
+    expect(body.flags).toEqual({ '--use-wes-model': true, '--normalize-reads': true, '--min-mapping-quality': '10', '--min-base-quality': '10', '--gvcf': true, '--fix-mate': true });
   });
 });

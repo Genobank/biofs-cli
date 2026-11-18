@@ -157,6 +157,7 @@ import { hifiAlignExecCommand, HifiAlignExecOptions } from './commands/hifi-alig
 import { registerDerivedGcsCommand, readDerivedCommand, RegisterDerivedGcsOptions } from './commands/register-derived';
 import { registerParabricksCommands } from './commands/parabricks';
 import { inventoryRegisterCommand } from './commands/inventory-register';
+import { referenceRegisterCommand } from './commands/reference-register';
 import { alphagenomeSubmitCommand, AlphaGenomeOptions } from './commands/alphagenome';
 import { inventoryDelegateCommand, DelegateOptions } from './commands/inventory-delegate';
 import { jobsCommand, jobLogCommand, JobsOptions, JobLogOptions } from './commands/job-view';
@@ -5019,6 +5020,16 @@ program
   .option('--json', 'Emit JSON')
   .action(async (biocids: string[], options: { attest: string; yes?: boolean; json?: boolean }) => {
     try { await inventoryRegisterCommand(biocids, options); } catch (e: any) { console.error(chalk.red(e.message)); process.exit(1); }
+  });
+
+program
+  .command('reference-register [biocids...]')
+  .description('NODE OPERATOR: register the public reference datasets of the pbrun catalog (genome, known sites, capture design) by biocid, each pinned to the MD5 of its objects; owner the reference custodian, consent public_reference; with no biocid, all of them; dry run unless --yes')
+  .requiredOption('--attest <text>', 'The source of these reference datasets and on what basis GenoBank.io holds them (at least 20 characters, recorded with the rows)')
+  .option('--yes', 'Write the rows (default is a dry run that writes nothing and lists the biocids)')
+  .option('--json', 'Emit JSON')
+  .action(async (biocids: string[], options: { attest: string; yes?: boolean; json?: boolean }) => {
+    try { await referenceRegisterCommand(biocids, options); } catch (e: any) { console.error(chalk.red(e.message)); process.exit(1); }
   });
 
 const alphagenomeGroup = program.command('alphagenome').description('AlphaGenome variant-effect prediction as a governed biofs-node job (research only, never a diagnosis; regulation and splicing, not missense)');

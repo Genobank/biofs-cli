@@ -15,6 +15,7 @@
    "note": "GRCh38_gencode_v37_CTAT_lib_Mar012021.plug-n-play, extracted from gs://genobank-references/ctat/ on the executor"
   }
  },
+ "reference_custodian": "0xf54d5ea2eb0e93d46e8bd925e0104162b8737722",
  "references": {
   "hg19": {
    "alt_file": null,
@@ -43,21 +44,49 @@
   "hg38": {
    "alt_file": null,
    "assets": {
+    "agilent_v8_regions": {
+     "biocid": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/target-intervals/Agilent_SureSelect_V8_S33266436_Regions_hg38.bed",
+     "biodata_type": "target_intervals",
+     "file": "Agilent_SureSelect_V8_S33266436_Regions_hg38.bed",
+     "index": null,
+     "md5": {
+      "Agilent_SureSelect_V8_S33266436_Regions_hg38.bed": "2dWxeg1VFFuLsmwezgHE8A=="
+     },
+     "object": "gs://deepvariant-fastq-to-vcf-genobank-app/reference/hg38/Agilent_SureSelect_V8_S33266436_Regions_hg38.bed"
+    },
     "dbsnp138": {
+     "biocid": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/known-sites/Homo_sapiens_assembly38.dbsnp138.vcf",
+     "biodata_type": "known_sites",
      "file": "Homo_sapiens_assembly38.dbsnp138.vcf",
-     "index": ".idx"
+     "index": ".idx",
+     "md5": {
+      "Homo_sapiens_assembly38.dbsnp138.vcf": "9+HvXBgwv7M2dbnHy6pIaA==",
+      "Homo_sapiens_assembly38.dbsnp138.vcf.idx": "K6LiW2dcOgDKZjVDuYFw2A=="
+     }
     },
     "gnomad_af_only": {
      "file": "af-only-gnomad.hg38.vcf.gz",
      "index": ".tbi"
     },
     "known_indels": {
+     "biocid": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/known-sites/Homo_sapiens_assembly38.known_indels.vcf.gz",
+     "biodata_type": "known_sites",
      "file": "Homo_sapiens_assembly38.known_indels.vcf.gz",
-     "index": ".tbi"
+     "index": ".tbi",
+     "md5": {
+      "Homo_sapiens_assembly38.known_indels.vcf.gz": "FMxYiicZUawYBvm+iV+1Hw==",
+      "Homo_sapiens_assembly38.known_indels.vcf.gz.tbi": "GlX9+mUzrly8cOgYjneSKQ=="
+     }
     },
     "mills_1000g": {
+     "biocid": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/known-sites/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz",
+     "biodata_type": "known_sites",
      "file": "Mills_and_1000G_gold_standard.indels.hg38.vcf.gz",
-     "index": ".tbi"
+     "index": ".tbi",
+     "md5": {
+      "Mills_and_1000G_gold_standard.indels.hg38.vcf.gz": "LgJpYDLc/pX/AyT0oTUI4w==",
+      "Mills_and_1000G_gold_standard.indels.hg38.vcf.gz.tbi": "TIB+LL4HUsDESsgv87UgJQ=="
+     }
     },
     "pon_1000g": {
      "file": "1000g_pon.hg38.vcf.gz",
@@ -81,6 +110,8 @@
   "hg38_noalt": {
    "alt_file": null,
    "assets": {},
+   "biocid": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/reference-genome/human_GRCh38_no_alt_analysis_set.fasta",
+   "biodata_type": "reference_genome",
    "bucket": "deepvariant-fastq-to-vcf-genobank-app",
    "build": "hg38",
    "bwa_index": [
@@ -93,6 +124,16 @@
    "chr1_length": 248956422,
    "dict": "human_GRCh38_no_alt_analysis_set.dict",
    "fasta": "human_GRCh38_no_alt_analysis_set.fasta",
+   "md5": {
+    "human_GRCh38_no_alt_analysis_set.dict": "QXNh7XmXIfTQEO5BghH4JQ==",
+    "human_GRCh38_no_alt_analysis_set.fasta": "MPGpk1mlmT7b+Mi8iFglpw==",
+    "human_GRCh38_no_alt_analysis_set.fasta.amb": "fFcjVUbAG/2wEZyeHygyvQ==",
+    "human_GRCh38_no_alt_analysis_set.fasta.ann": "DGcE6P1fDSjM7D2+zjtQ5w==",
+    "human_GRCh38_no_alt_analysis_set.fasta.bwt": "iHEq+WJtXLuoIAfPjj+Qsg==",
+    "human_GRCh38_no_alt_analysis_set.fasta.fai": "X928EJyCmA+UNqpcIaV8YQ==",
+    "human_GRCh38_no_alt_analysis_set.fasta.pac": "bK6ZlCGzEH0xqu4xKmeytA==",
+    "human_GRCh38_no_alt_analysis_set.fasta.sa": "tWZog6955gBWOFL71ttg/w=="
+   },
    "prefix": "reference/pacbio/human_GRCh38_no_alt_analysis_set/"
   },
   "hs37d5": {
