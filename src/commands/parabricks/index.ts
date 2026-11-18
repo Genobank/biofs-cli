@@ -24,7 +24,8 @@ import { jobLogCommand } from '../job-view';
 
 export interface PbrunFlag { class: 'in' | 'out' | 'pass' | 'engine' | 'unsupported'; nargs: number | '*' | null; repeatable: boolean; required: boolean; group: string; metavar: string; aliases: string[]; desc: string; kind?: string; optional?: boolean; needs?: string[]; reason?: string; biodata_type?: string; shape?: string }
 export interface PbrunTool { family: string; main: string | null; fastq: boolean; align: boolean; somatic_fastq: boolean; index_only: boolean; category: string; doc_sha256: string; validation: { status: string; record: string | null }; flags: Record<string, PbrunFlag> }
-export interface PbrunRegistry { schema: string; docs_version: string; image_version: string; references: Record<string, any>; refdirs: Record<string, any>; already_a_verb: Record<string, string>; tools: Record<string, PbrunTool> }
+export interface PbrunTemplate { assay: string; tool: string; status: string; frozen: string; image: string; image_digest: string; reference: string; inputs: Record<string, string[]>; kit_flag: string | null; kits: Record<string, string>; flags: Record<string, unknown>; outputs: string[]; platform: string; rg_id: string }
+export interface PbrunRegistry { schema: string; docs_version: string; image_version: string; references: Record<string, any>; refdirs: Record<string, any>; already_a_verb: Record<string, string>; tools: Record<string, PbrunTool>; templates?: Record<string, PbrunTemplate>; template_sha256?: Record<string, string> }
 
 export const registry = registryJson as unknown as PbrunRegistry;
 export const REGISTRY_SHA256: string = crypto.createHash('sha256').update(fs.readFileSync(require.resolve('./registry.json'))).digest('hex');
@@ -212,6 +213,35 @@ export function rawFromCommand(cmd: Command, meta: PbrunTool): PbrunRaw {
   };
 }
 
+// ---- frozen run templates (18 November 2026) ------------------------------------------------------------------------------------------------------------------------------
+// biofs-node is the job operator: a template fixes the tool, the image digest, the reference genome, the known sites, the capture design, every flag, the outputs and the
+// read-group form. This verb sends only the per-run fields; the node expands them from its catalog and the worker re-checks the expansion against its own copy.
+export interface TemplateRaw { inFq: string[]; sampleName: string; library: string; libraryPerPair?: string[]; kit?: string; outName: string; owner?: string; wait?: boolean; json?: boolean; check?: boolean }
+
+export function buildTemplateBody(templateId: string, caseId: string, raw: TemplateRaw, wallet: string, signature: string, reg: PbrunRegistry = registry, sha: string = REGISTRY_SHA256): Record<string, unknown> {
+  const t = (reg.templates || {})[templateId];
+  if (!t) throw new Error(`unknown template ${templateId} (${Object.keys(reg.templates || {}).sort().join(', ')}): see biofs pbrun templates`);
+  if (!CASE_RE.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  const flat = (raw.inFq || []).flatMap((x) => String(x).split(',')).map((x) => x.trim()).filter(Boolean);
+  if (!flat.length || flat.length % 2 !== 0) throw new Error('--in-fq takes the two mates of each pair: R1 biocid then R2 biocid (an even number of biocids)');
+  for (const b of flat) if (!BIOCID_RE.test(b)) throw new Error(`--in-fq: ${b} is not a biocid (a gs:// path, URL or file name is never accepted)`);
+  const pairs: string[][] = [];
+  for (let i = 0; i < flat.length; i += 2) pairs.push([flat[i], flat[i + 1]]);
+  for (const [v, what] of [[raw.sampleName, '--sample-name'], [raw.library, '--library'], [raw.outName, '--out-name']] as const) if (!(typeof v === 'string' && NAME_RE.test(v))) throw new Error(`${what} is required (letters, digits, _ or -, at most 64)`);
+  const body: Record<string, unknown> = { wallet: ownerOr(raw.owner, wallet), signature, case_id: caseId, executor: 'worker', registry_sha256: sha, template: templateId, in_fq: pairs,
+    sample_name: raw.sampleName, library: raw.library, out_name: raw.outName };
+  if (raw.libraryPerPair && raw.libraryPerPair.length) {
+    const pl = raw.libraryPerPair.flatMap((x) => String(x).split(',')).map((x) => x.trim()).filter(Boolean);
+    if (pl.length !== pairs.length || pl.some((x) => !NAME_RE.test(x))) throw new Error(`--library-per-pair needs one library name for each of the ${pairs.length} FASTQ pairs`);
+    body.pair_libraries = pl;
+  }
+  if (t.kit_flag !== null) {
+    if (!raw.kit || !(raw.kit in t.kits)) throw new Error(`${templateId} is a ${t.assay} template: --kit must be one of ${Object.keys(t.kits).sort().join(', ')}`);
+    body.kit = raw.kit;
+  } else if (raw.kit) throw new Error(`${templateId} is a ${t.assay} template: it takes no capture kit`);
+  return body;
+}
+
 export function registerParabricksCommands(program: Command): void {
   const group = program
     .command('pbrun')
@@ -237,6 +267,38 @@ export function registerParabricksCommands(program: Command): void {
     .option('--json', 'Emit JSON lines')
     .action(async (id: string, o: { follow?: boolean; from?: string; json?: boolean }) => {
       try { await jobLogCommand(id, o); } catch (e: any) { Logger.error(`pbrun logs failed: ${e.message}`); process.exit(1); }
+    });
+  group.command('templates')
+    .description('The frozen run templates biofs-node operates (tool, image digest, references, flags fixed by the node; you give only the per-run fields)')
+    .option('--json', 'Emit JSON')
+    .action((o: { json?: boolean }) => {
+      const ts = registry.templates || {};
+      if (o.json) { console.log(JSON.stringify({ registry_sha256: REGISTRY_SHA256, templates: ts, template_sha256: registry.template_sha256 || {} }, null, 2)); return; }
+      for (const [id, t] of Object.entries(ts)) {
+        console.log(`${chalk.cyan(id.padEnd(18))} ${t.assay.padEnd(4)} ${t.tool.padEnd(22)} ${t.status.padEnd(18)} kits: ${Object.keys(t.kits).join(', ') || '-'}  sha ${((registry.template_sha256 || {})[id] || '').slice(0, 12)}`);
+        console.log(chalk.gray(`  ${t.image}@${t.image_digest.slice(0, 19)}  flags ${Object.entries(t.flags).map(([f, v]) => (v === true ? f : `${f} ${v}`)).join(' ')}`));
+      }
+    });
+  group.command('template <template> <caseId>')
+    .description('Run a frozen template: biofs-node fixes the tool, image, reference genome, known sites, capture design, flags and outputs; this sends only the FASTQ pairs, names, kit, output stem and owner')
+    .requiredOption('--in-fq <biocids...>', 'FASTQ pairs by biocid: R1 then R2 of each pair')
+    .requiredOption('--sample-name <name>', 'Sample name (SM of every read group)')
+    .requiredOption('--library <name>', 'Library name (LB; read-group ID and PU are <library>.<n>)')
+    .option('--library-per-pair <names...>', 'One library name per FASTQ pair, when libraries are pooled')
+    .option('--kit <name>', 'Capture kit of a WES template (e.g. agilent_v8)')
+    .requiredOption('--out-name <stem>', 'Stem of every output file name')
+    .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+    .option('--check', 'Print the request and send nothing')
+    .option('--wait', 'Poll until done or failed')
+    .option('--json', 'Emit JSON')
+    .action(async (templateId: string, caseId: string, o: TemplateRaw) => {
+      try {
+        if (o.check) { console.log(JSON.stringify(buildTemplateBody(templateId, caseId, o, '0x' + '0'.repeat(40), '<signature>'), null, 2)); return; }
+        await parabricksSubmit((w, s) => buildTemplateBody(templateId, caseId, o, w, s), o as any);
+      } catch (e: any) {
+        Logger.error(`pbrun template ${templateId} failed: ${e.message}`);
+        process.exit(1);
+      }
     });
   for (const [tool, meta] of Object.entries(registry.tools)) {
     const cmd = group.command(`${tool} <caseId>`)

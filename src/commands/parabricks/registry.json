@@ -198,6 +198,75 @@
   }
  },
  "schema": "biofs-pbrun-registry/1",
+ "template_sha256": {
+  "germline_wes_v1": "ec77f5814e0a141aaace41acc26e44a6fb325b9abcb15148111920ef02c3e84b",
+  "germline_wgs_v1": "9652c6f3fb8857e158da8f4b723e130ea53fdde8d079b8e4217bfcdca325cdb6"
+ },
+ "templates": {
+  "germline_wes_v1": {
+   "assay": "wes",
+   "flags": {
+    "--fix-mate": true,
+    "--gvcf": true,
+    "--min-base-quality": "10",
+    "--min-mapping-quality": "10",
+    "--normalize-reads": true,
+    "--use-wes-model": true
+   },
+   "frozen": "2026-11-18",
+   "image": "nvcr.io/nvidia/clara/clara-parabricks:4.8.0-1",
+   "image_digest": "sha256:44206e2b522e87370c1107c774f52c5859af9b8f3408aa7232de4bbe3c24953c",
+   "inputs": {
+    "--knownSites": [
+     "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/known-sites/Homo_sapiens_assembly38.dbsnp138.noalt.vcf.gz",
+     "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/known-sites/Homo_sapiens_assembly38.known_indels.noalt.vcf.gz",
+     "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/known-sites/Mills_and_1000G_gold_standard.indels.hg38.noalt.vcf.gz"
+    ]
+   },
+   "kit_flag": "--interval-file",
+   "kits": {
+    "agilent_v8": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/target-intervals/Agilent_SureSelect_V8_S33266436_Regions_hg38.noalt.bed"
+   },
+   "outputs": [
+    "--out-recal-file"
+   ],
+   "platform": "ILLUMINA",
+   "reference": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/reference-genome/human_GRCh38_no_alt_analysis_set.fasta",
+   "rg_id": "library",
+   "status": "manual_run_passed",
+   "tool": "deepvariant_germline"
+  },
+  "germline_wgs_v1": {
+   "assay": "wgs",
+   "flags": {
+    "--fix-mate": true,
+    "--gvcf": true,
+    "--min-base-quality": "10",
+    "--min-mapping-quality": "10",
+    "--normalize-reads": true
+   },
+   "frozen": "2026-11-18",
+   "image": "nvcr.io/nvidia/clara/clara-parabricks:4.8.0-1",
+   "image_digest": "sha256:44206e2b522e87370c1107c774f52c5859af9b8f3408aa7232de4bbe3c24953c",
+   "inputs": {
+    "--knownSites": [
+     "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/known-sites/Homo_sapiens_assembly38.dbsnp138.noalt.vcf.gz",
+     "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/known-sites/Homo_sapiens_assembly38.known_indels.noalt.vcf.gz",
+     "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/known-sites/Mills_and_1000G_gold_standard.indels.hg38.noalt.vcf.gz"
+    ]
+   },
+   "kit_flag": null,
+   "kits": {},
+   "outputs": [
+    "--out-recal-file"
+   ],
+   "platform": "ILLUMINA",
+   "reference": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/reference-genome/human_GRCh38_no_alt_analysis_set.fasta",
+   "rg_id": "library",
+   "status": "untested",
+   "tool": "deepvariant_germline"
+  }
+ },
  "tools": {
   "applybqsr": {
    "align": false,

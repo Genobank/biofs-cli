@@ -2,13 +2,13 @@ import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { registry, REGISTRY_SHA256, buildParabricksBody, registerParabricksCommands, PbrunRaw } from '../src/commands/parabricks';
+import { registry, REGISTRY_SHA256, buildParabricksBody, registerParabricksCommands, PbrunRaw, buildTemplateBody } from '../src/commands/parabricks';
 
 const W = '0x5f5a60EaEf242c0D51A21c703f520347b96Ed19a';
 const bc = (type: string, name: string) => `biocid://genobank/${W}/${type}/${name}`;
 const SIG = '0xsig';
 const NODE_REGISTRY = path.join(__dirname, '..', '..', 'biofs-node-sync-20261107', 'repo', 'neoantigen', 'pbrun_registry.json');
-const EXPECTED_SHA = '98962ec8c8abbc6eb371ca8ed10fdaea702bc5f179eaf7052c216484055c35ea';     // 18 November 2026: hg38_noalt known sites and capture design by biocid (restricted to the no-alt contigs), MD5-pinned
+const EXPECTED_SHA = 'dd4b796f3e12d121509a6e17d4458c33d4be50128ec963cc2485229c6f099fb2';     // 18 November 2026: frozen run templates germline_wes_v1 and germline_wgs_v1 operated by biofs-node
 
 function program(): Command {
   const p = new Command();
@@ -45,10 +45,10 @@ describe('the registry the CLI carries', () => {
 });
 
 describe('commands', () => {
-  test('one command per tool plus list, logs and status', () => {
+  test('one command per tool plus list, logs, status, templates and template', () => {
     const group = program().commands.find((c) => c.name() === 'pbrun')!;
     const names = group.commands.map((c) => c.name()).sort();
-    expect(names).toEqual([...Object.keys(registry.tools), 'list', 'logs', 'status'].sort());
+    expect(names).toEqual([...Object.keys(registry.tools), 'list', 'logs', 'status', 'templates', 'template'].sort());
   });
   test('no tool option collides with an option biofs adds', () => {
     expect(() => program()).not.toThrow();
@@ -250,5 +250,37 @@ describe('reference datasets by biocid (17 November 2026)', () => {
     expect(body.inputs['--knownSites']).toEqual(KS);
     expect(body.inputs['--interval-file']).toEqual([BED]);
     expect(body.flags).toEqual({ '--use-wes-model': true, '--normalize-reads': true, '--min-mapping-quality': '10', '--min-base-quality': '10', '--gvcf': true, '--fix-mate': true });
+  });
+});
+
+describe('pbrun template: the node operates a frozen template; the CLI sends only the per-run fields', () => {
+  const fq = (n: number, r: number) => `biocid://augenomics/0x${'a'.repeat(40)}/fastq/x${n}${r}/S${n}_R${r}.fastq.gz`;
+  const raw = { inFq: [fq(1, 1), fq(1, 2)], sampleName: 'SAMPLE1', library: 'LIB1', kit: 'agilent_v8', outName: 'C1_LIB1_germline' };
+  it('carries the template id, the FASTQ pairs, the names, the kit, the stem and the owner, and never a flag, a reference or an image', () => {
+    const b = buildTemplateBody('germline_wes_v1', 'C1', raw, W, SIG);
+    expect(b).toEqual({ wallet: W, signature: SIG, case_id: 'C1', executor: 'worker', registry_sha256: REGISTRY_SHA256, template: 'germline_wes_v1', in_fq: [[fq(1, 1), fq(1, 2)]],
+      sample_name: 'SAMPLE1', library: 'LIB1', out_name: 'C1_LIB1_germline', kit: 'agilent_v8' });
+    for (const k of ['flags', 'inputs', 'reference', 'tool', 'outputs', 'image']) expect(b).not.toHaveProperty(k);
+    expect(buildTemplateBody('germline_wes_v1', 'C1', { ...raw, owner: '0x' + 'b'.repeat(40) }, W, SIG).wallet).toBe('0x' + 'b'.repeat(40));
+  });
+  it('pairs lanes, takes one library per pair, and refuses what the template refuses', () => {
+    const b = buildTemplateBody('germline_wes_v1', 'C1', { ...raw, inFq: [fq(1, 1), fq(1, 2), fq(2, 1), fq(2, 2)], libraryPerPair: ['LIB1', 'LIB2'] }, W, SIG);
+    expect(b.in_fq).toEqual([[fq(1, 1), fq(1, 2)], [fq(2, 1), fq(2, 2)]]);
+    expect(b.pair_libraries).toEqual(['LIB1', 'LIB2']);
+    expect(() => buildTemplateBody('germline_wes_v1', 'C1', { ...raw, kit: undefined }, W, SIG)).toThrow(/agilent_v8/);
+    expect(() => buildTemplateBody('germline_wgs_v1', 'C1', raw, W, SIG)).toThrow(/no capture kit/);
+    expect(buildTemplateBody('germline_wgs_v1', 'C1', { ...raw, kit: undefined }, W, SIG)).not.toHaveProperty('kit');
+    expect(() => buildTemplateBody('germline_wes_v9', 'C1', raw, W, SIG)).toThrow(/unknown template/);
+    expect(() => buildTemplateBody('germline_wes_v1', 'C1', { ...raw, inFq: [fq(1, 1)] }, W, SIG)).toThrow(/two mates/);
+    expect(() => buildTemplateBody('germline_wes_v1', 'C1', { ...raw, inFq: ['gs://b/R1.fastq.gz', 'gs://b/R2.fastq.gz'] }, W, SIG)).toThrow(/not a biocid/);
+    expect(() => buildTemplateBody('germline_wes_v1', 'Maria Lopez', raw, W, SIG)).toThrow(/case identifier/);
+    expect(() => buildTemplateBody('germline_wes_v1', 'C1', { ...raw, libraryPerPair: ['A', 'B'] }, W, SIG)).toThrow(/library-per-pair/);
+  });
+  it('the catalog this CLI carries holds the two frozen templates with their pins', () => {
+    expect(Object.keys(registry.templates || {}).sort()).toEqual(['germline_wes_v1', 'germline_wgs_v1']);
+    const t = registry.templates!.germline_wes_v1;
+    expect(t.image_digest).toBe('sha256:44206e2b522e87370c1107c774f52c5859af9b8f3408aa7232de4bbe3c24953c');
+    expect(Object.keys(t.flags).sort()).toEqual(['--fix-mate', '--gvcf', '--min-base-quality', '--min-mapping-quality', '--normalize-reads', '--use-wes-model']);
+    expect(t.inputs['--knownSites'].every((b) => b.includes('.noalt.'))).toBe(true);
   });
 });
