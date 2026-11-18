@@ -144,6 +144,10 @@ import { jobsCommand, jobLogCommand, JobsOptions, JobLogOptions } from './comman
 import { inventoryListCommand, InventoryListOptions } from './commands/inventory-list';
 import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, captureSubmitCommand, CaptureOptions, acmgSubmitCommand, AcmgOptions, refIndexSubmitCommand, RefIndexOptions, vcfCompareSubmitCommand, VcfCompareOptions, windowsSubmitCommand, WindowsOptions, rescoreSubmitCommand, RescoreOptions, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
+import { neoantigenFabricateCommand, NeoantigenFabricateOptions } from './commands/neoantigen/fabricate';
+import { neoantigenStatusCommand as neoantigenSomaticStatusCommand } from './commands/neoantigen/status';
+import { neoantigenIngestCommand, NeoantigenIngestOptions } from './commands/neoantigen/ingest';
+import { neoantigenAlignCommand, NeoantigenAlignOptions } from './commands/neoantigen/align';
 import { pbsvSubmitCommand, PbsvSubmitOptions } from './commands/pbsv/submit';
 import { pbsvExecCommand, PbsvExecOptions } from './commands/pbsv/exec';
 import { repeatGenotypeSubmitCommand, RepeatGenotypeSubmitOptions } from './commands/repeat-genotype/submit';
@@ -2898,6 +2902,63 @@ hifiAlignCmd
   .action(async (options: HifiAlignExecOptions) => {
     try { await hifiAlignExecCommand(options); }
     catch (error) { Logger.error(`hifi-align exec failed: ${error}`); process.exit(1); }
+  });
+
+// ---- neoantigen cassette fabrication + PacBio cassette align ----
+const neoantigenCmd = program
+  .command('neoantigen')
+  .description('Personalized neoantigen cassette fabricate (cevumeran-style) + PacBio cassette QC align');
+
+neoantigenCmd
+  .command('fabricate-cassette <serial>')
+  .description('Fabricate ranked neoantigen cassette FASTA from cancer-map BioCIDs (consensus binders)')
+  .option('--top <n>', 'Top N epitopes to rank (default 16)', '16')
+  .option('--cassette-min <n>', 'Min CD8 epitopes in cassette (default 4)', '4')
+  .option('--cassette-max <n>', 'Max CD8 epitopes in cassette (default 8)', '8')
+  .option('--linker <type>', 'Linker: GPGPG|AAY|GGGGS|EAAAK', 'GPGPG')
+  .option('--binders <list>', 'Comma binders: mhcflurry,netmhcpan,curated', 'mhcflurry,netmhcpan,curated')
+  .option('--mode <mode>', 'fabricate|sim', 'fabricate')
+  .option('--skip-gcs-vcf', 'Curated peptides only (fast smoke)')
+  .option('--wait', 'Poll until job completes')
+  .option('--json', 'JSON output')
+  .option('--quiet', 'Quiet')
+  .action(async (serial: string, options: NeoantigenFabricateOptions) => {
+    try { await neoantigenFabricateCommand(serial, options); }
+    catch (error) { Logger.error(`neoantigen fabricate-cassette failed: ${error}`); process.exit(1); }
+  });
+
+neoantigenCmd
+  .command('status <jobId>')
+  .description('Poll cassette fabricate job status')
+  .option('--json', 'JSON output')
+  .action(async (jobId: string, options: { json?: boolean }) => {
+    try { await neoantigenSomaticStatusCommand(jobId, options); }
+    catch (error) { Logger.error(`neoantigen status failed: ${error}`); process.exit(1); }
+  });
+
+neoantigenCmd
+  .command('ingest-reads <source>')
+  .description('Prepare PacBio FASTQ/FASTA biocid for cassette alignment (no laptop bulk genomics)')
+  .option('--serial <serial>', 'Biosample / case serial')
+  .option('--json', 'JSON output')
+  .option('--quiet', 'Quiet')
+  .action(async (source: string, options: NeoantigenIngestOptions) => {
+    try { await neoantigenIngestCommand(source, options); }
+    catch (error) { Logger.error(`neoantigen ingest-reads failed: ${error}`); process.exit(1); }
+  });
+
+neoantigenCmd
+  .command('align-cassette')
+  .description('Align PacBio HiFi reads to fabricated mrna-construct cassette FASTA')
+  .requiredOption('--reads <biocid>', 'Reads biocid (PacBio FASTQ/FASTA)')
+  .requiredOption('--cassette <biocid>', 'mrna-construct cassette biocid')
+  .option('--decoy <ref>', 'Optional decoy fasta gs:// or name')
+  .option('--wait', 'Poll until done')
+  .option('--json', 'JSON output')
+  .option('--quiet', 'Quiet')
+  .action(async (options: NeoantigenAlignOptions) => {
+    try { await neoantigenAlignCommand(options); }
+    catch (error) { Logger.error(`neoantigen align-cassette failed: ${error}`); process.exit(1); }
   });
 
 // ---- downstream verbs the hifi-align keystone unblocks (M3/M4/M5/M9) ----
