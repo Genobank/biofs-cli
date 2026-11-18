@@ -1,0 +1,23 @@
+{
+  "schema": "genobank.protein-impact.domains/v1",
+  "source": "CATH domain boundaries of PDB 3FCS (PDBe mappings retrieved 2026-10-21; author numbering is the mature chain) converted to HGVS precursor numbering (ITGA2B +31, ITGB3 +26); signal, ectodomain end, transmembrane and cytoplasmic limits from UniProt 2026_03",
+  "genes": {
+    "ITGA2B": [
+      { "domain": "propeller", "start": 32, "end": 482 },
+      { "domain": "thigh", "start": 483, "end": 636 },
+      { "domain": "calf", "start": 637, "end": 993 },
+      { "domain": "tm", "start": 994, "end": 1019 },
+      { "domain": "cytoplasmic", "start": 1020, "end": 1039 }
+    ],
+    "ITGB3": [
+      { "domain": "PSI", "start": 27, "end": 77 },
+      { "domain": "hybrid", "start": 78, "end": 134 },
+      { "domain": "betaI", "start": 135, "end": 378 },
+      { "domain": "hybrid", "start": 379, "end": 459 },
+      { "domain": "EGF", "start": 460, "end": 630 },
+      { "domain": "tail", "start": 631, "end": 718 },
+      { "domain": "tm", "start": 719, "end": 741 },
+      { "domain": "cytoplasmic", "start": 742, "end": 788 }
+    ]
+  }
+}

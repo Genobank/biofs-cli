@@ -1,0 +1,53 @@
+{
+  "schema": "genobank.protein-impact.tools-lock/v1",
+  "locked_on": null,
+  "images": {
+    "plm": {
+      "name": "protein-impact-plm",
+      "digest": null,
+      "layers": [
+        "plm"
+      ]
+    },
+    "struct": {
+      "name": "protein-impact-struct",
+      "digest": null,
+      "layers": [
+        "structure"
+      ]
+    },
+    "fold": {
+      "name": "protein-impact-fold",
+      "digest": null,
+      "layers": [
+        "complex",
+        "probe"
+      ]
+    },
+    "md": {
+      "name": "protein-impact-md",
+      "digest": null,
+      "layers": [
+        "md"
+      ]
+    }
+  },
+  "models": {
+    "esm2_650m": {
+      "hf_repo": "facebook/esm2_t33_650M_UR50D",
+      "revision": null,
+      "license": "MIT (model card, checked 2026-10-21; re-check when locking)"
+    },
+    "esmc_600m": {
+      "hf_repo": "EvolutionaryScale/esmc-600m-2024-12",
+      "revision": null,
+      "license": "verify the model card terms when locking"
+    }
+  },
+  "structures": [],
+  "layer_models": {
+    "plm": [
+      "esm2_650m"
+    ]
+  }
+}

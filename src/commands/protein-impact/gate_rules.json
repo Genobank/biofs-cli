@@ -1,0 +1,10 @@
+{
+  "schema": "genobank.protein-impact.gate-rules/v1",
+  "min_pos": 20,
+  "min_neg": 20,
+  "min_auroc_lower_ci": 0.75,
+  "min_margin_over_best_baseline": 0.03,
+  "min_domain_auroc": { "propeller": 0.7, "calf": 0.7 },
+  "min_domain_n": { "pos": 5, "neg": 5 },
+  "shuffled_label_ci_must_include": 0.5
+}
