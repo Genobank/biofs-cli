@@ -86,7 +86,7 @@ export async function verifyLab(wallet: string): Promise<void> {
     console.log(chalk.cyan('\nNetwork:'));
     console.log(chalk.gray('  Network:'), chalk.white('Sequentia L1'));
     console.log(chalk.gray('  Chain ID:'), chalk.white('15132025'));
-    console.log(chalk.gray('  RPC:'), chalk.white('http://52.90.163.112:8545'));
+    console.log(chalk.gray('  RPC:'), chalk.white(process.env.SEQUENTIA_RPC_URL || 'https://seqrpc.genobank.app'));
 
   } catch (error: any) {
     spinner.fail('Verification failed');

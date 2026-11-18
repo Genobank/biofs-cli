@@ -1,0 +1,7 @@
+Registered 2026-11-05 before the second RIDER analysis was run (the shipped-definition RIDER numbers were already known:
+standard against lung kernel +17.3 percent median in the 4 mm core, 5 mm against 1.25 mm +12.4 percent).
+Candidate: aerated-lung mass in the 4 mm core with every voxel counted and density capped at +300 HU (core4_cap300), blur-invariant by
+construction. Found on three Siemens scans of one patient; tested here on six GE patients it has not seen.
+Success, all of: median kernel effect (standard against lung, 1.25 mm) within 3 percent in absolute value, median effect of 5 mm against
+1.25 mm (lung kernel) within 3 percent in absolute value, and the largest single-patient kernel effect within 6 percent.
+Failure of any part means the candidate does not remove the reconstruction dependence and is not adopted.

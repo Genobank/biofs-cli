@@ -65,7 +65,7 @@ const TM_REGIONS: Record<string, [number, number]> = {
 };
 
 export interface FourierScoreOptions {
-  window?: string;        // override N for non-TM windows (default 31)
+  window?: string;        // override N for non-TM windows (default 31, or 3×f_c period when consensus exists)
   windowTm?: string;      // override N for TM windows (default 51)
   uniprot?: string;       // override UniProt accession (single-variant mode)
   format?: string;        // table | tsv | json
@@ -73,6 +73,8 @@ export interface FourierScoreOptions {
   plot?: string;          // path to write |ΔF| windowed-spectrum PNG (one panel per variant)
   consensusFc?: boolean;  // also compute full-protein DFT at consensus f_c (requires `biofs rrm-consensus` cache)
   plotFull?: string;      // path to write full-protein |X(k)| spectrum PNG with f_c annotated
+  nullModel?: boolean;    // rank this alt among the 19 amino acids at the same site
+  encoding?: string;      // eiip (default) or piezo (side-chain dipole)
   quiet?: boolean;
 }
 
@@ -83,25 +85,61 @@ interface ParsedHGVS {
   ref: string;
   alt: string;
   original: string;
+  kind: 'missense' | 'truncation';
 }
 
 function parseHgvs(s: string, fallbackUniprot?: string): ParsedHGVS {
-  // Accept any of:
-  //   ITGA2B:p.Val779Ala
-  //   ITGA2B p.Val779Ala
-  //   ITGA2B:Val779Ala
-  //   p.Val779Ala  (gene from --uniprot)
-  const m = s.match(/^(?:([A-Za-z][A-Za-z0-9-]*)[:\s]+)?(?:p\.)?([A-Z][a-z]{2})(\d+)([A-Z][a-z]{2})$/);
-  if (!m) throw new Error(`Cannot parse "${s}". Use ITGA2B:p.Val779Ala`);
-  const [, geneRaw, ref3, posStr, alt3] = m;
-  const ref = AA_3_TO_1[ref3];
-  const alt = AA_3_TO_1[alt3];
-  if (!ref || !alt) throw new Error(`Unknown amino acid 3-letter code in "${s}"`);
+  // Accept:
+  //   BUB1B:p.Asn1002Lys   BUB1B:p.N1002K
+  //   BUB1B:p.Leu737Ter    BUB1B:p.Leu737*    BUB1B:p.L737*
+  const raw = s.trim();
+  const m3 = raw.match(/^(?:([A-Za-z][A-Za-z0-9-]*)[:\s]+)?(?:p\.)?([A-Z][a-z]{2})(\d+)([A-Z][a-z]{2}|\*|Ter|Stop)$/);
+  const m1 = raw.match(/^(?:([A-Za-z][A-Za-z0-9-]*)[:\s]+)?(?:p\.)?([A-Z*])(\d+)([A-Z*])$/);
+  let geneRaw: string | undefined;
+  let ref = '';
+  let alt = '';
+  let pos = 0;
+  if (m3) {
+    geneRaw = m3[1];
+    pos = parseInt(m3[3], 10);
+    ref = AA_3_TO_1[m3[2]] || '';
+    const a = m3[4];
+    alt = AA_3_TO_1[a] || ((a === '*' || a === 'Ter' || a === 'Stop') ? '*' : '');
+  } else if (m1) {
+    geneRaw = m1[1];
+    ref = m1[2] === '*' ? '*' : m1[2];
+    pos = parseInt(m1[3], 10);
+    alt = m1[4] === '*' ? '*' : m1[4];
+  } else {
+    throw new Error(`Cannot parse "${s}". Use BUB1B:p.Asn1002Lys or BUB1B:p.Leu737Ter`);
+  }
+  if (!ref) throw new Error(`Unknown amino acid in "${s}"`);
   const gene = geneRaw ? geneRaw.toUpperCase() : null;
   let uniprot: string | null = null;
   if (gene && GENE_TO_UNIPROT[gene]) uniprot = GENE_TO_UNIPROT[gene];
   else if (fallbackUniprot) uniprot = fallbackUniprot;
-  return { gene, uniprot, pos: parseInt(posStr, 10), ref, alt, original: s };
+  const kind: 'missense' | 'truncation' = alt === '*' ? 'truncation' : 'missense';
+  return { gene, uniprot, pos, ref, alt, original: s, kind };
+}
+
+function rrmFftPy(): string {
+  return path.join(__dirname, '..', 'lib', 'rrm_fft.py');
+}
+
+function runRrmFft(payload: Record<string, unknown>): any {
+  const py = rrmFftPy();
+  if (!fs.existsSync(py)) {
+    throw new Error(`rrm_fft.py missing at ${py} (rebuild biofs-cli so dist/lib/rrm_fft.py is copied)`);
+  }
+  const r = spawnSync('python3', [py], {
+    encoding: 'utf8',
+    input: JSON.stringify(payload),
+    maxBuffer: 20 * 1024 * 1024,
+  });
+  if (r.status !== 0) {
+    throw new Error(`rrm_fft failed: ${r.stderr || r.stdout}`);
+  }
+  return JSON.parse(r.stdout);
 }
 
 function fetchUniprotFasta(uniprot: string): string {
@@ -232,6 +270,22 @@ interface ScoreRow {
   deltaVectorDetrended: number[];
   wtSeq: string;
   mtSeq: string;
+  kind?: 'missense' | 'truncation';
+  fourierCall?: string;
+  fcAlignment?: number;
+  fcAlignmentCall?: string;
+  nativeFcRatio?: number;
+  truncationFcRatio?: number;
+  truncationLost?: number;
+  eiipNormalizedResidual?: number;
+  windowReason?: string;
+  nullWindowPercentile?: number;
+  nullDestructivePercentile?: number;
+  refIsEiipSilent?: boolean;
+  encoding?: string;
+  waveletL1?: number;
+  waveletMaxDelta?: number;
+  waveletArgmaxScale?: number;
   // Full-protein f_c scoring (Cosic's canonical RRM metric, only set when --consensus-fc)
   fcBin?: number;
   fcFreqNormalized?: number;
@@ -254,17 +308,6 @@ interface ConsensusCache {
   common_length: number;
   consensus_peak_bins: Array<{ bin: number; freq_normalized: number; magnitude: number }>;
   signal_to_noise_ratio: number;
-}
-
-function loadConsensus(gene: string): ConsensusCache {
-  const cachePath = path.join(os.homedir(), '.biofs', 'cache', 'rrm', `${gene}.json`);
-  if (!fs.existsSync(cachePath)) {
-    throw new Error(
-      `No consensus f_c cached for ${gene}. Run first: biofs rrm-consensus ${gene}\n` +
-      `(expected at ${cachePath})`
-    );
-  }
-  return JSON.parse(fs.readFileSync(cachePath, 'utf8'));
 }
 
 interface FullProteinFftResult {
@@ -401,9 +444,42 @@ print(json.dumps(out))
   return JSON.parse(r.stdout);
 }
 
+function fcUsable(cons: ConsensusCache, encoding: string): boolean {
+  const band = (cons as ConsensusCache & { fc_band?: string }).fc_band;
+  if (band === 'helical_artifact' || band === 'argmax_fallback') return false;
+  const p = cons.characteristic_frequency_period_aa;
+  if (!p || p <= 0) return false;
+  // Cosic EIIP functional periods are 8-80 aa. Piezo dipole peaks can sit
+  // at domain scale (>80 aa); still reject helix pitch (<8 aa).
+  if (p < 8) return false;
+  if (encoding === 'eiip' && p > 80) return false;
+  return true;
+}
+
+function loadConsensus(gene: string, encoding: string): { cons: ConsensusCache; cacheKind: 'psm' | 'rrm' } | null {
+  const home = os.homedir();
+  const psmPath = path.join(home, '.biofs', 'cache', 'psm', `${gene}.json`);
+  const rrmPath = path.join(home, '.biofs', 'cache', 'rrm', `${gene}.json`);
+  if (encoding === 'piezo' && fs.existsSync(psmPath)) {
+    const psm: ConsensusCache = JSON.parse(fs.readFileSync(psmPath, 'utf8'));
+    if (fcUsable(psm, 'piezo')) return { cons: psm, cacheKind: 'psm' };
+  }
+  if (fs.existsSync(rrmPath)) {
+    const rrm: ConsensusCache = JSON.parse(fs.readFileSync(rrmPath, 'utf8'));
+    if (fcUsable(rrm, encoding === 'piezo' ? 'piezo' : 'eiip')) {
+      return { cons: rrm, cacheKind: 'rrm' };
+    }
+  }
+  return null;
+}
+
 function scoreOne(parsed: ParsedHGVS, opts: FourierScoreOptions): ScoreRow {
   if (!parsed.uniprot) {
     throw new Error(`No UniProt accession for "${parsed.original}". Pass --uniprot.`);
+  }
+  const encoding = (opts.encoding || 'eiip').toLowerCase();
+  if (encoding !== 'eiip' && encoding !== 'piezo') {
+    throw new Error(`--encoding must be eiip or piezo, got ${encoding}`);
   }
   const fasta = fetchUniprotFasta(parsed.uniprot);
   const seq = fastaSequence(fasta);
@@ -411,117 +487,125 @@ function scoreOne(parsed: ParsedHGVS, opts: FourierScoreOptions): ScoreRow {
     throw new Error(`Position ${parsed.pos} out of range for ${parsed.uniprot} (length ${seq.length})`);
   }
   const observedRef = seq[parsed.pos - 1];
-  if (observedRef !== parsed.ref) {
+  if (parsed.ref !== '*' && observedRef !== parsed.ref) {
     throw new Error(
       `Reference mismatch at ${parsed.uniprot}:${parsed.pos} — sequence has "${observedRef}", HGVS expects "${parsed.ref}"`
     );
   }
 
   const inTm = isInTmRegion(parsed.gene, parsed.pos);
-  const defaultN = inTm ? 51 : 31;
+  let cons: ConsensusCache | null = null;
+  if (parsed.gene) {
+    const loaded = loadConsensus(parsed.gene, encoding);
+    if (loaded) {
+      cons = loaded.cons;
+      if (encoding === 'piezo' && loaded.cacheKind === 'rrm') {
+        process.stderr.write(
+          `note: no PSM cache for ${parsed.gene}; scoring piezo at EIIP family f_c (run biofs psm-consensus ${parsed.gene})\n`
+        );
+      }
+    } else if (opts.consensusFc) {
+      const verb = encoding === 'piezo' ? 'psm-consensus' : 'rrm-consensus';
+      throw new Error(
+        `No consensus f_c cached for ${parsed.gene}. Run first: biofs ${verb} ${parsed.gene}`
+      );
+    }
+  } else if (opts.consensusFc) {
+    throw new Error(`--consensus-fc requires a gene name in the HGVS (e.g. BUB1B:p.Asn1002Lys)`);
+  }
+
+  const period = cons?.characteristic_frequency_period_aa;
+  const defaultN = inTm ? 51 : (period && period > 0 ? (Math.round(3 * period) | 1) : 31);
   const Nstr = inTm ? opts.windowTm : opts.window;
-  const N = Nstr ? parseInt(Nstr, 10) : defaultN;
+  const N = Nstr ? parseInt(Nstr, 10) : Math.min(201, Math.max(31, defaultN % 2 === 0 ? defaultN + 1 : defaultN));
   if (N < 5 || N > 201 || N % 2 === 0) {
     throw new Error(`Window N must be odd and 5≤N≤201, got ${N}`);
   }
 
-  const wtSeq = extractWindow(seq, parsed.pos, N);
-  const mtSeq = wtSeq.slice(0, Math.floor(N / 2)) + parsed.alt + wtSeq.slice(Math.floor(N / 2) + 1);
-  const wtVec = toEIIPVector(wtSeq);
-  const mtVec = toEIIPVector(mtSeq);
-  const fft = computeFft(wtVec, mtVec);
+  const core = runRrmFft({
+    op: 'score',
+    sequence: seq,
+    pos: parsed.pos,
+    ref: parsed.ref === '*' ? observedRef : parsed.ref,
+    alt: parsed.alt,
+    kind: parsed.kind,
+    gene: parsed.gene,
+    variant: parsed.original,
+    fc_freq: cons?.characteristic_frequency_normalized,
+    fc_period: period,
+    window: N,
+    null_model: !!opts.nullModel,
+    encoding,
+  });
+  if (core.error) throw new Error(String(core.error));
 
+  const wtSeq = core.wt_window || extractWindow(seq, parsed.pos, N);
+  const mtSeq = core.mt_window || wtSeq;
   const row: ScoreRow = {
     variant: parsed.original,
     gene: parsed.gene,
     pos: parsed.pos,
-    ref: parsed.ref,
+    ref: parsed.ref === '*' ? observedRef : parsed.ref,
     alt: parsed.alt,
-    windowSize: N,
-    domainHint: inTm ? 'transmembrane' : 'extracellular',
-    refEIIP: EIIP[parsed.ref] ?? 0,
-    altEIIP: EIIP[parsed.alt] ?? 0,
-    deltaEIIP: Math.abs((EIIP[parsed.ref] ?? 0) - (EIIP[parsed.alt] ?? 0)),
-    sumAbsDeltaF: fft.sumAbsDelta,
-    sumAbsDeltaFNoDc: fft.sumAbsDeltaNoDc,
-    sumAbsDeltaFDetrended: fft.sumAbsDeltaDetrended,
-    maxAbsDeltaF: fft.maxAbsDelta,
-    maxBin: fft.maxAbsDeltaBin,
-    maxAbsDeltaFNoDc: fft.maxAbsDeltaNoDc,
-    maxBinNoDc: fft.maxAbsDeltaBinNoDc,
-    k0Delta: fft.k0Delta,
-    energyChangeRatio: fft.energyChangeRatio,
-    deltaVector: fft.deltaMag,
-    deltaVectorDetrended: fft.deltaMagDetrended,
+    windowSize: core.window || N,
+    domainHint: parsed.kind === 'truncation' ? 'truncation' : (inTm ? 'transmembrane' : (cons ? 'fc-window' : 'local')),
+    refEIIP: EIIP[observedRef] ?? 0,
+    altEIIP: parsed.alt === '*' ? 0 : (EIIP[parsed.alt] ?? 0),
+    deltaEIIP: core.delta_eiip ?? Math.abs((EIIP[observedRef] ?? 0) - (EIIP[parsed.alt] ?? 0)),
+    sumAbsDeltaF: core.window_sum_abs_delta ?? 0,
+    sumAbsDeltaFNoDc: core.window_sum_abs_delta_nodc ?? 0,
+    sumAbsDeltaFDetrended: core.window_sum_abs_delta_detrended ?? 0,
+    maxAbsDeltaF: core.window_max_abs_delta_nodc ?? 0,
+    maxBin: core.window_max_bin_nodc ?? 0,
+    maxAbsDeltaFNoDc: core.window_max_abs_delta_nodc ?? 0,
+    maxBinNoDc: core.window_max_bin_nodc ?? 0,
+    k0Delta: core.window_k0_delta ?? 0,
+    energyChangeRatio: core.window_energy_change_ratio ?? (core.energy_ratio ? core.energy_ratio - 1 : 0),
+    deltaVector: [],
+    deltaVectorDetrended: [],
     wtSeq,
     mtSeq,
+    kind: parsed.kind,
+    fourierCall: core.fourier_call || core.call,
+    fcAlignment: core.fc?.alignment,
+    fcAlignmentCall: core.fc?.call,
+    nativeFcRatio: core.native_fc_ratio,
+    truncationFcRatio: core.fc_ratio,
+    truncationLost: core.lost_residues,
+    eiipNormalizedResidual: core.eiip_normalized_residual,
+    windowReason: core.window_reason,
+    nullWindowPercentile: core.null_model?.windowed_dF_percentile,
+    nullDestructivePercentile: core.null_model?.destructive_percentile,
+    refIsEiipSilent: core.ref_is_eiip_silent ?? core.fc?.ref_is_eiip_silent,
+    encoding,
+    waveletL1: core.wavelet?.l1,
+    waveletMaxDelta: core.wavelet?.max_delta,
+    waveletArgmaxScale: core.wavelet?.argmax_scale,
   };
 
-  // Cosic RRM canonical scoring at the family characteristic frequency
-  // (with multi-peak + full-spectrum integrated metrics).
-  if (opts.consensusFc) {
-    if (!parsed.gene) {
-      throw new Error(`--consensus-fc requires a gene name in the HGVS (e.g. ITGA2B:p.Val779Ala)`);
-    }
-    const cons = loadConsensus(parsed.gene);
-    const consensusSpectrum: number[] | undefined = (cons as any).consensus_spectrum;
-    // Surface the top consensus peaks as scoring sites. If the cached file
-    // only has one (strict 3σ threshold filtered the rest), augment by
-    // walking the full consensus spectrum and grabbing the top-10 bins.
-    let peaksWithSnr = (cons.consensus_peak_bins || []).map(p => ({
-      bin: p.bin,
-      freq_normalized: p.freq_normalized,
-      magnitude: p.magnitude,
-      snr: 0,
-    }));
-    if (peaksWithSnr.length < 10 && consensusSpectrum) {
-      const ranked = consensusSpectrum
-        .map((m, k) => ({ k, m }))
-        .filter(({ k }) => k >= 2)
-        .sort((a, b) => b.m - a.m)
-        .slice(0, 10);
-      const N = consensusSpectrum.length;
-      const median = ((arr: number[]) => {
-        const s = [...arr].sort((a, b) => a - b);
-        return s.length % 2 === 0 ? (s[s.length / 2 - 1] + s[s.length / 2]) / 2 : s[(s.length - 1) / 2];
-      })(consensusSpectrum);
-      const mean = consensusSpectrum.reduce((a, b) => a + b, 0) / consensusSpectrum.length;
-      const sd = Math.sqrt(consensusSpectrum.reduce((a, b) => a + (b - mean) ** 2, 0) / consensusSpectrum.length);
-      peaksWithSnr = ranked.map(({ k, m }) => ({
-        bin: k,
-        freq_normalized: k / (2 * (N - 1)),
-        magnitude: m,
-        snr: (m - median) / (sd + 1e-12),
-      }));
-    }
-
-    // Build the full mutant sequence by swapping the one residue at parsed.pos.
-    const mtFull = seq.slice(0, parsed.pos - 1) + parsed.alt + seq.slice(parsed.pos);
-    const full = computeFullProteinFft(
-      seq,
-      mtFull,
-      cons.characteristic_frequency_normalized,
-      cons.common_length,
-      peaksWithSnr,
-      consensusSpectrum,
-    );
-
-    row.fcBin = full.fcBinInProteinSpectrum;
+  // Native-length f_c metrics from rrm_fft.py (not L1-normalized full-protein DFT).
+  if (cons) {
+    row.fcBin = cons.characteristic_frequency_bin;
     row.fcFreqNormalized = cons.characteristic_frequency_normalized;
     row.fcPeriodAa = cons.characteristic_frequency_period_aa;
-    row.fullXwtAtFc = full.wtAtFc;
-    row.fullXmtAtFc = full.mtAtFc;
-    row.fcRatio = full.wtAtFc > 0 ? full.mtAtFc / full.wtAtFc : 0;
-    row.fcDelta = full.wtAtFc - full.mtAtFc;
-    row.fcEnergyChangePct = full.wtAtFc > 0
-      ? 100 * (full.mtAtFc * full.mtAtFc - full.wtAtFc * full.wtAtFc) / (full.wtAtFc * full.wtAtFc)
+    row.fullXwtAtFc = core.native_fc_wt_mag ?? core.wt_mag;
+    row.fullXmtAtFc = core.native_fc_mt_mag ?? core.mt_mag;
+    row.fcRatio = parsed.kind === 'truncation' ? core.fc_ratio : core.native_fc_ratio;
+    row.fcDelta = (row.fullXwtAtFc ?? 0) - (row.fullXmtAtFc ?? 0);
+    row.fcEnergyChangePct = row.fullXwtAtFc
+      ? 100 * ((row.fullXmtAtFc ?? 0) ** 2 - row.fullXwtAtFc ** 2) / (row.fullXwtAtFc ** 2)
       : 0;
-    row.fullSpectrumWt = full.wtMag;
-    row.fullSpectrumMt = full.mtMag;
-    (row as any).multiPeakScores = full.multiPeakScores;
-    (row as any).weightedAggregateDeltaEPct = full.weightedAggregateDeltaEPct;
-    (row as any).fullSpectrumL1 = full.fullSpectrumL1;
-    (row as any).totalEnergyChangePct = full.totalEnergyChangePct;
+    if (opts.plotFull && parsed.kind === 'missense' && parsed.alt !== '*') {
+      const mtFull = seq.slice(0, parsed.pos - 1) + parsed.alt + seq.slice(parsed.pos);
+      const full = computeFullProteinFft(
+        seq,
+        mtFull,
+        cons.characteristic_frequency_normalized,
+        seq.length,
+      );
+      row.fullSpectrumWt = full.wtMag;
+      row.fullSpectrumMt = full.mtMag;
+    }
   }
 
   return row;
@@ -563,9 +647,11 @@ function renderFcSection(rows: ScoreRow[]): string {
     );
   }
   lines.push(chalk.magenta(sep));
-  lines.push(chalk.gray('   ratio MT/WT  <0.8 = significant loss of energy at characteristic frequency (LoF signature)'));
-  lines.push(chalk.gray('                ≈1.0 = no perturbation of family-conserved resonance'));
-  lines.push(chalk.gray('                >1.2 = energy gain (rare, may indicate altered specificity)'));
+  lines.push(chalk.gray('   Native-length |X(f_c)| ratio (not L1-normalized). Truncations use remaining chain vs full protein.'));
+  lines.push(chalk.gray('   Missense: phase alignment at f_c is the Cosic call (destructive vs constructive).'));
+  lines.push(chalk.gray('   ratio MT/WT  <0.8 = loss of energy at f_c (typical of truncations that remove a functional domain)'));
+  lines.push(chalk.gray('                ≈1.0 = conserved resonance still present'));
+  lines.push(chalk.gray('                >1.2 = energy gain at f_c'));
 
   // Multi-peak + full-spectrum integrated metrics (Cosic's "informational spectrum distance")
   for (const r of rows) {
@@ -649,8 +735,26 @@ function renderTable(rows: ScoreRow[]): string {
         r.sumAbsDeltaFDetrended.toFixed(4).padEnd(12) +
         (r.energyChangeRatio * 100).toFixed(2) + '%'
     );
-    lines.push(chalk.gray(`    WT: ${r.wtSeq}`));
-    lines.push(chalk.gray(`    MT: ${r.mtSeq}`));
+    if (r.kind === 'truncation') {
+      lines.push(chalk.gray(
+        `    truncation  lost ${r.truncationLost ?? '?'} aa  fc_ratio=${(r.truncationFcRatio ?? r.fcRatio ?? 0).toFixed(3)}  call=${r.fourierCall || ''}`
+      ));
+    } else {
+      const bits = [
+        r.fourierCall ? `call=${r.fourierCall}` : '',
+        r.fcAlignmentCall ? `phase=${r.fcAlignmentCall}` : '',
+        r.fcAlignment !== undefined ? `align=${r.fcAlignment.toFixed(3)}` : '',
+        r.nativeFcRatio !== undefined ? `native_fc_ratio=${r.nativeFcRatio.toFixed(4)}` : '',
+        r.eiipNormalizedResidual !== undefined && r.eiipNormalizedResidual !== null
+          ? `residual=${Number(r.eiipNormalizedResidual).toFixed(2)}` : '',
+        r.refIsEiipSilent ? 'wt_EIIP_silent' : '',
+        r.nullDestructivePercentile !== undefined ? `null_destructive_pctl=${r.nullDestructivePercentile.toFixed(0)}` : '',
+        r.windowReason ? r.windowReason : '',
+      ].filter(Boolean);
+      lines.push(chalk.gray(`    ${bits.join('  ')}`));
+      lines.push(chalk.gray(`    WT: ${r.wtSeq}`));
+      lines.push(chalk.gray(`    MT: ${r.mtSeq}`));
+    }
   }
   lines.push(chalk.cyan(sep));
   lines.push(chalk.gray('   Σ|ΔF|(k≥1)   = total spectral disruption with DC excluded'));
@@ -697,7 +801,7 @@ export async function fourierScoreCommand(variantsArg: string, opts: FourierScor
   const parsed = inputs.map(s => parseHgvs(s, opts.uniprot));
 
   if (!opts.quiet) {
-    console.error(chalk.cyan(`\n🌊 biofs fourier-score — ${parsed.length} variant(s)`));
+    console.error(chalk.cyan(`\n🌊 biofs fourier-score — ${parsed.length} variant(s)  encoding=${(opts.encoding || 'eiip').toLowerCase()}`));
     for (const p of parsed) {
       console.error(
         chalk.gray(`   ${p.original}  →  ${p.gene || '?'} (${p.uniprot || '?'})  pos ${p.pos}  ${p.ref}→${p.alt}`)
@@ -722,7 +826,10 @@ export async function fourierScoreCommand(variantsArg: string, opts: FourierScor
   const fcSection = renderFcSection(rows);
 
   if (opts.output) {
-    fs.writeFileSync(opts.output, (rendered + '\n' + fcSection).replace(/\x1b\[[0-9;]*m/g, ''));
+    const body = fmt === 'json'
+      ? rendered
+      : (rendered + (fcSection ? '\n' + fcSection : '')).replace(/\x1b\[[0-9;]*m/g, '');
+    fs.writeFileSync(opts.output, body.endsWith('\n') ? body : body + '\n');
     if (!opts.quiet) {
       console.error(chalk.green(`✓ Wrote scores for ${rows.length} variant(s) to ${opts.output}`));
     }

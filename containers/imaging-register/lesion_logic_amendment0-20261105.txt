@@ -1,0 +1,16 @@
+Amendment 0 to lesion_logic_criteria-20261105.txt (sha256 0d986a784dbbeaae61fe87ff3d7d197bf25a665e690756fd952b92f5e45cc99c, 2026-11-05T20:46:34Z)
+Written BEFORE any run of the test. Nothing of the test's output had been seen. Date 2026-11-05.
+
+Reason: while writing the harness I applied the code's own internal floor to the scenarios and found my expectations for the smallest
+spheres did not account for it. findings_runner.py sets MIN_LESION_ML = 0.2 (a connected component under 0.2 mL is dropped as speckle
+and never reported, "about 7 mm"). A sphere of diameter d has volume pi d^3 / 6: 6 mm is 0.113 mL (dropped), 8 mm is 0.268 mL (kept
+on a fine grid; on thick slices the voxel count can fall under the floor).
+
+Changes (criteria unchanged otherwise; LK1 to LK5 and P1 to P6 stand as written):
+  S08 expected statuses: stable only. The 6 mm new lesion is under the floor and is expected NOT to be reported. Not graded for category.
+  S12 diameters 4 and 6 mm: expected NOT reported at any spacing (floor). 8 mm: reported or not is recorded per spacing, and LK1 is
+      graded only where it is reported.
+  S14 first case (6 mm -> 7.5 mm): expected "new" (the 6 mm baseline is under the floor, the 7.5 mm follow-up is 0.221 mL and is kept);
+      second case (8 -> 9.5 mm): reported as measured. Not graded.
+  New prediction P7: lesions under about 7.3 mm are invisible in both scans, so a lesion growing from 6 mm to 8 mm is reported as
+      a NEW lesion, not an enlarged one.

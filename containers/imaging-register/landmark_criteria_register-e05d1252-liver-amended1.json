@@ -1,0 +1,57 @@
+{
+  "schema": "imaging-register-landmark-criteria/1",
+  "registered_at_utc": "2026-11-05T22:14:55Z",
+  "job_under_test": "register-e05d1252-b3a6-4fcf-9aec-1765c1f6392b",
+  "status": "Provisional. Set by the engineer before any result of this job was read. Not derived from the literature and not validated against a reference standard. A reader may change them before the results are read, never after.",
+  "proposal": {
+    "region": "liver",
+    "version": 2,
+    "patch_half_mm": 10,
+    "search_half_mm": 30,
+    "ncc_min": 0.5,
+    "margin_min": 0.05,
+    "min_spacing_mm": 12,
+    "per_zone": 12,
+    "min_edge_from_liver_surface_mm": 10,
+    "soft_lo_hu": 0.0,
+    "soft_hi_hu": 300.0,
+    "liver_offset": true,
+    "dog": true,
+    "dog_sigma_small_mm": 1.0,
+    "dog_sigma_large_mm": 6.0,
+    "cycle_max_mm": 2.0,
+    "cycle_search_half_mm": 12
+  },
+  "verification": {
+    "who": "a person who can recognise the same hepatic or portal vein branch point in both scans; a radiologist is preferred",
+    "accept_only_if": "the two points are the same vessel branch point, not a similar-looking texture or another branch",
+    "reject_if": "unsure"
+  },
+  "sufficiency": {
+    "min_verified_per_pair": 20,
+    "min_per_side": 4,
+    "min_lower_third": 4
+  },
+  "pass": {
+    "deformable_median_tre_mm_max": 2.0,
+    "deformable_p90_tre_mm_max": 5.0,
+    "lower_third_median_tre_mm_max": 3.0,
+    "deformable_median_must_beat_rigid_median": true
+  },
+  "reading": "PASS means the registration places liver vessel branch points that a reader confirmed within these distances. It says nothing about the liver surface or about neighbouring organs that sit in different places in the two scans, which is what the label gate measures; it is independent of the labels. Points the algorithm proposed and the reader rejected are reported beside the TRE, and the confirmed points are the easier, well-matched ones.",
+  "amendment": {
+    "amends_file": "landmark_criteria_register-e05d1252-liver.json",
+    "amends_sha256": "f2729b0488dbdedf569f5e81784d9035b5e891131edc8ecc365171caf3c5df5b",
+    "what_was_seen_before_amending": "The first proposal (registered 2026-11-05T21:35:39Z) found 27 candidates in the liver of the Mar 3 reference and matched them in the Jan 9 and Oct 21 scans: 0 of 27 passed the filter for Jan 9 and 2 of 27 for Oct 21, so the review page held 4 cards. Normalised cross-correlation of the best match ranged 0.27 to 0.70 and the best match lay 6 to 61 mm from the rigid prediction. No registration result (TRE) had been computed and no reader had seen a card.",
+    "changed": [
+      "proposal: match on a band-pass copy, move the rigid prediction by the liver's residual centroid offset, forward-backward check, more candidates (12 per zone, 12 mm apart), larger patch (10 mm), search 30 mm, NCC 0.50 and margin 0.05"
+    ],
+    "unchanged": [
+      "verification",
+      "sufficiency",
+      "pass",
+      "reading"
+    ],
+    "limit": "The new proposal settings were chosen from the counts above and the failure of the first set, not from any TRE. They decide which points a reader is shown; they cannot make a registration look better or worse, because the measured points are only those a reader confirms."
+  }
+}

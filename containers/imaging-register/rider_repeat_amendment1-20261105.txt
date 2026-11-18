@@ -1,0 +1,12 @@
+Amendment 1 to rider_repeat_criteria-20261105.txt. Written 2026-11-05T03:36:40Z.
+Made AFTER the first run returned INSUFFICIENT_PAIRS (3 pairs, registered minimum 8), and after reading the series headers (kernel, slice thickness, acquisition time, image type, series number, slice count; no mass, volume or asymmetry value) of 3 of the 5 skipped patients. The headers of the other 2 skipped patients had not been read when this was written. The three pair results of the first run (small differences, none flagged) were seen before this amendment; they come from patients with exactly two lung-kernel 1.25 mm series, which the rule below selects unchanged.
+
+What changed: the definition of a pair only. C1, C2, C3, their thresholds, and the minimum of 8 pairs are unchanged.
+Why: the registered text assumed one lung-kernel 1.25 mm series per scan and two scans per day. The headers show patients scanned 3 times in a day, and some series that are copies of another series (same series number and slice count, another study UID, no acquisition time).
+
+Definition now:
+(a) A scan is one distinct AcquisitionTime within the patient-day. A series without an acquisition time is a copy and is dropped only when a timed series of the same patient-day has the same series number and slice count; otherwise the patient-day is excluded and the reason is reported.
+(b) Each scan must have exactly one lung-kernel 1.25 mm series; otherwise the patient-day is excluded and the reason is reported.
+(c) With 2 or more scans the pair is the two earliest by acquisition time.
+(d) If fewer than 8 pairs result, further patients are downloaded in sorted order by the same candidate rule (at least 4 CT series of 200 to 320 images on one day) and the same definition applies. No patient is chosen or dropped by any mass value.
+The report lists every patient-day with the pair used or the reason it was excluded.

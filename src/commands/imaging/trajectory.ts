@@ -22,6 +22,7 @@ export interface ImagingTrajectoryOptions {
   timepoints?: string;            // JSON [{label,study,series}] or "label:study:series,..." (oldest -> newest)
   anatomy?: string;
   thrHu?: string;
+  registerJob?: string;
   wait?: boolean;
   quiet?: boolean;
   json?: boolean;
@@ -62,7 +63,8 @@ export async function imagingTrajectoryCommand(options: ImagingTrajectoryOptions
       `${BIOFS_NODE_BASE}/submit_imaging_trajectory`,
       { wallet: credentials.wallet_address, signature: credentials.user_signature,
         anatomy: options.anatomy || 'chest', timepoints: tps,
-        thr_hu: options.thrHu ? Number(options.thrHu) : undefined },
+        thr_hu: options.thrHu ? Number(options.thrHu) : undefined,
+        ...(options.registerJob ? { register_job_id: options.registerJob } : {}) },
       { timeout: 120_000, validateStatus: (s) => s < 500 },
     );
     if (submitResp.status >= 400) {

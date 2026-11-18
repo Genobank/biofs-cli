@@ -68,6 +68,9 @@ Researchers admitted to a room can run tele verbs on scoped biocids only.
 
 ## Security
 
-Stream and IGV session URLs embed `user_signature`. Treat HTML/batch files as
-secret capabilities. Revoke the room to cut off new tickets; do not email
-session files.
+`biofs tele igv` does not persist a stream URL by default (the ticket embeds
+`user_signature`). Use `biofs fuse` and open the fused path in IGV, or pass
+`--persist-ticket` only for a file you will not share. Revoke the room to cut
+off new tickets. `biofs tele mosdepth` and `biofs vault mount` refuse to copy
+BAM/VCF bytes onto the laptop unless an explicit `BIOFS_ALLOW_LAPTOP_*` env is
+set.

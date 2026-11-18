@@ -7,6 +7,11 @@
 # Tests: python test_register.py (numpy + scipy only); inside the image,
 #   docker run --rm --entrypoint python -v $PWD:/t:ro imaging-register:latest /t/smoke_ants_api.py
 #   docker run --rm --entrypoint python -v $PWD:/t:ro imaging-register:latest /t/smoke_pair.py
+#   docker run --rm --entrypoint python -v $PWD:/t:ro imaging-register:latest /t/smoke_main.py
 FROM imaging-twin:latest
 COPY register.py /app/register.py
+COPY frame_contract.py /app/frame_contract.py
+COPY lung_volume.py /app/lung_volume.py
+COPY organ_package.py /app/organ_package.py
+COPY organ_package_job.py /app/organ_package_job.py
 ENTRYPOINT ["python", "/app/register.py"]

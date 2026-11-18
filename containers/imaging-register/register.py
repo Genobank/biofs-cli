@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-register.py: GenoBank.io staged 3D CT registration with a quality gate (schema imaging-register/2).
+register.py: GenoBank.io staged 3D CT registration with a quality gate (schema imaging-register/3).
 
 The server-side execution surface that biofs-node dispatches to on the GPU executor for
 `biofs imaging register`. For N >= 2 CT timepoints of one anatomy it produces a common
-reference frame that every later stage (lesion tracking, organ twins, change maps) can
-trust, and it says in numbers how far it can be trusted:
+reference frame and a consumer contract (`frame_contract.py`) that says, per purpose,
+whether a later verb may use that frame. Lesion voxels and HU subtraction stay on a
+rigid grid. Organ volume, organ surface, and the pictures use this frame when the gate
+did not FAIL. Every gated number names the image it was measured on.
 
   stage each series -> read DICOM headers (protocol signature, slice-gap check)
   -> 3D volume -> 1 mm isotropic RAS, HU clamp -> TotalSegmentator (117 structures,
@@ -48,7 +50,38 @@ import os, sys, json, time, glob, shutil, subprocess, argparse, traceback, re
 
 import numpy as np
 
-SCHEMA = "imaging-register/2"
+import lung_volume
+
+SCHEMA = "imaging-register/3"
+# Linear CT resample blends across this band at each piecewise boundary.
+# Label maps stay a hard switch: a voxel keeps one region's label.
+BLEND_MM = 8.0
+# Which image a gated metric was measured on. The skin is the resampled CT outline.
+# Organ and bone numbers are warped TotalSegmentator labels, not a second segmentation
+# of the picture.
+METRIC_SOURCE = {
+    "spine_assd_mm": "warped_totalsegmentator_labels",
+    "spine_hd95_mm": "warped_totalsegmentator_labels",
+    "lung_dice_min": "warped_totalsegmentator_labels",
+    "lung_assd_max_mm": "warped_totalsegmentator_labels",
+    "lung_hd95_max_mm": "warped_totalsegmentator_labels",
+    "abdominal_organ_assd_max_mm": "warped_totalsegmentator_labels",
+    "abdominal_organ_hd95_max_mm": "warped_totalsegmentator_labels",
+    "abdominal_organ_assd_max_mm_corresponding": "warped_totalsegmentator_labels_bowel_excluded",
+    "abdominal_organ_hd95_max_mm_corresponding": "warped_totalsegmentator_labels_bowel_excluded",
+    "body_surface_assd_mm": "resampled_ct_body_outline",
+    "body_surface_hd95_mm": "resampled_ct_body_outline",
+    "jacobian_fold_fraction": "deformation_jacobian",
+    "vertebra_tre_median_mm": "warped_totalsegmentator_labels",
+    "heart_dice": "warped_totalsegmentator_labels",
+    "medium_structure_dice_min": "warped_totalsegmentator_labels",
+    "esophagus_dice": "warped_totalsegmentator_labels",
+    "jacobian_p01": "deformation_jacobian",
+    "jacobian_p99": "deformation_jacobian",
+    "bone_abs_logjac_p95": "deformation_jacobian_inside_vertebra_labels",
+    "dice_median": "warped_totalsegmentator_labels_transitivity",
+    "image_agreement_ncc": "ct_intensity_correlation_no_labels_reported_not_gated",
+}
 
 
 def log(*a):
@@ -78,11 +111,17 @@ GATES = [
     ("deformable", "lung_assd_max_mm", "<=", 1.5, "hard", "worst average surface distance of the two lungs"),
     ("deformable", "lung_hd95_max_mm", "<=", 5.0, "hard",
      "worst 95th percentile surface distance of the two lungs (a diaphragm left at the wrong height fails here; "
-     "so does a real change of lung volume such as an effusion or a collapse)"),
-    ("deformable", "abdominal_organ_assd_max_mm", "<=", 2.0, "soft",
-     "worst average surface distance of liver and spleen (inside the scanned range); a real change of organ shape also raises it"),
-    ("deformable", "abdominal_organ_hd95_max_mm", "<=", 6.0, "soft",
-     "worst 95th percentile surface distance of liver and spleen"),
+     "when the lung volume really changed and the breath does not explain it, the three lung checks read as warnings "
+     "while the spine stays hard)"),
+    ("deformable", "abdominal_organ_assd_max_mm_corresponding", "<=", 2.0, "soft",
+     "worst average surface distance of liver and spleen where the two scans correspond (reference organ surface "
+     "occupied by bowel in the moving scan is left out and reported as abdominal_organ_bowel_interposition_ml; the "
+     "raw distance stays in abdominal_organ_assd_max_mm); a real change of organ shape also raises it"),
+    ("deformable", "abdominal_organ_hd95_max_mm_corresponding", "<=", 6.0, "soft",
+     "worst 95th percentile surface distance of liver and spleen where the two scans correspond"),
+    ("deformable", "body_surface_assd_mm", "<=", 1.5, "soft",
+     "average surface distance of the skin, taken from the body outline of the reference CT and of the CT resampled into its frame; arms and breathing move it"),
+    ("deformable", "body_surface_hd95_mm", "<=", 5.0, "soft", "95th percentile surface distance of the skin"),
     ("deformable", "jacobian_fold_fraction", "<=", 1e-4, "hard",
      "share of voxels where a deformation folds (det J <= 0), lung and body deformations measured separately"),
     ("deformable", "vertebra_tre_median_mm", "<=", 2.0, "soft",
@@ -104,10 +143,10 @@ GATES = [
 # hard on the lungs, an abdominal CT hard on liver and spleen (it holds only the lung bases).
 ANATOMY_HARD = {
     "chest": {"lung_dice_min", "lung_assd_max_mm", "lung_hd95_max_mm"},
-    "abdomen": {"abdominal_organ_assd_max_mm", "abdominal_organ_hd95_max_mm"},
+    "abdomen": {"abdominal_organ_assd_max_mm_corresponding", "abdominal_organ_hd95_max_mm_corresponding"},
 }
 ANATOMY_SOFT = {
-    "chest": {"abdominal_organ_assd_max_mm", "abdominal_organ_hd95_max_mm"},
+    "chest": {"abdominal_organ_assd_max_mm_corresponding", "abdominal_organ_hd95_max_mm_corresponding"},
     "abdomen": {"lung_dice_min", "lung_assd_max_mm", "lung_hd95_max_mm"},
 }
 
@@ -124,20 +163,72 @@ def gates_for(anatomy):
     return out
 
 
-def evaluate_gate(metrics_by_stage, transitivity, gates=None):
+# The lung surface checks. When the lung volume really changed between the two scans, the lungs are not
+# expected to coincide after the warp, so a failure of these reads as a warning (decision of 2026-11-04,
+# audit finding A7). Never when the spine fails, never when the lung evidence is missing.
+LUNG_SURFACE_METRICS = ("lung_dice_min", "lung_assd_max_mm", "lung_hd95_max_mm")
+
+
+def _spine_hard_ok(metrics_by_stage, gates):
+    """True only when every hard spine check was computed and passed."""
+    seen = 0
+    for stage, metric, op, thr, sev, _ in gates:
+        if sev != "hard" or not metric.startswith("spine_"):
+            continue
+        val = (metrics_by_stage.get(stage, {}) or {}).get(metric)
+        if val is None:
+            return False
+        seen += 1
+        if not ((val >= thr) if op == ">=" else (val <= thr) if op == "<=" else (val > thr)):
+            return False
+    return seen > 0
+
+
+def evaluate_gate(metrics_by_stage, transitivity, gates=None, protocol_mode=None, lung_change=None):
     checks, hard_fail, soft_fail = [], [], []
+    downgrade_lungs = bool(lung_change and lung_change.get("computed") and lung_change.get("real_change_supported")
+                           and _spine_hard_ok(metrics_by_stage, gates or GATES))
     for stage, metric, op, thr, sev, meaning in (gates or GATES):
         src = transitivity if stage == "transitivity" else metrics_by_stage.get(stage, {})
         val = (src or {}).get(metric)
+        source = METRIC_SOURCE.get(metric, "unspecified")
         if val is None:
-            checks.append({"stage": stage, "metric": metric, "value": None, "op": op, "threshold": thr,
-                           "severity": sev, "pass": None, "meaning": meaning, "note": "not computed"})
+            # Missing evidence is never a pass. A hard check that could not be computed closes
+            # the verdict (the anatomy chosen for the job says which checks are hard, so a scan
+            # without the structure the job is about cannot come back PASS). A soft check that
+            # could not be computed is listed in the pair's `not_computed` and does not move it.
+            item = {"stage": stage, "metric": metric, "value": None, "op": op, "threshold": thr,
+                    "severity": sev, "pass": None, "meaning": meaning, "measured_on": source,
+                    "note": "not computed"}
+            if sev == "hard":
+                item["incomplete_hard_check"] = True
+                hard_fail.append(f"{stage}.{metric} not computed (hard check, evidence missing)")
+            checks.append(item)
             continue
         ok = (val >= thr) if op == ">=" else (val <= thr) if op == "<=" else (val > thr)
-        checks.append({"stage": stage, "metric": metric, "value": round(float(val), 5), "op": op,
-                       "threshold": thr, "severity": sev, "pass": bool(ok), "meaning": meaning})
+        item = {"stage": stage, "metric": metric, "value": round(float(val), 5), "op": op,
+                "threshold": thr, "severity": sev, "pass": bool(ok), "meaning": meaning,
+                "measured_on": source}
+        note = ""
+        # The 5 mm skin line stays. A cross-protocol pair (arms, field of view, kernel)
+        # is expected to trip it. The warning says so. The threshold does not move.
+        if (not ok) and protocol_mode == "cross" and metric.startswith("body_surface"):
+            item["context"] = "cross_protocol_rim_expected"
+            item["meaning"] = (meaning + " Cross-protocol: arms, field of view, and the reconstruction "
+                               "kernel move this tail. The threshold is unchanged.")
+            note = " [cross-protocol rim expected; threshold unchanged]"
+        if (not ok) and sev == "hard" and metric in LUNG_SURFACE_METRICS and downgrade_lungs:
+            sev = "soft"
+            item["severity"] = "soft"
+            item["downgraded_from"] = "hard"
+            item["context"] = "lung_volume_changed"
+            item["meaning"] = (meaning + " Downgraded to a warning: the lung volume changed between the two scans and the "
+                               "breath does not explain it, so the lungs are not expected to coincide (see lung_volume).")
+            note = " [lung volume changed, not explained by the breath; was a hard check]"
+        checks.append(item)
         if not ok:
-            (hard_fail if sev == "hard" else soft_fail).append(f"{stage}.{metric}={val:.4g} (needs {op} {thr})")
+            (hard_fail if sev == "hard" else soft_fail).append(
+                f"{stage}.{metric}={val:.4g} (needs {op} {thr}){note}")
     verdict = "FAIL" if hard_fail else ("PASS_WITH_WARNINGS" if soft_fail else "PASS")
     return verdict, checks, hard_fail, soft_fail
 
@@ -232,6 +323,17 @@ def compare_protocols(ref, mov):
     return {"comparability": "cross" if hard else "same", "differences_hard": hard, "differences_soft": soft}
 
 
+def lung_mass_comparability(ref_protocol, mov_protocol):
+    """Can the aerated-lung mass of two scans be compared? Not when the kernel family, the contrast state or the slice thickness
+    differs (same-scan reconstructions of 6 RIDER patients moved the mass by 22 percent between kernels and 15 percent between
+    1.25 and 5 mm). A different reconstruction variant inside one family is allowed and carried as a caveat.
+    Returns (comparable, reason or None, caveat or None)."""
+    c = compare_protocols(ref_protocol, mov_protocol)
+    why = list(c["differences_hard"]) + [d for d in c["differences_soft"] if d.startswith("slice thickness")]
+    caveat = next((d for d in c["differences_soft"] if d.startswith("reconstruction variant")), None)
+    return (not why), ("; ".join(why) if why else None), caveat
+
+
 def dcm_to_nifti(dcm_dir, out_nii):
     import SimpleITK as sitk
     reader = sitk.ImageSeriesReader()
@@ -310,6 +412,112 @@ def mask_from_labels(label_img, ids, dilate_mm=0.0, erode_mm=0.0):
     return m
 
 
+def detach_fused_table(body_zyx, spacing_zyx, bridge_mm=8.0, min_slab_ml=30.0):
+    """Split a thin slab off the body mask when an erosion of `bridge_mm` separates it.
+
+    Voxels outside the body are already ignored by the caller. This only handles a couch
+    that fused into the largest component across a thin bridge. A large extra that is not
+    a thin slab is left in the mask and reported as table_fused, so anatomy is not cut away.
+    When nothing separates, table_fused is false and the note says the couch was not proven
+    absent: those voxels can still drive the body warp.
+    """
+    from scipy import ndimage
+    body = np.asarray(body_zyx).astype(bool)
+    spacing = np.asarray(spacing_zyx, dtype=float)
+    empty = {"bridge_mm": bridge_mm, "extra_ml": 0.0, "table_detached_ml": 0.0, "table_fused": False}
+    if body.sum() < 1000:
+        empty["note"] = "body too small to test"
+        return body.astype(np.uint8), empty
+    step = float(min(spacing))
+    iterations = max(1, int(round(bridge_mm / step)))
+    eroded = ndimage.binary_erosion(body, iterations=iterations)
+    lab, n = ndimage.label(eroded)
+    if n == 0:
+        empty["note"] = "erosion removed the body; mask left intact"
+        return body.astype(np.uint8), empty
+    counts = np.bincount(lab.ravel())
+    counts[0] = 0
+    core = lab == int(counts.argmax())
+    restored = ndimage.binary_dilation(core, iterations=iterations) & body
+    extra = body & ~restored
+    ml = float(extra.sum()) * float(np.prod(spacing)) / 1000.0
+    report = {"bridge_mm": bridge_mm, "extra_ml": round(ml, 1), "table_detached_ml": 0.0, "table_fused": False}
+    if extra.sum() < 50 or ml < min_slab_ml:
+        report["note"] = "no separate slab after erosion; a couch fused wider than the bridge can still drive the warp"
+        return body.astype(np.uint8), report
+    # Opening a rectangle sheds corner voxels. Judge each extra component on its own,
+    # put small crumbs and non-slabs back, and drop only a thin slab.
+    cleaned = restored.copy()
+    elab, n_extra = ndimage.label(extra)
+    detached_ml = 0.0
+    voxel_ml = float(np.prod(spacing)) / 1000.0
+    for i in range(1, n_extra + 1):
+        comp = elab == i
+        comp_ml = float(comp.sum()) * voxel_ml
+        if comp_ml < min_slab_ml:
+            cleaned |= comp
+            continue
+        pts = np.argwhere(comp)
+        extent = (pts.max(axis=0) - pts.min(axis=0) + 1) * spacing
+        thin = float(extent.min())
+        long = float(extent.max())
+        is_slab = thin <= 40.0 and long >= 80.0 and thin / max(long, 1e-6) <= 0.35
+        if is_slab:
+            detached_ml += comp_ml
+        else:
+            cleaned |= comp
+            report["table_fused"] = True
+    report["table_detached_ml"] = round(detached_ml, 1)
+    if detached_ml > 0 and not report["table_fused"]:
+        report["note"] = "thin slab separated by erosion and removed from the mask that clears the CT"
+    elif detached_ml > 0:
+        report["note"] = "a thin slab was removed; a separate non-slab extra was kept"
+    elif report["table_fused"]:
+        report["note"] = ("erosion left a large extra that is not a thin slab; it was kept so anatomy is not removed. "
+                          "Those voxels can still drive the body warp.")
+    else:
+        report["note"] = "no separate slab after erosion; a couch fused wider than the bridge can still drive the warp"
+    return cleaned.astype(np.uint8), report
+
+
+def without_table(ct, body, margin_mm=3.0, bridge_mm=8.0):
+    """CT with voxels outside the body (plus `margin_mm`) set to air.
+
+    Returns (image, report). A couch fused by a thin bridge is removed when
+    `detach_fused_table` separates a slab. Anything else stays, and the report says so.
+    """
+    import SimpleITK as sitk
+    spacing = np.array(body.GetSpacing())[::-1]
+    cleaned, report = detach_fused_table(sitk.GetArrayFromImage(body), spacing, bridge_mm=bridge_mm)
+    cleaned_img = sitk.GetImageFromArray(cleaned.astype(np.uint8))
+    cleaned_img.CopyInformation(body)
+    r = max(1, int(round(margin_mm / body.GetSpacing()[0])))
+    keep = sitk.GetArrayFromImage(sitk.BinaryDilate(cleaned_img, [r, r, r])) > 0
+    a = sitk.GetArrayFromImage(ct).astype(np.float32)
+    a[~keep] = -1024.0
+    out = sitk.GetImageFromArray(a)
+    out.CopyInformation(ct)
+    return out, report
+
+
+def ct_body_surface(ref_ct, warped_zyx, valid, spacing, zwin):
+    """Skin distance between a reference CT and a CT already resampled onto its grid.
+    Both outlines come from the CT intensities, on that one grid."""
+    import SimpleITK as sitk
+    ref_body = sitk.GetArrayFromImage(body_mask_from(ref_ct)).astype(np.uint8)
+    wim = sitk.GetImageFromArray(np.ascontiguousarray(warped_zyx.astype(np.float32)))
+    wim.CopyInformation(ref_ct)
+    wbody = sitk.GetArrayFromImage(body_mask_from(wim)).astype(np.uint8)
+    return region_surface(np.where(valid, ref_body, 0), np.where(valid, wbody, 0),
+                          [1], spacing, zwin, border_xy=3)
+
+
+def dilate_mask(m, mm):
+    import SimpleITK as sitk
+    r = max(1, int(round(mm / m.GetSpacing()[0])))
+    return sitk.BinaryDilate(m, [r, r, r])
+
+
 def mask_minus(a, b):
     """a AND NOT b, for two binary masks on one grid."""
     import SimpleITK as sitk
@@ -362,7 +570,7 @@ def crop_common(fix_ct, mov_ct, fix_lab, mov_lab, vert_ids, margin_mm=25.0):
         body = body_mask_from(ct)
         st = sitk.LabelShapeStatisticsImageFilter(); st.Execute(body)
         bb = st.GetBoundingBox(1)
-        pad = int(round(10.0 / ct.GetSpacing()[0]))
+        pad = int(round(20.0 / ct.GetSpacing()[0]))
         x0, y0 = max(0, bb[0] - pad), max(0, bb[1] - pad)
         x1, y1 = min(sz[0] - 1, bb[0] + bb[3] + pad), min(sz[1] - 1, bb[1] + bb[4] + pad)
         idx, size = [x0, y0, k0], [x1 - x0 + 1, y1 - y0 + 1, k1 - k0 + 1]
@@ -518,11 +726,40 @@ def dice_table(a, b, ids):
     return out
 
 
-def region_surface(fa, wa, ids, spacing, zwin):
+def _far_surface(surface, distances, far_mm):
+    """Where the reference surface sits farther than far_mm from the moving surface.
+
+    Axes are z, y, x index of the isotropic array. Axis 0 is the slice axis.
+    This does not name a side anterior or inferior. That needs the image direction.
+    """
+    idx = np.argwhere(surface)
+    rec = {"threshold_mm": far_mm, "n": 0,
+           "fraction_of_reference_surface": 0.0,
+           "axes": "zyx index of the isotropic volume (axis 0 is the slice axis). Not an anatomical name."}
+    if idx.shape[0] == 0 or idx.shape[0] != getattr(distances, "shape", (None,))[0]:
+        if idx.shape[0] and idx.shape[0] != getattr(distances, "shape", (None,))[0]:
+            rec["note"] = "index mismatch"
+        return rec
+    far = distances > far_mm
+    n = int(far.sum())
+    rec["n"] = n
+    rec["fraction_of_reference_surface"] = round(float(n) / idx.shape[0], 4)
+    if n == 0:
+        return rec
+    rel = idx[far] - idx.mean(axis=0)
+    for axis, name in ((0, "axis0"), (1, "axis1"), (2, "axis2")):
+        rec[f"fraction_positive_{name}"] = round(float((rel[:, axis] > 0).mean()), 4)
+    return rec
+
+
+def region_surface(fa, wa, ids, spacing, zwin, border_xy=0, exclude=None, far_mm=None):
     """Label-agnostic agreement of one region (the union of `ids`) between the reference
     and the warped moving label maps: symmetric surface distance (mean and 95th
     percentile, mm) and Dice, inside the slices both scans cover (`zwin`, which already
-    excludes the cut faces at the edges of the common coverage)."""
+    excludes the cut faces at the edges of the common coverage). `border_xy` drops surface
+    voxels within that many voxels of the in-plane image edge (a body cut by the field of view).
+    `exclude` (a mask on the full grid) drops the surface voxels inside it, for places where the
+    two scans hold different contents and no correspondence exists."""
     from scipy import ndimage
     a = np.isin(fa, ids); b = np.isin(wa, ids)
     lo, hi = zwin
@@ -536,17 +773,43 @@ def region_surface(fa, wa, ids, spacing, zwin):
     # surface voxels on the window's top and bottom faces are cut faces, not anatomy
     z = np.arange(sl[0].start, sl[0].stop)[:, None, None]
     inner = (z > lo) & (z < hi)
+    if border_xy:
+        yy = np.arange(sl[1].start, sl[1].stop)[None, :, None]; xx = np.arange(sl[2].start, sl[2].stop)[None, None, :]
+        inner = inner & (yy >= border_xy) & (yy < a.shape[1] - border_xy) & (xx >= border_xy) & (xx < a.shape[2] - border_xy)
+    if exclude is not None:
+        inner = inner & ~exclude[sl]
     dA = ndimage.distance_transform_edt(~sB, sampling=spacing)[sA & inner]
     dB = ndimage.distance_transform_edt(~sA, sampling=spacing)[sB & inner]
     d = np.concatenate([dA, dB])
     if d.size == 0:
         return None
-    return {"assd_mm": round(float(d.mean()), 3), "hd95_mm": round(float(np.percentile(d, 95)), 3),
-            "max_mm": round(float(d.max()), 2), "dice": round(float(2.0 * (A & B).sum() / (A.sum() + B.sum())), 4)}
+    out = {"assd_mm": round(float(d.mean()), 3), "hd95_mm": round(float(np.percentile(d, 95)), 3),
+           "max_mm": round(float(d.max()), 2), "dice": round(float(2.0 * (A & B).sum() / (A.sum() + B.sum())), 4)}
+    if far_mm is not None:
+        out["far_surface"] = _far_surface(sA & inner, dA, far_mm)
+    return out
+
+
+def image_agreement(ref_ct, warped_ct, mask, valid, zwin, lo=-1024.0, hi=400.0, min_vox=5000):
+    """Label-free agreement of two CTs on one grid: Pearson correlation of the clipped
+    intensities inside `mask`, over the slices both scans cover. It does not use any
+    TotalSegmentator label of the warped scan, so it is a second opinion on the surface
+    metrics. Reported beside them; no threshold is set for it yet."""
+    m = np.asarray(mask, bool) & np.asarray(valid, bool)
+    m[:zwin[0]] = False
+    m[zwin[1] + 1:] = False
+    if int(m.sum()) < min_vox:
+        return None
+    a = np.clip(np.asarray(ref_ct, np.float32)[m], lo, hi)
+    b = np.clip(np.asarray(warped_ct, np.float32)[m], lo, hi)
+    if a.std() < 1e-6 or b.std() < 1e-6:
+        return None
+    return round(float(np.corrcoef(a, b)[0, 1]), 4)
 
 
 def stage_metrics(ref_lab, warped_lab, valid, names, groups, spacing, landmarks, zwin):
     """Everything the gate reads for one stage, plus the per-structure detail."""
+    from scipy import ndimage
     nl = max(names) + 1
     fa = np.where(valid, ref_lab, 0); wa = np.where(valid, warped_lab, 0)
     ref_full = np.bincount(ref_lab.ravel(), minlength=nl)
@@ -556,9 +819,38 @@ def stage_metrics(ref_lab, warped_lab, valid, names, groups, spacing, landmarks,
 
     spine = region_surface(fa, wa, groups["vertebrae"], spacing, zwin)
     lungs = {side: region_surface(fa, wa, groups[side], spacing, zwin) for side in ("lung_left", "lung_right")}
-    lv = [v for v in lungs.values() if v]
     organs = {o: region_surface(fa, wa, groups[o], spacing, zwin) for o in ("liver", "spleen") if groups.get(o)}
-    ov = [v for v in organs.values() if v]
+    # A structure the reference holds inside the common slices must produce a number. If it holds
+    # one and the warped scan has none (the lung collapsed out of the label, the organ is gone), the
+    # summary over the sides that did produce a number would hide it: the metric is withheld instead,
+    # and the gate closes on it (evaluate_gate treats a missing hard metric as a failure).
+    lo_p, hi_p = zwin
+
+    def in_reference(ids):
+        return bool(ids) and int(np.isin(fa[lo_p:hi_p + 1], ids).sum()) >= 500
+
+    lung_sides_missing = [s for s in ("lung_left", "lung_right") if in_reference(groups.get(s)) and not lungs[s]]
+    organs_missing = [o for o in ("liver", "spleen") if in_reference(groups.get(o)) and not organs.get(o)]
+    lv = [] if lung_sides_missing else [v for v in lungs.values() if v]
+    ov = [] if organs_missing else [v for v in organs.values() if v]
+    # Where the moving scan holds bowel (colon, stomach, small bowel) inside the reference organ,
+    # the two scans have different contents there: a smooth deformation cannot put an organ where
+    # the other scan has gas-filled bowel. That part of the reference surface is left out of the
+    # corresponding-surface distance and its volume is reported. Only this one direction is
+    # excluded, so an organ that is simply misplaced still shows on its other side.
+    bowel = groups.get("bowel") or []
+    lo_w, hi_w = zwin
+    zin = np.zeros(fa.shape[0], bool); zin[lo_w:hi_w + 1] = True
+    corr, interposed = {}, {}
+    for o in ("liver", "spleen"):
+        if not groups.get(o):
+            continue
+        ex = np.isin(fa, groups[o]) & np.isin(wa, bowel) & zin[:, None, None]
+        interposed[o] = round(float(ex.sum()) * float(np.prod(spacing)) / 1000.0, 1)
+        corr[o] = region_surface(fa, wa, groups[o], spacing, zwin,
+                                 exclude=ndimage.binary_dilation(ex, iterations=2), far_mm=6.0)
+    organs_corr_missing = [o for o in ("liver", "spleen") if in_reference(groups.get(o)) and not corr.get(o)]
+    cv = [] if organs_corr_missing else [v for v in corr.values() if v]
 
     lm = [i for i in landmarks if i in cand]
     cf = component_centroids(fa, lm); cw = component_centroids(wa, lm)
@@ -579,9 +871,15 @@ def stage_metrics(ref_lab, warped_lab, valid, names, groups, spacing, landmarks,
         "lung_assd_max_mm": max(v["assd_mm"] for v in lv) if lv else None,
         "lung_hd95_max_mm": max(v["hd95_mm"] for v in lv) if lv else None,
         "lungs": lungs,
+        "lung_sides_missing": lung_sides_missing,
+        "abdominal_organs_missing": sorted(set(organs_missing) | set(organs_corr_missing)),
         "abdominal_organ_assd_max_mm": max(v["assd_mm"] for v in ov) if ov else None,
         "abdominal_organ_hd95_max_mm": max(v["hd95_mm"] for v in ov) if ov else None,
         "abdominal_organs": organs,
+        "abdominal_organ_assd_max_mm_corresponding": max(v["assd_mm"] for v in cv) if cv else None,
+        "abdominal_organ_hd95_max_mm_corresponding": max(v["hd95_mm"] for v in cv) if cv else None,
+        "abdominal_organs_corresponding": corr,
+        "abdominal_organ_bowel_interposition_ml": interposed,
         "heart_dice": dget(groups.get("heart_id")),
         "medium_structure_dice_min": min(med.values()) if med else None,
         "medium_structure_dice": med,
@@ -592,6 +890,8 @@ def stage_metrics(ref_lab, warped_lab, valid, names, groups, spacing, landmarks,
         "vertebra_landmarks_used": len(tv),
         "vertebra_tre_mm": {names[i]: round(v, 3) for i, v in sorted(tre.items())},
         "dice_by_structure": {names[i]: round(v, 4) for i, v in sorted(dice.items()) if v is not None},
+        "abdominal_organ_far_surface": {o: v["far_surface"] for o, v in corr.items() if v and v.get("far_surface")},
+        "measured_on": dict(METRIC_SOURCE),
     }
 
 
@@ -612,25 +912,64 @@ REGIONS = [
     ("viscera", "viscera_solid", "viscera", (-200, 400), (100, 70, 40), "body"),
 ]
 MIN_REGION_ML = 150.0
+SKIN_MARGIN_MM = 10.0
 
 
 # Transforms: a stage is a list of ANTs transform files, or for the piecewise deformable
 # stage a dict {"body": [...], "regions": [{"name", "tf": [...], "select": <mask on the
 # reference grid>}, ...]}.
-def apply_stage(ants, ref_img, mov_img, tf, interpolator, default):
+def blend_piecewise(body, regions, spacing, blend_mm, hard):
+    """Compose piecewise resamples.
+
+    `regions` is a list of (array, select_mask) in precedence order. Later regions win
+    inside their mask, matching the previous hard switch. `hard` True (label maps) keeps
+    that switch. `hard` False (linear CT) ramps across `blend_mm` at each mask boundary
+    so the picture does not tear where two transforms meet.
+    """
+    out = np.array(body, dtype=np.float32, copy=True)
+    if not regions:
+        return out
+    if hard or blend_mm <= 0:
+        for arr, sel in regions:
+            out = np.where(sel, arr, out)
+        return out
+    from scipy import ndimage
+    sampling = tuple(float(x) for x in spacing)
+    for arr, sel in regions:
+        sel = np.asarray(sel, dtype=bool)
+        if not sel.any():
+            continue
+        if sel.all():
+            out = np.array(arr, dtype=np.float32, copy=True)
+            continue
+        dist_in = ndimage.distance_transform_edt(sel, sampling=sampling)
+        dist_out = ndimage.distance_transform_edt(~sel, sampling=sampling)
+        signed = dist_in - dist_out
+        weight = np.clip((signed + blend_mm) / (2.0 * blend_mm), 0.0, 1.0).astype(np.float32)
+        out = weight * np.asarray(arr, dtype=np.float32) + (1.0 - weight) * out
+    return out
+
+
+def apply_stage(ants, ref_img, mov_img, tf, interpolator, default, blend_mm=None):
     """Resample `mov_img` onto the grid of `ref_img` through one stage's transforms.
-    Piecewise: voxels inside a region's selection mask take that region's transforms, all
-    others the body transforms."""
+
+    Piecewise CT (linear) blends across BLEND_MM at each region boundary. Label maps
+    stay a hard switch. Which labels drive which region is unchanged.
+    """
+    if blend_mm is None:
+        blend_mm = BLEND_MM
     if isinstance(tf, dict):
         wb = ants.apply_transforms(ref_img, mov_img, tf["body"], interpolator=interpolator, defaultvalue=default)
         regs = tf.get("regions") or []
         if not regs:
             return wb
-        arr = wb.numpy()
+        hard = interpolator != "linear"
+        pieces = []
         for reg in regs:
             w = ants.apply_transforms(ref_img, mov_img, reg["tf"], interpolator=interpolator, defaultvalue=default)
-            arr = np.where(ants.image_read(reg["select"]).numpy() > 0, w.numpy(), arr)
-        return wb.new_image_like(arr.astype(np.float32))
+            pieces.append((w.numpy(), ants.image_read(reg["select"]).numpy() > 0))
+        mixed = blend_piecewise(wb.numpy(), pieces, tuple(wb.spacing), 0.0 if hard else blend_mm, hard)
+        return wb.new_image_like(mixed.astype(np.float32))
     return ants.apply_transforms(ref_img, mov_img, tf, interpolator=interpolator, defaultvalue=default)
 
 
@@ -645,7 +984,7 @@ def zyx(ants_img, dtype=None):
 # patient's right on the viewer's left; coronal and sagittal with superior up; sagittal
 # with anterior on the viewer's left. The volumes are RAS, so each slice is turned 180
 # degrees in-plane.
-def render_panels(out_png, ref_arr, stage_arrs, levels, title):
+def render_panels(out_png, ref_arr, stage_arrs, levels, title, body=None):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -667,6 +1006,8 @@ def render_panels(out_png, ref_arr, stage_arrs, levels, title):
         yy, xx = np.indices(rf.shape)
         chk = np.where(((yy // tile + xx // tile) % 2) == 0, rf, lf)
         diff = lf.astype(np.float32) - rf.astype(np.float32)
+        if body is not None:
+            diff = np.where(get(body) > 0, diff, 0.0)   # air and the scanner table are not anatomy
         for c, im in enumerate(ims + [chk]):
             ax = axes[r, c]; ax.imshow(show(win(im)), cmap="gray", aspect="equal")
             ax.set_xticks([]); ax.set_yticks([])
@@ -688,6 +1029,7 @@ def render_panels(out_png, ref_arr, stage_arrs, levels, title):
 def register_pair(wd, ref, mov, names, groups, reg_iso_req, lung_iso_req, max_vox):
     """Register timepoint `mov` into the frame of `ref`. Returns transforms, metrics, artifacts."""
     import ants, SimpleITK as sitk
+    from scipy import ndimage
     nn, lin_i = sitk.sitkNearestNeighbor, sitk.sitkLinear
     pair = f"{mov['label']}_to_{ref['label']}"
     pdir = os.path.join(wd, "pairs", pair); os.makedirs(pdir, exist_ok=True)
@@ -781,14 +1123,22 @@ def register_pair(wd, ref, mov, names, groups, reg_iso_req, lung_iso_req, max_vo
         if m_ids and vol_ml(flc, m_ids) >= MIN_REGION_ML and vol_ml(mlc, m_ids) >= MIN_REGION_ML:
             regions.append({"name": name, "metric_ids": m_ids, "select_ids": s_ids, "window": win, "iters": iters,
                             "iso_req": lung_iso_req if grid == "lung" else reg_iso_req})
-    body_f, body_m = fb, mb
+    # the skin edge drives the body warp only if the metric sees both sides of it: the body
+    # metric masks reach 10 mm into the air (where the table has been removed)
+    body_f, body_m = dilate_mask(fb, SKIN_MARGIN_MM), dilate_mask(mb, SKIN_MARGIN_MM)
     for rg in regions:
         body_f = mask_minus(body_f, mask_from_labels(flc, rg["select_ids"], erode_mm=5))
         body_m = mask_minus(body_m, mask_from_labels(mlc, rg["select_ids"], erode_mm=5))
     Fbm = to_ants(body_f, reg_iso, nn, 0, "fixed_bodymask")
     Mbm = to_ants(body_m, reg_iso, nn, 0, "moving_bodymask")
     tr = time.time()
-    r_body = ants.registration(F, M, type_of_transform="SyNOnly", initial_transform=rigid_tf,
+    fixed_notable, fixed_table = without_table(sitk.Cast(fc, sitk.sitkFloat32), fb)
+    moving_notable, moving_table = without_table(sitk.Cast(mc, sitk.sitkFloat32), mb)
+    log(f"{pair}: table fixed detached {fixed_table.get('table_detached_ml')} ml fused {fixed_table.get('table_fused')}; "
+        f"moving detached {moving_table.get('table_detached_ml')} ml fused {moving_table.get('table_fused')}")
+    Fnt = to_ants(fixed_notable, reg_iso, lin_i, -1024.0, "fixed_notable")
+    Mnt = to_ants(moving_notable, reg_iso, lin_i, -1024.0, "moving_notable")
+    r_body = ants.registration(Fnt, Mnt, type_of_transform="SyNOnly", initial_transform=rigid_tf,
                                mask=Fbm, moving_mask=Mbm, outprefix=os.path.join(pdir, "body_"),
                                syn_metric="CC", syn_sampling=2, reg_iterations=(100, 70, 40),
                                flow_sigma=3, total_sigma=0, grad_step=0.2, mask_all_stages=True,
@@ -842,20 +1192,36 @@ def register_pair(wd, ref, mov, names, groups, reg_iso_req, lung_iso_req, max_vo
     zv = np.flatnonzero(valid.any(axis=(1, 2)))
     zwin = (int(zv[0]) + 5, int(zv[-1]) - 5)
     metrics, warped_ct = {}, {}
+    ref_ct_np = sitk.GetArrayFromImage(fix_ct)
     for st, tl in stages.items():
         wl = apply_stage(ants, REF, MOVLAB, tl, "genericLabel", 0)
         metrics[st] = stage_metrics(ref_arr, zyx(wl, np.int16), valid, names, groups, spacing, lm, zwin)
+        # The skin is the outline of the resampled CT. Warping the binary body mask through the
+        # piecewise transforms tears it at the lung and viscera boundaries, and that torn mask
+        # reported a distance the CT itself does not have.
         wct = apply_stage(ants, REF, MOVCT, tl, "linear", -1024)
         warped_ct[st] = zyx(wct)
+        # label-free second opinion: CT intensity correlation inside the lungs, the viscera and the body
+        metrics[st]["image_agreement_ncc"] = {
+            "lungs": image_agreement(ref_ct_np, warped_ct[st], np.isin(ref_arr, groups["lungs"]), valid, zwin, lo=-1024.0, hi=-200.0),
+            "viscera": image_agreement(ref_ct_np, warped_ct[st], np.isin(ref_arr, groups["viscera"]), valid, zwin, lo=-200.0, hi=300.0),
+            "body": image_agreement(ref_ct_np, warped_ct[st], ref_ct_np > -300, valid, zwin),
+            "gated": False,
+            "note": "CT intensity correlation, no labels. Reported beside the surface metrics. No threshold is set."}
+        skin = ct_body_surface(fix_ct, warped_ct[st], valid, spacing, zwin)
+        metrics[st].update({"body_surface_assd_mm": skin["assd_mm"] if skin else None,
+                            "body_surface_hd95_mm": skin["hd95_mm"] if skin else None,
+                            "body_surface": skin})
         if st == "deformable":
             ants.image_write(wl, os.path.join(pdir, f"{mov['label']}_labels_in_{ref['label']}.nii.gz"))
             ants.image_write(wct, os.path.join(pdir, f"{mov['label']}_ct_in_{ref['label']}.nii.gz"))
         m = metrics[st]
         log(f"{pair} {st:>10}: spine ASSD {m['spine_assd_mm']} HD95 {m['spine_hd95_mm']}, lungs Dice min {m['lung_dice_min']} "
             f"ASSD max {m['lung_assd_max_mm']} HD95 max {m['lung_hd95_max_mm']}, liver/spleen ASSD max "
-            f"{m['abdominal_organ_assd_max_mm']} HD95 max {m['abdominal_organ_hd95_max_mm']}, vertebra TRE median "
+            f"{m['abdominal_organ_assd_max_mm']} HD95 max {m['abdominal_organ_hd95_max_mm']} (corresponding "
+            f"{m['abdominal_organ_hd95_max_mm_corresponding']}, bowel in organ {m['abdominal_organ_bowel_interposition_ml']} ml), vertebra TRE median "
             f"{m['vertebra_tre_median_mm']} ({m['vertebra_landmarks_used']}), heart {m['heart_dice']}, "
-            f"medium min {m['medium_structure_dice_min']}")
+            f"medium min {m['medium_structure_dice_min']}, skin ASSD {m['body_surface_assd_mm']} HD95 {m['body_surface_hd95_mm']}")
 
     # Jacobian of each deformation inside the region it governs
     jb = ants.create_jacobian_determinant_image(F, r_body["fwdtransforms"][0], do_log=False)
@@ -895,10 +1261,14 @@ def register_pair(wd, ref, mov, names, groups, reg_iso_req, lung_iso_req, max_vo
         xsag = int(round(np.mean([c[2] for _, c in order])))
         levels.append(("coronal", (lambda a, y=ycor: a[:, y, :])))
         levels.append(("sagittal", (lambda a, x=xsag: a[:, :, x])))
-    ref_ct_arr = sitk.GetArrayFromImage(fix_ct)
+    ref_ct_arr = ref_ct_np
+    # ct_body_surface keeps its mask local. The difference panel needs the reference
+    # outline in this function, or the job dies here after the warp is already written.
+    ref_body = sitk.GetArrayFromImage(body_mask_from(fix_ct)).astype(np.uint8)
     png = os.path.join(pdir, f"qc_{pair}.png")
     render_panels(png, ref_ct_arr, {k: warped_ct[k] for k in ("initial", "rigid", "deformable")},
-                  levels, f"{pair}: registration stages")
+                  levels, f"{pair}: registration stages",
+                  body=ndimage.binary_dilation(ref_body > 0, iterations=5))
 
     # keep the transforms with stable names; apply order for each list is as written
     keep = {"init": "init.mat"}
@@ -924,7 +1294,11 @@ def register_pair(wd, ref, mov, names, groups, reg_iso_req, lung_iso_req, max_vo
         "crop_z_mm": None if zr is None else [round(z, 1) for z in zr],
         "deformable_model": ("piecewise: a reference voxel inside a region's select mask takes that region's "
                              "transforms (" + ", ".join(rg["name"] for rg in regions) + "); every other voxel takes "
-                             "the body transforms" if regions else "single body transform"),
+                             "the body transforms. Linear CT blends across " + str(BLEND_MM) +
+                             " mm at each mask boundary. Label maps stay a hard switch."
+                             if regions else "single body transform"),
+        "blend_mm": BLEND_MM,
+        "table": {"fixed": fixed_table, "moving": moving_table},
         "apply": apply,
         "seconds": {"rigid": round(t_rig, 1), "body": round(t_body, 1),
                     **{rg["name"]: round(rg["seconds"], 1) for rg in regions}, "total": round(time.time() - t0, 1)},
@@ -937,6 +1311,50 @@ def register_pair(wd, ref, mov, names, groups, reg_iso_req, lung_iso_req, max_vo
                       "warped_labels": f"{mov['label']}_labels_in_{ref['label']}.nii.gz"},
         "dir": pdir,
     }
+
+
+def leg_report(trans, pairs):
+    """Name the structure and the hop where the triangle is weakest.
+
+    `trans` is the composed-path versus direct-path Dice. `pairs` are the hops already
+    measured. The pair with the lowest Dice on that structure is the weakest leg.
+    """
+    if not trans:
+        return trans
+    td = trans.get("dice_by_target") or {}
+    if not td:
+        trans["weakest_target"] = None
+        return trans
+    structure = min(td, key=lambda k: td[k])
+    trans["weakest_target"] = {"structure": structure, "composed_vs_direct_dice": td[structure]}
+
+    def pair_dice(row):
+        metrics = ((row.get("metrics") or {}).get("deformable") or {})
+        if structure == "spine":
+            return metrics.get("spine_dice")
+        if structure in ("lung_left", "lung_right"):
+            lung = (metrics.get("lungs") or {}).get(structure) or {}
+            return lung.get("dice")
+        by_name = (metrics.get("dice_by_structure") or {}).get(structure)
+        if by_name is not None:
+            return by_name
+        organ = (metrics.get("abdominal_organs") or {}).get(structure) or {}
+        return organ.get("dice")
+
+    legs = [{"pair": row.get("pair"), "dice": pair_dice(row)} for row in pairs]
+    known = [leg for leg in legs if isinstance(leg.get("dice"), (int, float))]
+    trans["legs"] = legs
+    if known:
+        worst = min(known, key=lambda leg: leg["dice"])
+        trans["weakest_leg"] = {
+            "structure": structure,
+            "pair": worst["pair"],
+            "pair_dice": worst["dice"],
+            "composed_vs_direct_dice": td[structure],
+            "reading": ("The composed path and the direct path disagree most on this structure. "
+                        "The pair named is the hop with the lowest Dice for it."),
+        }
+    return trans
 
 
 def transitivity(ref, mid, last, pr_mid_ref, pr_last_mid, pr_last_ref, names, groups):
@@ -975,6 +1393,43 @@ def transitivity(ref, mid, last, pr_mid_ref, pr_last_mid, pr_last_ref, names, gr
                                                key=lambda x: x["dice"])[:5]}}
 
 
+def write_job_status(workdir, payload):
+    """Status beside the workdir. /tmp is wiped when the GPU VM powers off. This file is not."""
+    path = os.path.join(workdir, "status.json")
+    tmp = path + ".tmp"
+    payload = dict(payload)
+    payload["updated_unix_ms"] = int(time.time() * 1000)
+    with open(tmp, "w") as f:
+        json.dump(payload, f)
+    os.replace(tmp, path)
+
+
+def lung_report_files(ct_path, labels_path, groups):
+    """Lung volume, aerated mass and lobe volumes of one scan, on its native 1 mm grid."""
+    import SimpleITK as sitk
+    ci, li = sitk.ReadImage(ct_path), sitk.ReadImage(labels_path)
+    return lung_volume.lung_report(sitk.GetArrayFromImage(ci), sitk.GetArrayFromImage(li), ci.GetSpacing()[::-1], groups)
+
+
+def engine_identity():
+    import hashlib
+    def sha(path):
+        if not os.path.isfile(path):
+            return None
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            h.update(f.read())
+        return h.hexdigest()
+    here = os.path.dirname(os.path.abspath(__file__))
+    return {
+        "engine_sha256": sha(os.path.abspath(__file__)),
+        "frame_contract_sha256": sha(os.path.join(here, "frame_contract.py")),
+        "lung_volume_sha256": sha(os.path.join(here, "lung_volume.py")),
+        "image_digest": os.environ.get("IMAGE_DIGEST") or os.environ.get("REGISTER_IMAGE_DIGEST"),
+        "image_tag": os.environ.get("IMAGE_TAG") or os.environ.get("REGISTER_IMAGE_TAG"),
+    }
+
+
 # ----------------------------------------------------------------------------------
 def main():
     ap = argparse.ArgumentParser()
@@ -1005,6 +1460,8 @@ def main():
     max_vox = int(os.getenv("MAX_REG_VOX", "24000000"))
 
     wd = os.path.join(args.workdir, args.job_id); os.makedirs(wd, exist_ok=True)
+    identity = engine_identity()
+    write_job_status(wd, {"job_id": args.job_id, "status": "running", "schema": SCHEMA})
     gates = gates_for(args.anatomy)
     manifest = {"schema": SCHEMA, "job_id": args.job_id, "wallet": args.wallet, "anatomy": args.anatomy,
                 "reference": ref["label"], "protocol_mode_requested": args.protocol_mode,
@@ -1017,7 +1474,8 @@ def main():
     try:
         import SimpleITK as sitk, ants, totalsegmentator
         manifest["software"] = {"SimpleITK": sitk.Version.VersionString(), "antspyx": getattr(ants, "__version__", "?"),
-                                "TotalSegmentator": getattr(totalsegmentator, "__version__", "2.x"), "threads": threads}
+                                "TotalSegmentator": getattr(totalsegmentator, "__version__", "2.x"), "threads": threads,
+                                **identity}
         names = None
         for t in tps:
             tdir = os.path.join(wd, t["label"])
@@ -1038,6 +1496,7 @@ def main():
             "heart_id": (ids_matching(names, r"^heart$") or [None])[0],
             "liver": ids_matching(names, r"^liver$"),
             "spleen": ids_matching(names, r"^spleen$"),
+            "bowel": ids_matching(names, r"^(stomach|duodenum|small_bowel|colon)$"),
             # the viscera that move with the diaphragm: heart, inferior vena cava and the solid
             # abdominal organs drive this deformation; hollow organs follow it
             "viscera_solid": ids_matching(names, r"^(heart|inferior_vena_cava|liver|spleen|pancreas|gallbladder|kidney_(left|right)"
@@ -1054,6 +1513,22 @@ def main():
         mode = args.protocol_mode if args.protocol_mode in ("same", "cross") else ("cross" if cross else "same")
         manifest["protocol_mode"] = mode
         manifest["voxel_comparison_assessable"] = (mode == "same")
+
+        # lung volume of every scan on its native grid, so a change of lung volume can be told from a breath
+        lung_groups = {"lung_left": groups["lung_left"], "lung_right": groups["lung_right"],
+                       "lobes": {nm: ids_matching(names, rf"^{nm}$") for nm in lung_volume.LUNG_LOBES}}
+        lung_reports, lung_error = {}, None
+        try:
+            for t in tps:
+                lung_reports[t["label"]] = lung_report_files(t["ct"], t["labels"], lung_groups)
+        except Exception as lung_exc:
+            lung_reports, lung_error = {}, f"{type(lung_exc).__name__}: {lung_exc}"[:300]
+            log("lung volume report not computed", lung_error)
+        manifest["lung_volume"] = {"params": lung_volume.LUNG_CHANGE_PARAMS, "per_timepoint": lung_reports,
+                                   "comparisons": {}, "error": lung_error,
+                                   "reading": ("Native-space lung volume and the mass of the aerated lung per scan. A breath "
+                                               "changes the volume but not the mass; a change of mass, or of one lung alone, "
+                                               "is not explained by the breath. Decision support, not a diagnosis.")}
 
         # every non-reference timepoint into the reference frame; with >= 3 timepoints also
         # last -> middle so the transitivity check can compare two independent paths
@@ -1073,19 +1548,39 @@ def main():
         manifest["transitivity"] = trans
 
         verdicts = []
+        protos = {t["label"]: t["protocol"] for t in tps}
         for key, pr in results.items():
-            v, checks, hard, soft = evaluate_gate(pr["metrics"], trans if key[1] == ref["label"] else None, gates)
-            pr["gate"] = {"verdict": v, "checks": checks, "hard_failures": hard, "warnings": soft}
+            lc = None
+            if key[0] in lung_reports and key[1] in lung_reports:
+                comparable, why_not, caveat = lung_mass_comparability(protos[key[1]], protos[key[0]])
+                lc = lung_volume.compare_lung_volume(lung_reports[key[1]], lung_reports[key[0]], mass_comparable=comparable,
+                                                     mass_withheld_reason=why_not, mass_caveat=caveat)
+                manifest["lung_volume"]["comparisons"][pr["pair"]] = lc
+                log(f"{pr['pair']} lung volume: {lc['explanation']}")
+            v, checks, hard, soft = evaluate_gate(pr["metrics"], trans if key[1] == ref["label"] else None, gates,
+                                                  protocol_mode=mode, lung_change=lc)
+            pr["gate"] = {"verdict": v, "checks": checks, "hard_failures": hard, "warnings": soft,
+                          "not_computed": [f"{c['stage']}.{c['metric']}" for c in checks if c.get("pass") is None],
+                          "lung_gate_downgraded": any(c.get("downgraded_from") for c in checks)}
             verdicts.append(v)
             manifest["pairs"].append({k: pr[k] for k in ("pair", "moving", "reference", "init", "registration_grid_mm",
-                                                         "crop_z_mm", "deformable_model", "apply", "seconds", "metrics",
-                                                         "transforms", "valid_fraction", "artifacts", "gate")})
+                                                         "crop_z_mm", "deformable_model", "blend_mm", "table", "apply",
+                                                         "seconds", "metrics", "transforms", "valid_fraction",
+                                                         "artifacts", "gate")})
             log(f"GATE {pr['pair']}: {v} {('hard: ' + '; '.join(hard)) if hard else ''} {('warn: ' + '; '.join(soft)) if soft else ''}")
         overall = "FAIL" if "FAIL" in verdicts else ("PASS_WITH_WARNINGS" if "PASS_WITH_WARNINGS" in verdicts else "PASS")
         manifest["gate"] = {"verdict": overall, "by_pair": {pr["pair"]: pr["gate"]["verdict"] for pr in results.values()}}
+        manifest["transitivity"] = leg_report(trans, manifest["pairs"])
         if mode == "cross":
             manifest["gate"]["note"] = ("cross-protocol: geometry is registered, but voxel intensities are not "
-                                        "comparable; use structure- and lesion-level comparison only")
+                                        "comparable; use structure- and lesion-level comparison only. "
+                                        "A skin warning on this pair is the expected rim. The skin threshold is unchanged.")
+        try:
+            import frame_contract
+            manifest["consumers"] = frame_contract.advise_all(manifest)
+        except Exception as hook_error:
+            log("consumer contract not written", hook_error)
+            manifest["consumers_error"] = str(hook_error)[:300]
 
         # outputs: reference-frame stack + per-pair artifacts
         out = os.path.join(wd, "out"); os.makedirs(out, exist_ok=True)
@@ -1107,6 +1602,8 @@ def main():
         manifest["label_names"] = {str(k): v for k, v in sorted(names.items())}
         manifest["elapsed_sec"] = round(time.time() - t0, 1)
         manifest["status"] = "done"
+        write_job_status(wd, {"job_id": args.job_id, "status": "done", "schema": SCHEMA,
+                              "gate": manifest.get("gate"), "output_dir": os.path.join(wd, "out")})
         out_prefix = f"gs://{args.out_bucket}/{args.wallet}/imaging-register/{args.job_id}/"
         if not args.no_upload:
             manifest["output_gcs"] = out_prefix
@@ -1123,11 +1620,17 @@ def main():
                        "deformable": {k: p["metrics"]["deformable"].get(k) for k in
                                       ("spine_assd_mm", "spine_hd95_mm", "lung_dice_min", "lung_hd95_max_mm",
                                        "abdominal_organ_assd_max_mm", "abdominal_organ_hd95_max_mm",
+                                       "abdominal_organ_assd_max_mm_corresponding", "abdominal_organ_hd95_max_mm_corresponding",
+                                       "abdominal_organ_bowel_interposition_ml", "body_surface_assd_mm", "body_surface_hd95_mm",
                                        "vertebra_tre_median_mm", "heart_dice", "medium_structure_dice_min",
                                        "jacobian_fold_fraction", "bone_abs_logjac_p95")}} for p in manifest["pairs"]],
             "transitivity": (trans or {}).get("dice_median"), "elapsed_sec": manifest["elapsed_sec"]}))
     except Exception as e:
         log("ERROR", e); traceback.print_exc()
+        try:
+            write_job_status(wd, {"job_id": args.job_id, "status": "error", "error": str(e)[:500]})
+        except Exception:
+            pass
         print("REGISTER_RESULT " + json.dumps({"status": "error", "error": str(e)[:500], "job_id": args.job_id}))
         sys.exit(1)
 

@@ -1,0 +1,73 @@
+Organ package (schema organ-twin-package/1): pass criteria and predictions, written before the module existed and before any run.
+Module: organ_package.py. Tests: test_organ_package.py. Date of writing: 2026-11-06.
+
+What the package is
+For one finished imaging-register job it builds, per organ and per timepoint: the native volume in ml, the organ cropped out of the CT (HU
+unchanged) with its mask, a per-slice table, and a surface mesh (GLB). Meshes are written in three placements: native (the scan's own patient
+coordinates, always), rigid spine frame (the moving scan's native mesh moved into the reference scan's coordinates by the saved rigid
+transform; shape and size untouched; only when the spine region of that pair did not fail), and deformable frame (from the warped label map;
+shape normalised to the reference, so it carries the reference volume by construction and is never a size measurement; only when
+frame_contract.advise(organ_surface) allows it for that pair). Between timepoints it tabulates volume change from the native volumes.
+Decision support for a radiologist, never a diagnosis.
+
+Conventions fixed here, so a viewer cannot guess them
+  GLB: metres. X = patient left, Y = superior, Z = anterior. From patient LPS millimetres (x, y, z): X = x/1000, Y = z/1000, Z = -y/1000.
+  A default camera at +Z looks at the patient from the front, patient right on the viewer's left. The mapping is a proper rotation.
+  Vertices are written outward-facing (positive signed volume) whatever the voxel-to-patient matrix.
+  Volumes: voxel count times voxel volume of the NATIVE label map. Never from a warped label map.
+  CT crop: int16 HU, clipped to -1024..3071, bounding box of the organ plus 5 voxels, same orientation as the source scan.
+
+Known-answer criteria on synthetic organs (every number is made, so every answer is known). All must pass.
+OP1 coordinates. An ellipsoid (semi-axes 22, 16, 30 mm) joined with a 7 mm ball, on a grid with a non-zero origin and an oblique direction
+    matrix. Each GLB vertex mapped back to patient LPS is compared with the analytic surface (first-order distance to the implicit surface).
+    1 mm isotropic grid: median distance <= 0.5 mm and 99th percentile <= 1.0 mm. Anisotropic grid (0.8 x 0.9 x 2.5 mm): 99th percentile
+    <= 2.5 mm.
+OP2 volume. volume_ml equals voxel count times voxel volume to 1e-9 relative. Against the analytic ellipsoid (1 mm grid): within 2 percent. Mesh volume
+    within 4 percent of the voxel volume.
+OP3 orientation. The ball sits to the patient's left, anterior and superior of the ellipsoid. In the GLB it must lie toward +X, +Z and +Y
+    from the ellipsoid centre. Signed volume of every mesh is positive for the standard direction matrix, a reflected one (determinant -1),
+    and an oblique one.
+OP4 rigid placement. The moving image is made from the reference by a known rigid transform written as an ITK .mat file and read back
+    through the same code the package uses on a saved job. After placement the moving mesh and the reference mesh: mean distance <= 0.5 mm,
+    maximum <= 1.5 mm (1 mm grid). A transform applied in the wrong direction must fail this test (the test includes it).
+OP5 frame policy follows frame_contract, case by case: (a) no failure: deformable and rigid meshes built; (b) a hard failure in the liver and
+    spleen region: no deformable mesh, rigid mesh built, the reason names the region; (c) a hard failure in the spine: neither, native only;
+    (d) a lung volume change not explained by the breath: lung deformable meshes withheld, other organs built; (e) a required region with no
+    number: deformable withheld. Volumes and native meshes exist in every case.
+OP6 slice table. Sum of area times slice spacing equals the volume to 1e-9 relative; the slice position equals the projection of the slice's
+    centre on the scan's slice normal exactly (oblique case); a one-voxel mask gives that voxel's patient coordinate as centroid.
+OP7 changes. Volumes 100, 110 and 88 ml over three timepoints give deltas against the reference and against the previous timepoint to
+    0.01 ml and 0.01 percent. An organ touching the first or last slice, or the in-plane border, in either scan of a comparison is marked
+    delta_assessable false with the reason (the volume is a lower bound). Lung change explanations in the manifest pass through unchanged.
+OP8 integrity. verify reports OK on a fresh build. One changed byte in a mesh, a deleted file, and an extra unlisted file each make verify
+    report FAIL and name the file. Two builds of the same inputs give the same file hashes and the same package.json apart from the build block.
+OP9 privacy. A source manifest poisoned with PatientName, PatientID, PatientBirthDate, InstitutionName and a test name inside the protocol
+    block gives a package that contains none of those keys and not the test name. Only listed protocol keys are copied.
+OP10 CT crop. For an integer CT with a known pattern, every voxel of the crop equals the source voxel and maps to the same patient coordinate.
+OP11 scan edge. A mask on slice 0, on the last slice, or on the in-plane border is flagged with the side; a mask clear of all edges is not.
+OP12 composites. lung_left and lung_right are the unions of their lobes; the volume of the union equals the sum of the lobes.
+OP13 mesh. Face count <= the budget (default 40000) when decimation is available, the decimation is recorded, and a mask with two separate
+    pieces keeps both (the component count is recorded; none dropped silently).
+
+Criteria on real jobs (run on the GPU VM's persistent disk, CPU only, output to /mnt/scratch, nothing written to the vault).
+RD1 The package builds for the chest job register-ef1676c3 and the abdomen job register-e05d1252 and verify reports OK for both.
+RD2 The native lung volumes of the package (lung_left, lung_right, and the five lobes) equal the volumes of the job's own lung volume report
+    (lung_volume_report.json or manifest lung_volume) within 0.5 percent.
+RD3 Rigid placement check. For every pair against the reference where the spine region did not fail, the merged vertebrae of the moving scan,
+    placed by the saved rigid transform, lie within 2.0 mm ASSD of the reference vertebrae; and that number differs from the manifest's own
+    rigid-stage spine ASSD by <= 0.5 mm. A pair that misses either is marked rigid placement not admitted.
+RD4 Deformable-frame mesh volume against the reference volume of the same organ is reported (diagnostic, no bar).
+RD5 Every pair whose gate is FAIL has no deformable mesh in the package, and the package states why.
+RD6 No organ volume of the package is taken from a warped label map.
+
+Predictions, written before any code was run
+P1 OP1 to OP13 pass at the first run except one or two items I have not thought of; most likely trouble: OP4 tolerance and OP1 on the anisotropic grid.
+P2 The reflected direction matrix flips the winding unless the code checks the signed volume; the first version of the code will fail OP3 on it.
+P3 RD3 passes for all reference pairs of the chest and abdomen jobs (about 1 mm).
+P4 RD2 passes for all.
+P5 At least one organ of the abdomen job (liver, colon or stomach) is cut by the scan range in at least one timepoint, and the package says so.
+P6 The build takes under 10 minutes per job on the VM.
+
+Not in this version, stated now: PET; vertex colours or Jacobian maps; attribution of findings to organs; a repeatability floor for organ
+volumes (without it no organ volume change is called clinically relevant by this package, only reported); registration of the package as a
+biocid (no biofs verb writes it yet); a viewer.

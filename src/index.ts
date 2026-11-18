@@ -2,7 +2,7 @@
 
 import { Command } from 'commander';
 // FLUENCY_LINEAGE_VERBS_20260730
-import { fluencyBuildCommand, fluencyStateCommand } from './commands/fluency';
+import { fluencyBuildCommand, fluencyStateCommand, fluencyPackCommand } from './commands/fluency';
 // CONSENT_VERBS_20260730
 import { consentPayloadCommand, consentSubmitCommand } from './commands/consent';
 import { lineageCommand } from './commands/lineage';
@@ -31,6 +31,15 @@ import { umountCommand, UmountOptions } from './commands/umount';
 import { tokenizeCommand, TokenizeOptions } from './commands/tokenize';
 import { tokenizeFastqsCommand, TokenizeFastqsOptions } from './commands/tokenize-fastqs';
 import { tokenizeBiosampleCommand, TokenizeBiosampleOptions } from './commands/tokenize-biosample';
+import {
+  humanmarkScanCommand, HumanmarkScanOptions,
+  humanmarkProveCommand, HumanmarkProveOptions,
+  humanmarkVerifyCommand, HumanmarkVerifyOptions,
+  humanmarkBlessCommand, HumanmarkBlessOptions,
+  humanmarkAttestCommand, HumanmarkAttestOptions,
+  humanmarkBindCommand, HumanmarkBindOptions,
+  humanmarkOnchainCommand,
+} from './commands/humanmark';
 import { linkClaraCommand, LinkClaraOptions } from './commands/link-clara';
 import { familyStatusCommand, FamilyStatusOptions } from './commands/family-status';
 import { credIssueCommand, CredIssueOptions } from './commands/cred/issue';
@@ -62,6 +71,13 @@ import { streamCommand, StreamOptions } from './commands/stream';
 import { pipeCommand, PipeOptions } from './commands/pipe';
 import { aliasCommand, AliasOptions } from './commands/alias';
 import { htsgetServiceInfoCommand, htsgetTicketCommand } from './commands/htsget';
+import {
+  crypt4ghKeygenCommand,
+  crypt4ghEncryptCommand,
+  crypt4ghDecryptCommand,
+  crypt4ghRevokeCommand,
+  crypt4ghInspectCommand,
+} from './commands/crypt4gh';
 import {
   teleToolsCommand,
   teleStatsCommand,
@@ -116,7 +132,7 @@ import { imagingCharacterizeCommand, ImagingCharacterizeOptions } from './comman
 import { imagingEnrichCommand, ImagingEnrichOptions } from './commands/imaging/enrich';
 import { imagingCompareCommand, ImagingCompareOptions } from './commands/imaging/compare';
 import { imagingReconcileCommand, ImagingReconcileOptions } from './commands/imaging/reconcile';
-import { imagingRegisterCommand, imagingRegisterStatusCommand, ImagingRegisterOptions, ImagingRegisterStatusOptions } from './commands/imaging/register';
+import { imagingRegisterCommand, imagingRegisterStatusCommand, imagingRegisterAdviseCommand, ImagingRegisterOptions, ImagingRegisterStatusOptions } from './commands/imaging/register';
 import { imagingPackageCommand, imagingPackageStatusCommand, ImagingPackageOptions, ImagingPackageStatusOptions } from './commands/imaging/package';
 import { methylSubmitCommand, MethylSubmitOptions } from './commands/methyl/submit';
 import { methylExecCommand, MethylExecOptions } from './commands/methyl/exec';
@@ -129,6 +145,9 @@ import { svCallExecCommand, SvCallExecOptions } from './commands/sv-call/exec';
 import { qcSubmitCommand, QcSubmitOptions } from './commands/qc/submit';
 import { qcExecCommand, QcExecOptions } from './commands/qc/exec';
 import { registerProteinImpact } from './commands/protein-impact/register';
+import { registerDerivedCommand, RegisterDerivedOptions } from './commands/register-derived-file';
+import { fusionEvidenceSubmitCommand, fusionEvidenceStatusCommand, FusionSubmitOptions } from './commands/fusion-evidence';
+import { mirrorSubmitCommand, mirrorStatusCommand, mirrorJobsCommand, mirrorScheduleCommand, MirrorOptions } from './commands/mirror';
 import { verkkoSubmitCommand, VerkkoSubmitOptions } from './commands/verkko/submit';
 import { verkkoExecCommand, VerkkoExecOptions } from './commands/verkko/exec';
 import { ontVariantsSubmitCommand, OntVariantsSubmitOptions } from './commands/ont-variants/submit';
@@ -180,9 +199,15 @@ import { annotateStatusCommand, AnnotateStatusOptions } from './commands/annotat
 import { createX402Command } from './commands/x402';
 import { interpretSubmitCommand, InterpretSubmitOptions } from './commands/interpret/submit';
 import { interpretStatusCommand, InterpretStatusOptions } from './commands/interpret/status';
+import { cassetteCommand, CassetteOptions } from './commands/cassette';
+import { hlaTypeSubmitCommand, HlaTypeOptions } from './commands/hla-type/submit';
+import { cancermapRegenCommand, CancermapRegenOptions } from './commands/cancermap/regen';
 import { ancestrySomosCommand, AncestrySomosOptions } from './commands/ancestry/somos';
 import { ancestryStatusCommand, AncestryStatusOptions } from './commands/ancestry/status';
 import { ancestryIngestCommand, AncestryIngestOptions } from './commands/ancestry/ingest';
+import { hfOnrampCommand, HfOnrampOptions } from './commands/onramp/huggingface';
+import { clawbioSubmitCommand, clawbioStatusCommand, ClawbioSubmitOptions } from './commands/clawbio/submit';
+import { governanceShowCommand, governanceHashCommand, GovernanceOptions } from './commands/governance';
 import {
   ancestryShareCommand, AncestryShareOptions,
   ancestrySharesCommand, AncestrySharesOptions,
@@ -203,6 +228,7 @@ import { eraseCommand, EraseOptions } from './commands/erase';
 import { eraseTrialRunCommand, eraseTrialNodeCommand, eraseTrialReadCommand, eraseTrialGranteeCommand, EraseTrialOptions } from './commands/erase-trial';
 import { fourierScoreCommand, FourierScoreOptions } from './commands/fourier-score';
 import { rrmConsensusCommand, RrmConsensusOptions } from './commands/rrm-consensus';
+import { rrmValidateClinvarCommand, rrmValidateStatusCommand, RrmValidateOptions } from './commands/rrm-validate';
 import { psmConsensusCommand, PsmConsensusOptions } from './commands/psm-consensus';
 import { bodeCommand, BodeOptions } from './commands/bode';
 import { waveletConsensusCommand, WaveletConsensusOptions } from './commands/wavelet-consensus';
@@ -227,9 +253,6 @@ import { ticketCommand, TicketOptions } from './commands/ticket';
 import { scanCommand, ScanOptions } from './commands/scan';
 import { inventoryCommand, InventoryOptions } from './commands/inventory';
 import { samplesListCommand, SamplesListOptions } from './commands/samples';
-import { cassetteCommand, CassetteOptions } from './commands/cassette';
-import { hlaTypeSubmitCommand, HlaTypeOptions } from './commands/hla-type/submit';
-import { cancermapRegenCommand, CancermapRegenOptions } from './commands/cancermap/regen';
 import { inventoryCohortCommand, InventoryCohortOptions } from './commands/inventory/cohort';
 import { jobReconcileCommand, JobReconcileOptions } from './commands/job/reconcile';
 import { cohortPipelineCommand, CohortPipelineOptions } from './commands/cohort-pipeline';
@@ -820,7 +843,7 @@ teleCommon(
 teleCommon(
   teleCmd
     .command('mosdepth <id>')
-    .description('mosdepth coverage (materializes temp BAM; prefer fuse for large WGS)')
+    .description('mosdepth coverage (refuses to write a BAM on this laptop unless BIOFS_ALLOW_LAPTOP_BAM=1)')
     .option('--out <prefix>', 'output prefix'),
 ).action(async (id: string, options: TeleCommonCli) => {
   try {
@@ -834,10 +857,11 @@ teleCommon(
 teleCommon(
   teleCmd
     .command('igv <id>')
-    .description('Write IGV desktop batch + IGV.js HTML session for the stream URL')
+    .description('Write an IGV.js session. Default does not persist a signed stream URL.')
     .option('--web', 'also open IGV.js HTML')
     .option('--open', 'open the HTML session in the default browser')
-    .option('--out <path>', 'output HTML path'),
+    .option('--out <path>', 'output HTML path')
+    .option('--persist-ticket', 'opt-in: embed the htsget URL (contains user_signature) in the file'),
 ).action(async (id: string, options: TeleCommonCli) => {
   try {
     await teleIgvCommand(id, options);
@@ -957,6 +981,82 @@ htsgetCmd
     }
   });
 
+const crypt4ghCmd = program
+  .command('crypt4gh')
+  .description('Optional GA4GH crypt4gh v1 envelope. Bound encrypt/decrypt require a BioNFT serial; the node holds the reader secret.');
+
+crypt4ghCmd
+  .command('keygen')
+  .description('Generate an extra X25519 crypt4gh recipient keypair (PEM). This is not a BioNFT.')
+  .option('--out <dir>', 'directory for recipient.pub / recipient.sk (default ~/.biofs/crypt4gh)')
+  .action(async (options: { out?: string }) => {
+    try {
+      await crypt4ghKeygenCommand(options);
+    } catch (error: any) {
+      Logger.error(`crypt4gh keygen failed: ${error?.message || error}`);
+      process.exit(6);
+    }
+  });
+
+crypt4ghCmd
+  .command('encrypt')
+  .description('Wrap bytes as crypt4gh v1. Default: --serial, BioNFT checkAccess, node-minted reader key.')
+  .option('--serial <biosample>', 'biosample serial governed by a BioNFT')
+  .option('--allow-unbound', 'EGA interop only: encrypt to a local recipient public key with no BioNFT')
+  .option('--recipient-pk <path>', 'extra GA4GH recipient, or required with --allow-unbound')
+  .option('-i, --input <path>', 'plaintext path (default stdin)')
+  .option('-o, --output <path>', 'ciphertext path (default stdout)')
+  .action(async (options: { recipientPk?: string; input?: string; output?: string; serial?: string; allowUnbound?: boolean }) => {
+    try {
+      await crypt4ghEncryptCommand(options);
+    } catch (error: any) {
+      Logger.error(`crypt4gh encrypt failed: ${error?.message || error}`);
+      process.exit(6);
+    }
+  });
+
+crypt4ghCmd
+  .command('decrypt')
+  .description('Unwrap crypt4gh v1. Default: --serial, BioNFT checkAccess, node releases the reader secret.')
+  .option('--serial <biosample>', 'biosample serial governed by a BioNFT')
+  .option('--allow-unbound', 'EGA interop only: decrypt with a local secret key and no BioNFT')
+  .option('--sk <path>', 'crypt4gh secret key PEM (required with --allow-unbound)')
+  .option('-i, --input <path>', 'ciphertext path (default stdin)')
+  .option('-o, --output <path>', 'plaintext path (default stdout)')
+  .action(async (options: { sk?: string; input?: string; output?: string; serial?: string; allowUnbound?: boolean }) => {
+    try {
+      await crypt4ghDecryptCommand(options);
+    } catch (error: any) {
+      Logger.error(`crypt4gh decrypt failed: ${error?.message || error}`);
+      process.exit(6);
+    }
+  });
+
+crypt4ghCmd
+  .command('revoke')
+  .description('Stop later reader-key release for this serial. Already-held secrets still decrypt.')
+  .requiredOption('--serial <biosample>', 'biosample serial whose envelope owner you are')
+  .action(async (options: { serial: string }) => {
+    try {
+      await crypt4ghRevokeCommand(options);
+    } catch (error: any) {
+      Logger.error(`crypt4gh revoke failed: ${error?.message || error}`);
+      process.exit(6);
+    }
+  });
+
+crypt4ghCmd
+  .command('inspect <file>')
+  .description('Print crypt4gh header facts (magic, version, packet count)')
+  .action(async (file: string) => {
+    try {
+      await crypt4ghInspectCommand(file);
+    } catch (error: any) {
+      Logger.error(`crypt4gh inspect failed: ${error?.message || error}`);
+      process.exit(6);
+    }
+  });
+
 // ========================================================================
 // (end v2.7.0 block)
 // ========================================================================
@@ -1018,6 +1118,127 @@ tokenizeCmd
       await tokenizeBiosampleCommand(biosampleSerial, options);
     } catch (error) {
       Logger.error(`Biosample tokenization failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+const humanmarkCmd = program
+  .command('humanmark')
+  .description('Prove a file was authored by a human: screen for PHI/genomic data, '
+    + 'commit the bytes with the ERC-8356 keccak scheme, emit a portable authorship proof');
+
+humanmarkCmd
+  .command('scan <path...>')
+  .description('Screen files and record their content commitments')
+  .option('--quiet', 'No progress output')
+  .action(async (paths: string[], options: HumanmarkScanOptions) => {
+    try {
+      await humanmarkScanCommand(paths, options);
+    } catch (error) {
+      Logger.error(`HumanMark scan failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+humanmarkCmd
+  .command('prove <file>')
+  .description('Emit a portable authorship prove bundle (<file>.humanmark.json)')
+  .option('--biocid <uri>', 'biocid:// of the manifest/content')
+  .option('--revocable', 'The work is under a revocable consent grant (clinical)')
+  .option('--snp-bloom <hex>', '50-SNP bloom commitment (from biofs fingerprint)')
+  .option('--fingerprint <vcf>', 'Local VCF/23andMe file to derive the 50-SNP bloom from')
+  .option('--out <path>', 'Output path (default <file>.humanmark.json)')
+  .action(async (file: string, options: HumanmarkProveOptions) => {
+    try {
+      await humanmarkProveCommand(file, options);
+    } catch (error) {
+      Logger.error(`HumanMark prove failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+humanmarkCmd
+  .command('verify <file>')
+  .description('Verify a file against its record and prove bundle')
+  .option('--bundle <path>', 'Prove bundle path')
+  .action(async (file: string, options: HumanmarkVerifyOptions) => {
+    try {
+      await humanmarkVerifyCommand(file, options);
+    } catch (error) {
+      Logger.error(`HumanMark verify failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+humanmarkCmd
+  .command('bless <file>')
+  .description('Human override to green with a written reason (never genomic)')
+  .option('--reason <text>', 'Written reason (required)')
+  .action(async (file: string, options: HumanmarkBlessOptions) => {
+    try {
+      await humanmarkBlessCommand(file, options);
+    } catch (error) {
+      Logger.error(`HumanMark bless failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+humanmarkCmd
+  .command('attest <file>')
+  .description('Screen, write a C2PA assertion sidecar, and emit the prove bundle (refuses biocid://)')
+  .option('--biocid <uri>', 'biocid:// to bind in the sidecar')
+  .option('--fingerprint <vcf>', 'Local VCF/23andMe file to derive the 50-SNP bloom from')
+  .option('--out <path>', 'Prove bundle path (default <file>.humanmark.json)')
+  .option('--bind', 'After attest, submit bindContent on Sequentia (needs author Bind sig or HUMANMARK_AUTHOR_KEY)')
+  .action(async (file: string, options: HumanmarkAttestOptions) => {
+    try {
+      await humanmarkAttestCommand(file, options);
+    } catch (error) {
+      Logger.error(`HumanMark attest failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+humanmarkCmd
+  .command('bind <file>')
+  .description('Submit ERC-8356 bindContent for a prove bundle on Sequentia ConsentGrant')
+  .option('--bundle <path>', 'Prove bundle (default <file>.humanmark.json)')
+  .option('--sidecar <path>', 'C2PA sidecar (default <file>.c2pa.json)')
+  .option('--attestor <address>', 'Author wallet (default biofs login wallet)')
+  .option('--sig <hex>', 'EIP-712 Bind signature from the attestor')
+  .action(async (file: string, options: HumanmarkBindOptions) => {
+    try {
+      await humanmarkBindCommand(file, options);
+    } catch (error) {
+      Logger.error(`HumanMark bind failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+humanmarkCmd
+  .command('onchain <contentCommitment>')
+  .description('Read the on-chain ERC-8356 C2PA binding for a content commitment')
+  .action(async (contentCommitment: string) => {
+    try {
+      await humanmarkOnchainCommand(contentCommitment);
+    } catch (error) {
+      Logger.error(`HumanMark on-chain read failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('attest <file>')
+  .description('Alias for biofs humanmark attest')
+  .option('--biocid <uri>', 'biocid:// to bind in the sidecar')
+  .option('--fingerprint <vcf>', 'Local VCF/23andMe file to derive the 50-SNP bloom from')
+  .option('--out <path>', 'Prove bundle path (default <file>.humanmark.json)')
+  .option('--bind', 'After attest, submit bindContent on Sequentia')
+  .action(async (file: string, options: HumanmarkAttestOptions) => {
+    try {
+      await humanmarkAttestCommand(file, options);
+    } catch (error) {
+      Logger.error(`HumanMark attest failed: ${error}`);
       process.exit(1);
     }
   });
@@ -1285,6 +1506,7 @@ imagingCmd
   .option('--timepoints <spec>', 'N-timepoint mode: JSON [{label,study,series}] (ordered, first=reference) or "label:study:series,..." — supersedes --baseline/--followup')
   .option('--anatomy <name>', 'anatomy to register (abdomen | chest)', 'abdomen')
   .option('--registration <mode>', 'deformable (SyNRA + Jacobian, default) or rigid (strict 6-DOF, spot-faithful organ meshes)', 'deformable')
+  .option('--register-job <id>', 'imaging-register job whose frame and gate travel with this result (organ use only; this job keeps its own alignment)')
   .option('--baseline-series <uid>', 'override the baseline primary CT series UID')
   .option('--followup-series <uid>', 'override the follow-up primary CT series UID')
   .option('--wait', 'Wait for the GPU pipeline to finish')
@@ -1325,6 +1547,7 @@ imagingCmd
   .requiredOption('--timepoints <spec>', 'oldest→newest: JSON [{label,study,series}] or "label:study[:series],..." (>=3; series auto-resolved if omitted)')
   .option('--anatomy <name>', 'anatomy (chest | abdomen)', 'chest')
   .option('--thr-hu <hu>', 'override the per-interval significance threshold (default adaptive max(55, 3·det_sigma))')
+  .option('--register-job <id>', 'imaging-register job. HU change stays rigid. Cross-protocol intensities are marked not assessable.')
   .option('--wait', 'Wait for the classifier to finish')
   .option('--quiet', 'Suppress progress output')
   .option('--json', 'Output as JSON')
@@ -1346,6 +1569,7 @@ imagingCmd
   .requiredOption('--timepoints <spec>', 'oldest→newest: JSON [{label,study,series}] or "label:study[:series],..." (>=2; series auto-resolved if omitted)')
   .option('--anatomy <name>', 'anatomy (chest | abdomen)', 'chest')
   .option('--treatment <ctx>', 'treatment context (naive | post_chemo | post_radiation | post_immunotherapy | post_surgery | unknown); non-naive forces human review', 'unknown')
+  .option('--register-job <id>', 'imaging-register job. Lesion voxels stay on the rigid grid. The frame only attributes organs and can force review.')
   .option('--wait', 'Wait for the GPU pipeline to finish')
   .option('--quiet', 'Suppress progress output')
   .option('--json', 'Output as JSON')
@@ -1437,6 +1661,7 @@ imagingCmd
   .option('--region <label>', 'focus the rigid alignment on a z-band (needs --zlo/--zhi), e.g. pelvis')
   .option('--zlo <frac>', 'region z-fraction lower bound [0..1]')
   .option('--zhi <frac>', 'region z-fraction upper bound [0..1]')
+  .option('--register-job <id>', 'imaging-register job. The comparator stays rigid. Cross-protocol HU is marked not assessable.')
   .option('--wait', 'Wait for the comparator to finish')
   .option('--quiet', 'Suppress progress output')
   .option('--json', 'Output as JSON')
@@ -1468,8 +1693,8 @@ imagingCmd
   });
 
 // imaging register — staged 3D registration of N CT timepoints into one reference
-// frame with a quality gate (rigid on bone -> affine -> SyN, QC per stage, transitivity),
-// on the GPU executor via biofs-node.
+// frame with a quality gate (vertebral rigid, column rigid, piecewise SyN, QC per
+// stage, transitivity), on the GPU executor via biofs-node.
 const collect = (v: string, prev: string[]) => prev.concat([v]);
 imagingCmd
   .command('register')
@@ -1487,6 +1712,18 @@ imagingCmd
       await imagingRegisterCommand(options);
     } catch (error) {
       Logger.error(`imaging register failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+imagingCmd
+  .command('register-advise <manifest> [purpose] [pair]')
+  .description('Print what a later verb may do with a finished imaging-register manifest')
+  .action(async (manifest: string, purpose?: string, pair?: string) => {
+    try {
+      await imagingRegisterAdviseCommand(manifest, purpose, pair);
+    } catch (error) {
+      Logger.error(`imaging register-advise failed: ${error}`);
       process.exit(1);
     }
   });
@@ -1571,6 +1808,8 @@ workspaceCmd
   .option('--as <agent_id>', 'Author id (e.g. operator, claude-code, grok-build)', 'operator')
   .option('--role <role>', 'Turn role', 'message')
   .option('--content <text>', 'Turn content')
+  .option('--content-file <path>', 'Read the turn content from a file (for long turns)')
+  .option('--model <model_id>', 'Model id that authored the turn (recorded on the turn for provenance)')
   .option('--ref <biocid:hash:kind...>', 'Data refs, each biocid:content_hash:kind')
   .option('--node <url>', 'biofs-node base override')
   .option('--json', 'Output as JSON')
@@ -2011,6 +2250,65 @@ const ancestryCmd = program
   .command('ancestry')
   .description('SOMOS 24-population ancestry — supervised-ADMIXTURE projection, optionally encrypted (genome never decrypted)');
 
+// Hugging Face gated-dataset on-ramp (server-side stream into BioRouter).
+const onrampCmd = program
+  .command('onramp')
+  .description('On-ramp a gated external biodata source into BioRouter (server-side; no genomic bytes on the laptop)');
+onrampCmd
+  .command('huggingface')
+  .description('Stream a gated Hugging Face dataset into gs://genobank-biorouter and register biocids for a custodian biowallet')
+  .requiredOption('--repo <id>', 'Hugging Face dataset repo (e.g. SageBio/mva-hackathon-2026-data)')
+  .requiredOption('--owner <address>', 'Custodian / family biowallet (EIP-55). Claimable.')
+  .requiredOption('--serial <serial>', 'Origin biosample serial (never UNKNOWN)')
+  .option('--case-id <id>', 'Protocol case id (default MV26-000001)', 'MV26-000001')
+  .option('--originlab <lab>', 'bioagent / originlab (default mva-hackathon)', 'mva-hackathon')
+  .option('--hf-token <token>', 'HF access token (or HF_TOKEN env)')
+  .option('--wait', 'Wait until the server-side stream and registry write finish')
+  .option('--quiet', 'Suppress progress')
+  .option('--json', 'Emit JSON')
+  .action(async (options: HfOnrampOptions) => {
+    try {
+      await hfOnrampCommand(options);
+    } catch (error) {
+      Logger.error(`huggingface on-ramp failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+const clawbioCmd = program
+  .command('clawbio')
+  .description('Independent consensus: ClawBio VEP (Ensembl) + EVEE Evo 2, dispatched on biofs-node');
+clawbioCmd
+  .command('submit <biosample_serial>')
+  .description('Run ClawBio variant-annotation and EVEE on biofs-node (candidate alleles only; genome stays on the server)')
+  .option('--owner <address>', 'Custodian / family biowallet (EIP-55). Defaults to the logged-in wallet.')
+  .option('--sqlite-biocid <biocid>', 'OpenCRAVAT sqlite biocid override')
+  .option('--candidates-json <path>', 'Optional candidate allele JSON (default: ACMG LoF + MVA genes from the case file)')
+  .option('--max-candidates <n>', 'Cap on alleles sent to VEP/EVEE', '80')
+  .option('--wait', 'Wait until the consensus report is registered')
+  .option('--quiet', 'Suppress progress')
+  .option('--json', 'Emit JSON')
+  .action(async (serial: string, options: ClawbioSubmitOptions) => {
+    try {
+      await clawbioSubmitCommand(serial, options);
+    } catch (error) {
+      Logger.error(`clawbio submit failed: ${error}`);
+      process.exit(1);
+    }
+  });
+clawbioCmd
+  .command('status <clawbio_job_id>')
+  .description('Poll a biofs-node ClawBio+EVEE consensus job')
+  .option('--json', 'Emit JSON')
+  .action(async (jobId: string, options: { json?: boolean }) => {
+    try {
+      await clawbioStatusCommand(jobId, options);
+    } catch (error) {
+      Logger.error(`clawbio status failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
 ancestryCmd
   .command('ingest <file>')
   .description('Ingest a DTC genotype into the SOMOS vault and register it, yielding a biosample serial')
@@ -2378,6 +2676,26 @@ program
     }
   });
 
+const governanceCmd = program
+  .command('governance')
+  .description('Genome Governance Token for AI Agents: hashed BioNFT grant template (no recontact, 30-day erase, CC BY 4.0 outputs, not medical care)');
+governanceCmd
+  .command('show')
+  .description('Print the four constraints and the keccak256 termsRef / purposeProfileRef')
+  .option('--json', 'Emit JSON')
+  .action(async (options: GovernanceOptions) => {
+    try { await governanceShowCommand(options); }
+    catch (error) { Logger.error(`governance show failed: ${error}`); process.exit(1); }
+  });
+governanceCmd
+  .command('hash')
+  .description('Print ConsentGrant.termsRef for genobank:consent-template:genome-governance-ai-agent:v1')
+  .option('--json', 'Emit JSON')
+  .action(async (options: GovernanceOptions) => {
+    try { await governanceHashCommand(options); }
+    catch (error) { Logger.error(`governance hash failed: ${error}`); process.exit(1); }
+  });
+
 // BioContext manifest commands (v2.6.0)
 const contextCmd = program
   .command('context')
@@ -2639,8 +2957,104 @@ qcCmd
     catch (error) { Logger.error(`qc exec failed: ${error}`); process.exit(1); }
   });
 
+// register-derived-file: file a small derived biofile from a local path into the signer's vault with a biocid and lineage (the `register-derived` group is the GCS and read path)
+program
+  .command('register-derived-file <file>')
+  .description('Register a small derived biofile (your own, with parent biocids) in your vault: biocid in the registry, lineage kept')
+  .requiredOption('--type <biodata_type>', 'biodata type, e.g. peptide-fasta, peptide-table')
+  .requiredOption('--parent <biocid>', 'parent biocid (repeatable; each must be yours)', (v: string, acc: string[]) => acc.concat([v]), [] as string[])
+  .option('--case-id <id>', 'Case identifier')
+  .option('--category <c>', 'data_category (clinical|dna|rna)', 'clinical')
+  .option('--json', 'Output as JSON')
+  .action(async (file: string, options: RegisterDerivedOptions) => { await registerDerivedCommand(file, options); });
+
 // protein-impact: protein-level impact of known missense substitutions (ITGA2B, ITGB3); analysis only, no design
 registerProteinImpact(program);
+// mirror — GenoBank.io DR biodata mirror: primary biodata to Cloudflare R2, Crypt4GH-encrypted, server to server
+const mirror = program
+  .command('mirror')
+  .description('Disaster-recovery mirror of primary biodata to Cloudflare R2, encrypted, server to server (operator only)');
+mirror
+  .command('plan')
+  .description('Count what a run would copy and delete, with the Google egress estimate (writes nothing)')
+  .option('--targets <buckets>', 'Comma-separated bucket names (default: every bucket)')
+  .option('--no-wait', 'Return the job id instead of waiting for the plan')
+  .option('--json', 'Output as JSON')
+  .action(async (options: MirrorOptions) => { await mirrorSubmitCommand('plan', options); });
+mirror
+  .command('run')
+  .description('Copy every primary file not yet mirrored, then propagate deletions (2 percent guard)')
+  .option('--targets <buckets>', 'Comma-separated bucket names (default: every bucket)')
+  .option('--allow-mass-delete', 'Apply deletions even when they exceed 2 percent of the mirror')
+  .option('--max-mbps <n>', 'Combined read cap in MB/s (default 60)')
+  .option('--workers <n>', 'Files copied in parallel (default 3)')
+  .option('--wait', 'Wait for the run to finish')
+  .option('--json', 'Output as JSON')
+  .action(async (options: MirrorOptions) => { await mirrorSubmitCommand('run', options); });
+mirror
+  .command('status [jobId]')
+  .description('Progress of the latest mirror job, or of one job')
+  .option('--json', 'Output as JSON')
+  .action(async (jobId: string | undefined, options: MirrorOptions) => { await mirrorStatusCommand(jobId, options); });
+mirror
+  .command('jobs')
+  .description('The last 10 mirror jobs and the daily schedule')
+  .option('--json', 'Output as JSON')
+  .action(async (options: MirrorOptions) => { await mirrorJobsCommand(options); });
+mirror
+  .command('schedule')
+  .description('Turn the daily sync on or off (biofs-node runs it; deletions propagate each day)')
+  .option('--daily', 'Run once a day')
+  .option('--off', 'Stop the daily sync')
+  .option('--hour-utc <h>', 'Hour of day in UTC (default 9)')
+  .option('--max-mbps <n>', 'Combined read cap in MB/s for scheduled runs')
+  .option('--workers <n>', 'Files copied in parallel for scheduled runs')
+  .option('--json', 'Output as JSON')
+  .action(async (options: MirrorOptions) => { await mirrorScheduleCommand(options); });
+
+// MutatomeNFT verbs load only where the private module is installed (git-excluded until filing).
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require('./commands/mutatome').registerMutatome(program);
+} catch (e: any) {
+  if (e?.code !== 'MODULE_NOT_FOUND') throw e;
+}
+
+// Fusion-evidence command group — one candidate fusion transcript tested on the caller's own
+// RNA (junction reads, every read incl. unmapped) and tumor/normal DNA (copy-number step,
+// discordant pairs), server-side via biofs-node; inputs are biocids, result is a biocid.
+const fusionCmd = program
+  .command('fusion-evidence')
+  .description('Test a candidate fusion transcript on your own RNA and tumor/normal DNA, server-side (biocid in, biocid out)');
+
+fusionCmd
+  .command('submit', { isDefault: true })
+  .description('Submit a fusion-evidence job to biofs-node')
+  .requiredOption('--five-exon <iv>', "5' partner exon (RNA build), chr:start-end 1-based")
+  .requiredOption('--three-exon <iv>', "3' partner exon (RNA build), chr:start-end 1-based")
+  .option('--five-next-exon <iv>', "the 5' gene's own next exon (canonical competitor)")
+  .option('--three-prev-exon <iv>', "the 3' gene's own previous exon (canonical competitor)")
+  .option('--five-strand <s>', "5' gene strand (+/-)", '+')
+  .option('--three-strand <s>', "3' gene strand (+/-)", '+')
+  .option('--rna <biocid>', 'RNA BAM biocid')
+  .option('--tumor <biocid>', 'Tumor DNA BAM biocid')
+  .option('--normal <biocid>', 'Matched-normal DNA BAM biocid')
+  .option('--dna-junction <spec>', 'Genotype a DNA breakpoint in every DNA input: chr:end+INS+chr:start (RNA build, + strand)')
+  .option('--extra-dna <biocid>', 'Tumor-only DNA BAM in the RNA build, scanned for discordant/split reads (repeatable)', (v: string, acc: string[]) => acc.concat([v]), [] as string[])
+  .option('--rna-build <b>', 'RNA BAM reference build (hg38|hs37d5)', 'hg38')
+  .option('--dna-build <b>', 'DNA BAM reference build (hg38|hs37d5)', 'hs37d5')
+  .option('--label <text>', 'Label stored with the job')
+  .option('--case-id <id>', 'Case identifier stored with the result')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Output as JSON')
+  .action(async (options: FusionSubmitOptions) => { await fusionEvidenceSubmitCommand(options); });
+
+fusionCmd
+  .command('status <fusion_job_id>')
+  .description('Show a fusion-evidence job (only the signer who submitted it can read it)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Output as JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await fusionEvidenceStatusCommand(id, options); });
 
 // Verkko command group — telomere-to-telomere assembly (verkko 2.3.2), biocid-gated
 const verkkoCmd = program
@@ -3399,6 +3813,40 @@ program
     }
   });
 
+const rrmValidateCmd = program
+  .command('rrm-validate')
+  .description('Scale validation of Cosic-RRM / piezoelectric / wavelet variant scores against ClinVar (biofs-node)');
+rrmValidateCmd
+  .command('clinvar')
+  .description('ClinVar GRCh38 allele VCF on biofs-node: per-gene ΔAUC vs AlphaMissense, protein-class hold-out')
+  .option('--owner <address>', 'Biowallet that owns the derived report (default: logged-in wallet)')
+  .option('--min-stars <n>', 'ClinVar review stars ≥ N (default 1)', '1')
+  .option('--min-n <n>', 'Min P/LP and B/LB missense per gene (default 15)', '15')
+  .option('--max-genes <n>', 'Cap powered genes (0 = all)', '0')
+  .option('--wait', 'Wait until the node job finishes')
+  .option('--quiet', 'Suppress progress')
+  .option('--json', 'Emit JSON')
+  .action(async (options: RrmValidateOptions) => {
+    try {
+      await rrmValidateClinvarCommand(options);
+    } catch (error) {
+      Logger.error(`rrm-validate clinvar failed: ${error}`);
+      process.exit(1);
+    }
+  });
+rrmValidateCmd
+  .command('status <wave_job_id>')
+  .description('Poll a biofs-node ClinVar wave job')
+  .option('--json', 'Emit JSON')
+  .action(async (jobId: string, options: { json?: boolean }) => {
+    try {
+      await rrmValidateStatusCommand(jobId, options);
+    } catch (error) {
+      Logger.error(`rrm-validate status failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
 // PSM-consensus — Piezoelectric Signal Model: same cross-spectrum maths as
 // rrm-consensus, but with side-chain dipole moment (Debye) replacing EIIP.
 // Tests the hypothesis that the piezoelectric encoding picks up
@@ -3882,12 +4330,14 @@ program
   .option('--format <type>', 'Output format: table | tsv | json (default: table)', 'table')
   .option('--output <path>', 'Write output to file instead of stdout')
   .option('--plot <path>', 'Render |ΔF| windowed spectrum to PNG (one panel per variant)')
-  .option('--consensus-fc', 'Also score full-protein DFT at family characteristic frequency f_c (requires `biofs rrm-consensus <gene>` first)')
-  .option('--plot-full <path>', 'Render full-protein |X(k)| spectrum to PNG with f_c annotated (requires --consensus-fc)')
+  .option('--consensus-fc', 'Also score at family characteristic frequency f_c (auto if ~/.biofs/cache/rrm/<gene>.json exists)')
+  .option('--plot-full <path>', 'Render full-protein |X(k)| spectrum to PNG with f_c annotated (requires consensus cache)')
+  .option('--null-model', 'Rank this substitution among the 19 amino acids at the same site')
+  .option('--encoding <eiip|piezo>', 'Per-residue index: Cosic EIIP or side-chain dipole (default eiip)', 'eiip')
   .option('--quiet', 'Suppress progress output')
   .action(async (variants: string, options: FourierScoreOptions) => {
     try {
-      await fourierScoreCommand(variants, options);
+      await fourierScoreCommand(variants, { ...options, nullModel: !!(options as FourierScoreOptions).nullModel });
     } catch (error) {
       Logger.error(`Fourier scoring failed: ${error}`);
       process.exit(1);
@@ -4326,6 +4776,7 @@ consentCmd
   .requiredOption('--session <id>', 'MCP session id (Mcp-Session-Id)')
   .requiredOption('--biocid <biocid>', 'The biocid:// the grant covers')
   .option('--days <n>', 'Validity in days (1-30)', '1')
+  .option('--template <id>', 'Grant template (genome-governance-ai-agent pins 30-day research-not-care)')
   .option('--json', 'Emit JSON')
   .option('--quiet', 'Suppress progress')
   .action(async (o: any) => {
@@ -4880,6 +5331,17 @@ fluencyCmd
   .option('--quiet', 'Suppress progress')
   .action(async (biocid: string, options: { json?: boolean; quiet?: boolean }) => {
     try { await fluencyStateCommand(biocid, options); } catch (error) { Logger.error(`fluency state failed: ${error}`); process.exit(1); }
+  });
+fluencyCmd
+  .command('pack')
+  .description('Prepare the most representative files for an advanced-patient conversation (coverage-complete store, ACMG writeup, SV). Does not print storage URLs.')
+  .option('--wallet <address>', "Admin: pack another wallet's vault")
+  .option('--layer <name>', 'Conversation layer (default advanced_patient)', 'advanced_patient')
+  .option('--build', 'Also run fluency build on the primary store')
+  .option('--json', 'Emit JSON')
+  .option('--quiet', 'Suppress progress')
+  .action(async (options: { wallet?: string; layer?: string; build?: boolean; json?: boolean; quiet?: boolean }) => {
+    try { await fluencyPackCommand(options); } catch (error) { Logger.error(`fluency pack failed: ${error}`); process.exit(1); }
   });
 
 program

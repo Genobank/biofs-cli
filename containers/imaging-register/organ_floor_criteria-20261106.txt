@@ -1,0 +1,63 @@
+Organ volume floors: pass criteria and predictions, written before organ_floor.py existed and before any floor run. Date of writing: 2026-11-06.
+Module: organ_floor.py. Tests: test_organ_floor.py. Package side: organ_package.py (amendment 2 below, same file of criteria).
+
+Question: how much does the volume of an organ, as TotalSegmentator draws it, change between two scans when nothing about the organ has changed?
+A measured answer lets the organ package say "this change is larger than the noise of the measurement", and nothing more. It does not say a change
+is clinically relevant. A floor is a lower bound of the real variation between two visits: it holds no filling of hollow organs, no change of posture
+or of arms, no change of contrast phase beyond what the sources contain.
+
+Three sources, each "no true change" by construction:
+  S1 perturbation of the operator's own scans. Each native scan (3 scans of the chest job register-ef1676c3, 3 of the abdomen job register-e05d1252, 1 mm
+     isotropic CT as the jobs staged it) gets 6 emulated variants, then every variant and the unperturbed CT are segmented again by the production path
+     (register.segment, TotalSegmentator total). Variants: V1 white Gaussian noise 10 HU (seed 1); V2 noise 10 HU (seed 2); V3 noise 20 HU (seed 3);
+     V4 Gaussian blur 0.6 mm; V5 a shift of 0.5 mm along each axis (linear resampling); V6 blur 0.6 mm plus noise 10 HU (seed 4). V0 is the unperturbed
+     CT segmented again. Value per organ, scan and variant: |volume(variant) / volume(job's own native labels) - 1| in percent. An emulation, not a
+     reconstruction: it shows the sensitivity of the segmentation to noise, blur and sub-voxel position of this scan.
+  S2 real same-day repeats: RIDER Lung CT, the 8 pairs already segmented for the lung-mass calibration (rider_repeat, 16 scans, same scanner, same kernel,
+     minutes apart: repositioning, breath and noise realisation are real). Value: |volume(B) / volume(A) - 1| in percent, scans in acquisition order.
+     Chest field of view only.
+  S3 real reconstruction change: RIDER Lung CT, 6 patients, the lung-kernel and the standard-kernel reconstruction of the same raw data at 1.25 mm and
+     at 2.5 mm, each segmented (24 segmentations, 12 pairs). Value: |volume(standard) / volume(lung) - 1| in percent.
+Organs: the 29 of organ_package.DEFAULT_ORGANS (composites lung_left, lung_right, spine as in the package). A value is dropped when the organ touches
+the edge of the scan (organ_package.scan_edge) in either scan of the comparison, because its volume is then a lower bound.
+
+Floor per organ and source: n, median, p95 and max of the absolute relative difference in percent, and the p95 in ml; only when n >= 8, otherwise null.
+Floor per organ for the package: the largest p95 percent over the sources with n >= 8. The floors file lists for each organ which sources it
+came from, and states what the floor excludes (filling, posture, arms, contrast phase; for the organs with no same-day repeat, every real source).
+
+Criteria on the code, known-answer, all must pass (test_organ_floor.py)
+FL1 perturbation. Noise: the standard deviation of (variant - original) is within 3 percent of the requested value on a 60 cubed volume; the same seed gives
+    byte-identical output and another seed does not. Blur: the effective sigma of an impulse is within 5 percent of the requested value. Shift: a smooth
+    test image shifted by 0.5 voxel equals the analytic shifted image within 2 percent of its amplitude, away from the border. Zero noise, zero blur and zero
+    shift return the original exactly. Origin, spacing, direction, size and pixel type of the output equal the input.
+FL2 volumes. The volume of an organ from a label map equals voxel count times voxel volume exactly and the cut flag equals organ_package.scan_edge.
+FL3 pooling. For a made list of differences p95, median, max and n equal numpy to 1e-9; a value is dropped when the organ is cut in either scan; n < 8 gives
+    null; the package floor is the largest p95 over the sources with n >= 8; the floors file carries sources, limits and the exclusion text; the output is
+    deterministic (same input, same bytes apart from the time).
+FL4 application in the package (organ_package.py, amendment 2). With a floors file, each change row of an organ with a floor carries floor_pct and
+    exceeds_measured_floor: true when |delta_pct| > floor_pct, false when not, null when the row is not assessable (the reason is kept). An organ without
+    a floor carries floor null and exceeds_measured_floor null. The words clinically relevant appear nowhere in the package. Without a floors file nothing
+    changes: repeatability_floor stays null and no row carries exceeds_measured_floor. The organ's change record names the floor sources and the
+    exclusions. verify rejects a package whose recorded floor differs from the floors file hash it names.
+
+Criteria on the real data (organ_floor_real_checks.py reads the outputs; nothing here is tuned after the run)
+RF1 completeness. The run produces 21 segmentations per job in S1 (3 scans x 7 variants incl. V0), 16 in S2 (read from disk, no new segmentation) and 24 in S3.
+    Every segmentation that fails is listed; none is replaced.
+RF2 coverage. For each source the number of organs with n >= 8 is reported with the list of organs that have none; the abdomen organs (liver, spleen,
+    kidneys, pancreas, gallbladder, stomach, duodenum, small_bowel, colon, urinary_bladder, prostate, adrenals) must have a floor from S1.
+RF3 determinism of the segmenter. V0 equals the job's own native labels in volume to 0.5 percent for every organ of 20 ml or more in all 6 scans; if not, the
+    result is reported as segmenter non-determinism and the floors already contain it.
+RF4 the floors file is built, hashed and read back; the package is rebuilt for both jobs with the floors and verify reports OK.
+
+Predictions, written before any run
+P-F1 V0 is identical to the job's own labels (volumes equal) for every organ in all 6 scans.
+P-F2 S1 p95 of lung_left, lung_right, liver, spleen, kidney_left, kidney_right and heart is at most 2 percent.
+P-F3 S1 p95 of adrenal_gland_left, adrenal_gland_right, gallbladder, duodenum and pancreas is at least 5 percent.
+P-F4 S1 p95 of colon and stomach is at most 6 percent (a floor that cannot see filling).
+P-F5 For at least 60 percent of the organs that have both, the S3 p95 is larger than the S1 p95 (a kernel moves boundaries more than noise does).
+P-F6 S2 p95 of lung_left and lung_right is between 3 and 15 percent (breath).
+P-F7 On the abdomen job the change of liver at jan9 against mar3 (+6.3 percent), of spleen at oct21 (+7.2 percent) and of pancreas at jan9 and oct21 exceed
+     their floors; the changes of kidney_left and kidney_right at oct21 (-0.1 and -1.2 percent) do not.
+
+Not in this version, stated now: abdominal same-day repeat scans (none available), inhale against exhale, the effect of contrast phase, a floor for
+filling of hollow organs, floors for each scanner or protocol, a floor for the shape of an organ, any threshold for clinical relevance.

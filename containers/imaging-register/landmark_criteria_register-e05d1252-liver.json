@@ -1,0 +1,35 @@
+{
+  "schema": "imaging-register-landmark-criteria/1",
+  "registered_at_utc": "2026-11-05T21:35:39Z",
+  "job_under_test": "register-e05d1252-b3a6-4fcf-9aec-1765c1f6392b",
+  "status": "Provisional. Set by the engineer before any result of this job was read. Not derived from the literature and not validated against a reference standard. A reader may change them before the results are read, never after.",
+  "proposal": {
+    "region": "liver",
+    "patch_half_mm": 8,
+    "search_half_mm": 45,
+    "ncc_min": 0.6,
+    "margin_min": 0.03,
+    "min_spacing_mm": 15,
+    "per_zone": 5,
+    "min_edge_from_liver_surface_mm": 10,
+    "soft_lo_hu": 0.0,
+    "soft_hi_hu": 300.0
+  },
+  "verification": {
+    "who": "a person who can recognise the same hepatic or portal vein branch point in both scans; a radiologist is preferred",
+    "accept_only_if": "the two points are the same vessel branch point, not a similar-looking texture or another branch",
+    "reject_if": "unsure"
+  },
+  "sufficiency": {
+    "min_verified_per_pair": 20,
+    "min_per_side": 4,
+    "min_lower_third": 4
+  },
+  "pass": {
+    "deformable_median_tre_mm_max": 2.0,
+    "deformable_p90_tre_mm_max": 5.0,
+    "lower_third_median_tre_mm_max": 3.0,
+    "deformable_median_must_beat_rigid_median": true
+  },
+  "reading": "PASS means the registration places liver vessel branch points that a reader confirmed within these distances. It says nothing about the liver surface or about neighbouring organs that sit in different places in the two scans, which is what the label gate measures; it is independent of the labels. Points the algorithm proposed and the reader rejected are reported beside the TRE, and the confirmed points are the easier, well-matched ones."
+}

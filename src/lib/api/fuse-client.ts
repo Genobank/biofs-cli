@@ -175,6 +175,13 @@ export interface FuseCohortFourierResponse {
   methodology?: string;
 }
 
+function ownerAuth(wallet: string, signature: string) {
+  return {
+    'X-Biofs-Wallet': wallet,
+    'X-Biofs-Signature': signature,
+  };
+}
+
 export class FuseAPIClient {
   private baseUrl: string;
 
@@ -189,7 +196,8 @@ export class FuseAPIClient {
   async discover(wallet: string, signature: string): Promise<FuseDiscoverResponse> {
     try {
       const response = await axios.get(`${this.baseUrl}/discover`, {
-        params: { wallet, signature }
+        headers: ownerAuth(wallet, signature),
+        params: { wallet },
       });
       return response.data;
     } catch (error: any) {

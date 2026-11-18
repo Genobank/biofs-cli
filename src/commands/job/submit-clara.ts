@@ -17,6 +17,30 @@ export interface ClaraJobOptions {
   json?: boolean;              // JSON output format
 }
 
+function claraSubmitUrl(biofsNodeUrl: string): string {
+  const base = biofsNodeUrl.replace(/\/$/, '');
+  // Public nginx maps /api_biofs_node/X → /agent/X. GPU jobs must hit /job
+  // so the front node can discover a GPU executor. The legacy
+  // /api/v1/clara/submit-job path is only valid on a node that is reached
+  // without that rewrite (direct :8787).
+  if (/api_biofs_node/i.test(base)) {
+    return `${base}/job`;
+  }
+  return `${base}/api/v1/clara/submit-job`;
+}
+
+function loadBiofsConfig(): any {
+  const localConfigPath = path.join(process.cwd(), 'config.json');
+  const homeConfigPath = path.join(process.env.HOME || '~', '.biofsrc');
+  if (fs.existsSync(localConfigPath)) {
+    return JSON.parse(fs.readFileSync(localConfigPath, 'utf-8'));
+  }
+  if (fs.existsSync(homeConfigPath)) {
+    return JSON.parse(fs.readFileSync(homeConfigPath, 'utf-8'));
+  }
+  throw new Error('Config not found. Create config.json or ~/.biofsrc with biofsNode.url');
+}
+
 export async function submitClaraCommand(
   biosampleId: string,
   fastqR1?: string,
@@ -26,131 +50,128 @@ export async function submitClaraCommand(
   const spinner = ora('Submitting Clara Parabricks job...').start();
 
   try {
-    // Get credentials
     const credentials = await getCredentials();
     if (!credentials) {
       throw new Error('Not authenticated. Please run "biofs login" first.');
     }
 
-    // Load config (check multiple locations)
-    let config: any;
-    const localConfigPath = path.join(process.cwd(), 'config.json');
-    const homeConfigPath = path.join(process.env.HOME || '~', '.biofsrc');
-
-    if (fs.existsSync(localConfigPath)) {
-      config = JSON.parse(fs.readFileSync(localConfigPath, 'utf-8'));
-    } else if (fs.existsSync(homeConfigPath)) {
-      config = JSON.parse(fs.readFileSync(homeConfigPath, 'utf-8'));
-    } else {
-      throw new Error('Config not found. Create config.json or ~/.biofsrc with biofsNode.url');
-    }
-
+    const config = loadBiofsConfig();
     const biofsNodeUrl = config.biofsNode?.url || process.env.BIOFS_NODE_URL;
-
     if (!biofsNodeUrl) {
       throw new Error('BioFS-Node URL not configured. Set biofsNode.url in config.json or BIOFS_NODE_URL in .env');
     }
 
     const userWallet = credentials.wallet_address;
     const userSignature = credentials.user_signature;
+    const sequencingType = (options.sequencingType || config.services?.clara?.defaultSequencingType || 'WES').toUpperCase();
+    const isWgs = sequencingType === 'WGS';
 
-    // Step 1: Query consent record (optional - will use defaults if not found)
     spinner.text = 'Querying biosample consent record...';
     const bionft = BioNFTClient.getInstance();
 
-    let agentWallet = '0x0f93777fd0dd3ba0b0b834a7ad5680f146ced3f1'; // Default agent wallet
-    let consent: any = null;
-
+    let agentWallet = '0x0f93777fd0dd3ba0b0b834a7ad5680f146ced3f1';
     try {
       const { isTokenized, consent: consentData } = await bionft.checkBiosampleTokenization(biosampleId);
       if (isTokenized && consentData && consentData.agent_wallet) {
         agentWallet = consentData.agent_wallet;
-        consent = consentData;
         Logger.info(`✓ Found consent record with agent wallet: ${agentWallet}`);
       } else {
         Logger.info(`✓ Using default agent wallet: ${agentWallet}`);
       }
-    } catch (error: any) {
-      // Consent check failed - use defaults
+    } catch {
       Logger.info(`✓ Consent check skipped, using default agent wallet`);
     }
 
-    // Step 2: FASTQ files (BioFS-Node will auto-discover from QUIC mount)
     let finalFastqR1 = fastqR1;
     let finalFastqR2 = fastqR2;
-
     if (!fastqR1 || !fastqR2) {
-      // BioFS-Node processor will auto-discover from /biofs/<biosample_id>/
       Logger.info('✓ FASTQ files will be auto-discovered by BioFS-Node');
       finalFastqR1 = 'auto';
       finalFastqR2 = 'auto';
     }
 
-    // Use Clara defaults from config
     const claraConfig = config.services?.clara || {};
-    const jobData = {
-      jobId: options.jobId || uuidv4(),
+    const jobId = options.jobId || uuidv4();
+    const jobData: Record<string, unknown> = {
+      jobId,
       biosampleId,
+      biosample_serial: biosampleId,
       fastqR1: finalFastqR1,
       fastqR2: finalFastqR2,
-      userWallet,  // Patient wallet (biofs-node expects 'userWallet' not 'patientWallet')
-      sequencingType: options.sequencingType || claraConfig.defaultSequencingType || 'WES',
+      r1Uri: finalFastqR1,
+      r2Uri: finalFastqR2,
+      r1_uri: finalFastqR1,
+      r2_uri: finalFastqR2,
+      userWallet,
+      creatorWallet: userWallet,
+      userSignature,
+      user_signature: userSignature,
+      creatorSig: userSignature,
+      signature: userSignature,
+      sequencingType,
       reference: options.reference || claraConfig.defaultReference || 'hg38',
-      captureKit: options.captureKit || claraConfig.defaultCaptureKit || 'agilent_v8',
-      intervalFile: options.intervalFile || claraConfig.defaultIntervalFile || '/Samples1/hg38/Agilent_V8_SureSelect_hg38.bed'
+      captureKit: options.captureKit || (isWgs ? 'wgs' : (claraConfig.defaultCaptureKit || 'agilent_v8')),
+      intervalFile: options.intervalFile || (isWgs ? '' : (claraConfig.defaultIntervalFile || '/Samples1/hg38/Agilent_V8_SureSelect_hg38.bed')),
+      inputType: 'fastq',
     };
 
-    spinner.text = 'Connecting to BioFS-Node...';
+    const submitUrl = claraSubmitUrl(biofsNodeUrl);
+    spinner.text = `Connecting to BioFS-Node (${submitUrl})...`;
 
-    // Submit job to BioFS-Node
     const response = await axios.post(
-      `${biofsNodeUrl}/api/v1/clara/submit-job`,
+      submitUrl,
       jobData,
       {
         timeout: 30000,
         headers: {
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+          'X-Biofs-Signature': userSignature,
+        },
       }
     );
 
-    if (!response.data.success) {
+    if (response.data.success === false) {
       throw new Error(response.data.error || 'Job submission failed');
     }
 
     spinner.succeed(chalk.green('✓ Clara job submitted successfully'));
 
+    const payload = {
+      success: true,
+      jobId: response.data.jobId || jobId,
+      biosampleId,
+      status: response.data.status || 'accepted',
+      sequencingType,
+      reference: jobData.reference,
+      captureKit: jobData.captureKit,
+      fastqR1: finalFastqR1,
+      fastqR2: finalFastqR2,
+      submittedTo: submitUrl,
+      forwarded: response.data.forwarded,
+      subsidized: response.data.subsidized,
+    };
+
     if (options.json) {
-      console.log(JSON.stringify(response.data, null, 2));
+      console.log(JSON.stringify({ ...response.data, ...payload }, null, 2));
       return;
     }
 
     console.log();
     console.log(chalk.bold('Clara Parabricks Job Submitted:'));
-    console.log(`  ${chalk.cyan('Job ID:')} ${response.data.jobId}`);
+    console.log(`  ${chalk.cyan('Job ID:')} ${payload.jobId}`);
     console.log(`  ${chalk.cyan('Biosample:')} ${biosampleId}`);
-    console.log(`  ${chalk.cyan('Status:')} ${response.data.status}`);
-    console.log(`  ${chalk.cyan('Sequencing Type:')} ${jobData.sequencingType}`);
+    console.log(`  ${chalk.cyan('Status:')} ${payload.status}`);
+    console.log(`  ${chalk.cyan('Sequencing Type:')} ${sequencingType}`);
     console.log(`  ${chalk.cyan('Reference:')} ${jobData.reference}`);
-    console.log(`  ${chalk.cyan('Capture Kit:')} ${jobData.captureKit}`);
     console.log();
-    console.log(chalk.bold('Consent Details:'));
-    console.log(`  ${chalk.cyan('Patient Wallet:')} ${userWallet.substring(0, 10)}...`);
-    console.log(`  ${chalk.cyan('Processing Agent:')} ${(agentWallet || 'None').substring(0, 10)}...`);
-    console.log();
-    console.log(chalk.bold('Input Files:'));
-    console.log(`  ${chalk.cyan('R1:')} ${finalFastqR1}`);
-    console.log(`  ${chalk.cyan('R2:')} ${finalFastqR2}`);
-    console.log();
-    console.log(chalk.gray('Monitor status: ') + chalk.cyan(`biofs job status ${response.data.jobId}`));
-    console.log(chalk.gray('Or via API: ') + chalk.cyan(`curl ${biofsNodeUrl}/api/v1/clara/job/${response.data.jobId}`));
+    console.log(chalk.gray('Monitor status: ') + chalk.cyan(`biofs job status ${payload.jobId}`));
     console.log();
 
   } catch (error: any) {
     spinner.fail(chalk.red('✗ Failed to submit Clara job'));
 
     if (error.response) {
-      Logger.error(`Server error (${error.response.status}): ${error.response.data?.error || error.message}`);
+      Logger.error(`Server error (${error.response.status}): ${JSON.stringify(error.response.data) || error.message}`);
     } else if (error.request) {
       Logger.error(`Cannot connect to BioFS-Node. Is it running at ${error.config?.baseURL || 'configured URL'}?`);
     } else {
@@ -160,5 +181,3 @@ export async function submitClaraCommand(
     process.exit(1);
   }
 }
-
-

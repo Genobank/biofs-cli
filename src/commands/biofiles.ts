@@ -85,12 +85,20 @@ export async function filesCommand(options: FilesOptions): Promise<void> {
 
   if (files.length === 0) {
     Logger.info('No files found matching your criteria');
+    if (targetOwner) {
+      console.log('');
+      console.log('Inventory is keyed by owner_wallet. Files held by a custodian still');
+      console.log('appear in ai_index for the patient wallet. After biofs-node maps');
+      console.log('ai_index into list_inventory they show here. Confirm with:');
+      console.log(`  biofs fluency pack --wallet ${targetOwner} --layer advanced-patient --json`);
+    }
     return;
   }
 
-  // Output results
+  // Output results. Never emit storage URLs (gs://, signed, S3).
   if (options.json) {
-    console.log(JSON.stringify(files, null, 2));
+    const publicFiles = files.map(({ s3_path, gcs_path, presigned_url, ...rest }) => rest);
+    console.log(JSON.stringify(publicFiles, null, 2));
   } else {
     displayFilesTable(files, options.filter);
   }

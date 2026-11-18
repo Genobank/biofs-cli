@@ -14,4 +14,5 @@ WORKDIR /app
 COPY vista3d_runner.py /app/runner.py
 COPY vista3d_runner.py /app/vista3d_runner.py
 COPY imaging_lesion_track_runner.py /app/lesion_track.py
+COPY frame_contract.py /app/frame_contract.py
 ENTRYPOINT ["python","/app/runner.py"]

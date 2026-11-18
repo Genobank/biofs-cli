@@ -667,6 +667,13 @@ def main():
         meshes_out = os.path.join(up, "mesh"); shutil.copytree(meshdir, meshes_out, dirs_exist_ok=True)
         manifest["elapsed_sec"] = round(time.time() - t0, 1)
         manifest["status"] = "done"
+        # This job keeps its own alignment. REGISTER_MANIFEST records whether organ
+        # volumes may also be read from an imaging-register frame.
+        try:
+            import frame_contract
+            manifest = frame_contract.attach_if_configured(manifest, "twin")
+        except Exception as _hook_err:
+            log(f"register frame not attached: {_hook_err}")
         with open(os.path.join(up, "manifest.json"), "w") as f:
             json.dump(manifest, f, indent=2)
         sh(["gcloud", "storage", "cp", "--recursive", up + "/*", out_prefix])

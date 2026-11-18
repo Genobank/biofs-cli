@@ -21,7 +21,7 @@ import { ethers } from 'ethers';
 import { Logger } from '../utils/logger';
 
 // Sequentia Network Configuration
-const SEQUENTIA_RPC_URL = 'http://52.90.163.112:8545';
+const SEQUENTIA_RPC_URL = process.env.SEQUENTIA_RPC_URL || 'https://seqrpc.genobank.app';
 const BIOPIL_CONTRACT_ADDRESS = '0xDae899b64282370001E3f820304213eDf2D983DE';
 
 export enum BioPILLicenseType {

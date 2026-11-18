@@ -39,6 +39,9 @@ export async function tokenizeCommand(filePath: string, options: TokenizeOptions
     throw new Error(`File not found: ${filePath}`);
   }
 
+  const { assertUploadAllowed } = await import('./humanmark');
+  assertUploadAllowed(absolutePath);
+
   // Get file stats
   const fileStats = await stat(absolutePath);
   const fileSize = fileStats.size;

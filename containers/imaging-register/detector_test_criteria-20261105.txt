@@ -1,0 +1,42 @@
+Detector known-answer test of the findings verb (findings_runner.py in imaging-findings:v27-20261105, VISTA-3D detector, LesionLocator tracker if its checkpoint is present)
+Pre-registration, written before the first run. Engineer: Daniel Uribe. Date 2026-11-05.
+Companion of lesion_logic_criteria-20261105.txt (logic with injected masks, sha256 0d986a78...): this test uses the REAL detector.
+
+DESIGN
+One real chest CT (the Jun 17 scan of job register-ef1676c3, 1.0 mm isotropic, derived from the owner's own series; it stays on the GPU VM disk and is never copied to the laptop).
+Spheres of known diameter and density are blended into the lung parenchyma (known_answer.insert_sphere, 0.8 mm soft edge), at seeded positions at least 12 mm from the lung edge, in plain parenchyma, at least 35 mm apart.
+Each scan gets independent Gaussian noise of 10 HU (baseline seed A, follow-up seed B), as a stand-in for two acquisitions. No blur, no deformation, no rigid offset: the registration is the easy case.
+The executor runs unchanged (real main(), real VISTA-3D, real tracker). Only storage is replaced: a `gcloud` shim on PATH maps gs://bucket/path to a local folder, so nothing is read from or written to the vault.
+Series are written as DICOM by synthetic_dicom.py (synthetic identifiers only), baseline study date 2026-01-01, follow-up 2026-04-01.
+
+PAIRS (baseline -> follow-up)
+  D0 no change              baseline and follow-up are the same CT with different noise. Nothing inserted.
+  D1 new nodules            same baseline as D0. The follow-up gets 8 new nodules: solid (40 HU) of 6, 8, 10, 12, 16, 20, 30 mm and one ground-glass (-500 HU) of 16 mm.
+  D2 growth                 baseline: solid 12 mm (a) and 16 mm (b). Follow-up: a 18 mm (+50%, +6 mm), b 16 mm.
+  D3 shrink and disappearance  baseline: solid 20 mm (a), 16 mm (b), 14 mm (c). Follow-up: a 12 mm, b 10 mm, c absent.
+
+WHAT IS READ OUT (per pair, from the executor's findings.json, its per-instance masks and the truth file)
+  detection:  for each inserted nodule, the best-overlapping instance in the scan where it exists: IoU with the true sphere, measured long axis, volume ratio
+  findings:   status and category the executor reports, against the truth
+  tracker:    which tracker ran (LesionLocator or overlap fallback), the classes VISTA-3D accepted and dropped
+
+PASS CRITERIA (fixed now)
+  DT1 sensitivity: reported by diameter and density (no threshold: this is a measurement of the detector)
+  DT2 no change: D0 has no finding with status new or enlarged
+  DT3 measurement: for every nodule with IoU >= 0.2, |measured long axis - true diameter| <= max(2.0 mm, 15% of the true diameter)
+  DT4 status: for every nodule detected in the scan(s) where it exists: D1 new; D2 a enlarged, b stable; D3 a shrunk, b shrunk, c resolved
+  DT5 category consistency: the category reported for each pair equals RECIST 1.1 (as stated in lesion_logic_criteria-20261105.txt) applied to the executor's own findings
+  DT6 clinical consequence (reported, not graded): the category the truth would give (D1 PD, D2 PD, D3 PR, D0 none) against the one reported, and every inserted nodule the detector missed
+
+PREDICTIONS WRITTEN BEFORE THE RUN (scored after it)
+  E1 VISTA-3D does not detect most of the inserted solid nodules; none of the 6 mm and 8 mm ones; at most half of the solid ones of 12 mm and above (low confidence)
+  E2 the 16 mm ground-glass nodule is not detected
+  E3 D0 gives no new or enlarged finding (moderate confidence: the same anatomy with other noise)
+  E4 the LesionLocator checkpoint is present and the tracker that runs is LesionLocator (low confidence; if absent the overlap fallback runs)
+  E5 for the nodules that are detected the long axis is above the true diameter (the bias of the logic test)
+  E6 at least one pair gives a category that differs from the truth because a nodule was missed
+
+LIMITS (stated before the run)
+  Inserted spheres are not tumours: they are smooth, uniform and have no vessels or spiculation. A detector that misses them says little about real lesions; one that finds them says little as well. The test measures the executor end to end on a case with a known answer, not clinical sensitivity.
+  One CT, one patient's anatomy, one set of seeds. Registration is trivial (same grid). The Jun 17 scan may contain real structures VISTA-3D calls tumours; they appear in both scans and are reported.
+  The executor image and its model weights are those of the VM on the day of the run; their identifiers are recorded in the report.

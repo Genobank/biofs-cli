@@ -1,0 +1,30 @@
+Known-answer test of the lesions verb logic (imaging_lesion_track_runner.py: components, link_tracks, recist_category)
+Pre-registration, written before the first run of this part. Date 2026-11-05. Same method and limits as lesion_logic_criteria-20261105.txt
+(sha256 0d986a784dbbeaae61fe87ff3d7d197bf25a665e690756fd952b92f5e45cc99c): spheres on a label grid, no detector, no registration error
+except where a scenario shifts the lesion; scikit-image version of the local run recorded in the report.
+
+SCENARIOS (1.0 mm isotropic unless stated; classes 23 and 26)
+  V1 volume: spheres of 8, 10, 12, 16, 20, 30 mm at spacings 1.0x1.0x1.0, 0.7x0.7x1.25, 0.8x0.8x3.0; reported volume_ml against pi d^3 / 6
+  V2 long axis: reported long_axis_mm against d (same sweep)
+  V3 linking, shift sweep: one stable lesion of 8, 12, 20 mm in two timepoints, the second shifted 0, 2, 4, 6, 8, 10, 14 mm along x:
+     is it one track with two members?
+  V4 split: one 20 mm lesion at timepoint 0; at timepoint 1 two 12 mm spheres with centres 17 mm apart: the topology reported for each track
+  V5 merge: the reverse of V4: topology reported
+  V6 category rules: recist_category for the cases of test_findings_recist.py, with a nadir equal to the baseline unless stated
+
+PASS CRITERIA (fixed now)
+  T1 volume: for d of 8 mm or more, |reported - true| / true <= 10% at spacings 1.0 and 0.7; at 0.8x0.8x3.0 reported, no limit
+  T2 long axis: as LK1 of the findings test: |measured - d| <= max(1.5 mm, 10% of d), d of 8 mm or more, every spacing
+  T3 linking: a stable lesion is ONE track with two members for every shift at which the two spheres still overlap (shift < d)
+  T4 split: the docstring says the code tags split and merge; the criterion is that V4 reports topology "split" for the lesion and
+     that V5 reports "merge"
+  T5 category: the RECIST 1.1 category for every V6 case (new measurable lesion before CR; PD needs 20% and 5 mm over the nadir)
+
+PREDICTIONS FROM READING THE CODE, written before the run
+  Q1 the centroid gate in link_tracks is dead code: a pair with IoU 0 is dropped even when the centroids are close; so T3 fails at the shift
+     where the spheres stop overlapping, not at the 20 mm gate (8 mm lesion from shift 8 mm on; 12 mm from 12 mm on, which is not in the sweep)
+  Q2 split and merge are never tagged: topology is "matched" or "appear" only; T4 fails
+  Q3 in V4 the second 12 mm sphere appears as a NEW measurable lesion, so the category is PD
+  Q4 volume is within 10% at spacing 1.0 and 0.7 (voxel counting), the long axis carries the +0.8 to +1.5 mm bias of the findings test
+  Q5 T5 passes after the order fix made today in imaging_lesion_track_runner.py (backup .bkp.pre_recistorder_20261105_125047) and fails on the backup
+If a prediction is wrong, the report says so.

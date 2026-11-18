@@ -1,0 +1,62 @@
+Organ package verb: pass criteria, interface contract and predictions, written before any code of the verb. Date of writing: 2026-11-06 (local), UTC time in the .time file.
+Scope of this step: code on local branches with tests. No push, no deploy, no npm publish, no image change, no change on the GPU VM, nothing registered in the vault.
+
+Parts
+  CLI   new clone of Genobank/biofs-cli at origin/master, branch imaging-package-verb: `biofs imaging package <registerJobId>` and `biofs imaging package-status <packageJobId>`.
+        Daniel's working tree ~/Downloads/biofs-cli is not touched.
+  NODE  clone ~/Downloads/biofs-node-sync-20261107/repo (equal to production, tree dcbecab2), branch organ-package-verb: new module src/lib/organ_package_job.js and two routes in
+        src/index.js, POST /agent/submit_organ_package and GET /agent/organ_package_status, following submit_imaging_register and imaging_register_status.
+  EXEC  the executor endpoints on the GPU VM are NOT written in this step; this file fixes their contract so they can be written next.
+
+Interface contract
+  CLI to node
+    POST {BASE}/submit_organ_package  body {wallet, signature, register_job_id, organs, floors}; organs is the string "default" (or absent) or an array of organ names; floors is a boolean, default true.
+      202 {package_job_id, status: "running", register_job_id, organs, floors, gate_verdict}
+    GET  {BASE}/organ_package_status?package_job_id=<id>  header x-biofs-signature (or query signature)  200 the job row.
+    Ids: register-<uuid> for the input, package-<uuid> for the job. biocid of the result: biocid://genobank/<wallet lowercase>/imaging-organ-package/<package_job_id>, parent biocid://genobank/<wallet lowercase>/imaging-register/<register_job_id>.
+  node to executor (same port 8787 as imaging_register)
+    POST http://<ip>:8787/agent/organ_package  body {wallet, job_id, register_job_id, input_gcs, organs, floors}; answer 200 {status: "running"}.
+    GET  http://<ip>:8787/agent/organ_package_status?job_id=<package_job_id>  answer {status: running|done|error, exit_code, result}.
+    result on done: {schema: "organ-twin-package/1", output_gcs, files, bytes, verify: {ok}, floors_sha256 or null, built_at}; on error: {error}.
+    input_gcs = gs://genobank-health-imaging/<wallet>/imaging-register/<register_job_id>, output_gcs = gs://genobank-health-imaging/<wallet>/imaging-organ-package/<package_job_id>.
+    The executor must refuse an input_gcs whose wallet segment is not the wallet in the request, and must run organ_package.py build with --floors only when floors is true.
+
+Criteria on the node, known answer, with fakes for mongo, the executor and the signature recovery (test/organ_package_job.test.mjs; all must pass)
+  ON1 validation. Missing signature 400; register_job_id absent or not matching ^register-[0-9a-f-]{36}$ 400; organs neither "default" nor an array of at most 64 names matching ^[a-z][a-z0-9_]*$ 400;
+      floors not a boolean 400; mongo missing 503; wallet not recoverable 401; a wallet in the body that differs from the signer 403. Each case writes no row and calls no executor.
+  ON2 ownership and state. Unknown register job 404. A register job of another wallet 403 with an answer that carries only the error text. A register job whose status is not done 409 naming the status.
+      A done job whose gate verdict is FAIL is accepted (the abdomen jobs of Nov 5 were FAIL and still yield a rigid-frame package), and the verdict is stored on the package job row as gate_verdict.
+  ON3 dispatch. The executor receives exactly {wallet, job_id, register_job_id, input_gcs, organs, floors}. input_gcs is built from the signer's wallet and the register job id; a different output_gcs
+      stored in the register row is ignored (a test row carries one). The row stores wallet, register_job_id, organs, floors, executor name and ip, status running, created_at, and no signature.
+      Executor refusal or network failure: the row becomes error with the message and the answer is 502 with the package_job_id. No executor available: 503 and no row. A second submit for the same
+      register job while a package job of the same wallet is running: 409 naming the running job.
+  ON4 status. Unknown id 404; malformed id 400; no signature 401; another wallet 403. A running job is polled once at the executor. On done: the row becomes done with the result, the biocid is registered
+      in biorouter.biocid_registry (biocid, biocid_key, owner_wallet, bioagent genobank, biodata_type imaging-organ-package, data_category imaging, dataset the job id, gcs_bucket genobank-health-imaging,
+      gcs_path <wallet>/imaging-organ-package/<id>, derived_from [the register biocid], consent_status active) and in bioroutes.inventory (hierarchy_role derived, hierarchy_parents the same list,
+      owner_wallet the signer). A second status call after done does not touch the registry. On executor error: row error with the executor's message. Executor unreachable: the current row, unchanged.
+      A row that is already done is returned without calling the executor. The biocid is registered only after the executor reported done and only when result.verify.ok is true; a done result with
+      verify.ok false makes the row error with the reason "package failed its own verify" and registers nothing.
+  ON5 no secrets. No stored row and no answer contains the signature string.
+  ON6 wiring. src/index.js changes by insertion only (git diff --numstat shows 0 deletions); `node --check src/index.js` passes; the two routes exist exactly once; the whole node test directory passes
+      (node --test test/), including the tests that existed before.
+  ON7 mutation. At least 10 deliberate breaks of organ_package_job.js (drop the owner check on submit, drop it on status, trust the register row's output_gcs, skip the running-job guard, register before done,
+      register despite verify.ok false, store the signature in the row, accept FAIL-gate jobs as errors, drop the 404, change the parent biocid): every one is caught by at least one test, or is shown to be equivalent.
+
+Criteria on the CLI (jest, axios mocked; all must pass)
+  CN1 package. The body posted to submit_organ_package equals {wallet, signature, register_job_id, floors} with organs present only when --organs is given (comma list, split and trimmed); --no-floors gives
+      floors false. An id that does not match ^register-[0-9a-f-]{36}$ stops before any network call. Not logged in stops before any network call. A node answer of 400 or more returns null and prints the error text.
+      --json prints the row; --wait follows with the status calls.
+  CN2 package-status. The first answer of 400 or more ends a --wait at once; after one answer, error replies are retried up to 30 times with 20 s between, using a faked timer; done and error end the wait;
+      the printed summary names the organs count, the files count, the bytes, verify and the floors hash when present, and prints the biocid.
+  CN3 registration. src/index.ts registers imaging package and imaging package-status with the options above; `npm run build` (tsc and validate-commands) passes; the jest suite of the repo passes as it did
+      before the change (the count before and after is recorded).
+  CN4 mutation. At least 6 deliberate breaks (wrong endpoint, organs always sent, floors flag inverted, id check removed, 400 not handled, wait does not stop on error) each caught by at least one test.
+
+Predictions, written before any run
+  P-V1 The first run of the node tests fails at least one test, from a fixture mistake rather than the module.
+  P-V2 At least 9 of the 10 node mutations are caught on the first mutation run.
+  P-V3 tsc builds the CLI verb on the first try.
+  P-V4 The jest suite of the repo fails at least one test before my change in a clean clone (existing failures), which I record and do not fix.
+
+Not in this step, stated now: the executor endpoints on the GPU VM, an image that contains organ_package.py, the biocid and vault registration of a real package, any push, deploy or npm publish, the floors
+file location on the executor, a viewer, PET, attribution of findings to organs.

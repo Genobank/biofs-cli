@@ -18,7 +18,7 @@ import { ethers } from 'ethers';
 import { Logger } from '../utils/logger';
 
 // Sequentia Network Configuration
-const SEQUENTIA_RPC_URL = 'http://52.90.163.112:8545';
+const SEQUENTIA_RPC_URL = process.env.SEQUENTIA_RPC_URL || 'https://seqrpc.genobank.app';
 const CONSENT_MANAGER_ADDRESS = '0x2ff3FB85c71D6cD7F1217A08Ac9a2d68C02219cd'; // Deployed Nov 24, 2025
 
 export enum ConsentStatus {

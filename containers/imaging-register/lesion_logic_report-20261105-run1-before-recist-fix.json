@@ -1,0 +1,1305 @@
+{
+ "schema": "imaging-findings-logic-known-answer-report/1",
+ "skimage_version": "0.26.0",
+ "numpy_version": "2.3.5",
+ "criteria_sha256": "0d986a784dbbeaae61fe87ff3d7d197bf25a665e690756fd952b92f5e45cc99c",
+ "amendment0_sha256": "eaa654ef7001a24764c1782398b203d2932255d1d727fb936cca05e1374685a3",
+ "findings_runner_sha256": "e20b6bbf45304ec3e86c4de673b4c4b1bb35fa80f7fe2474f777cbd0dc96ccca",
+ "min_lesion_ml": 0.2,
+ "enlarge_frac": 0.2,
+ "scenarios": [
+  {
+   "id": "S01",
+   "title": "no lesion in either scan",
+   "got_statuses": [],
+   "expect_statuses": [],
+   "status_ok": true,
+   "got_category": "no-target",
+   "reference_category_from_true_diameters": "no-target",
+   "expect_category_registered": "no-target",
+   "category_ok": true,
+   "reference_sld_true_mm": [
+    0,
+    0
+   ],
+   "recist": {
+    "category": "no-target",
+    "baseline_sld_mm": 0,
+    "followup_sld_mm": 0,
+    "pct_change_vs_baseline": null,
+    "target_lesion_count": 0
+   },
+   "tracker": "overlap_fallback",
+   "findings": []
+  },
+  {
+   "id": "S02",
+   "title": "lung 12 mm, same place",
+   "got_statuses": [
+    "stable"
+   ],
+   "expect_statuses": [
+    "stable"
+   ],
+   "status_ok": true,
+   "got_category": "SD",
+   "reference_category_from_true_diameters": "SD",
+   "expect_category_registered": "SD",
+   "category_ok": true,
+   "reference_sld_true_mm": [
+    12.0,
+    12.0
+   ],
+   "recist": {
+    "category": "SD",
+    "baseline_sld_mm": 13.2,
+    "followup_sld_mm": 13.2,
+    "pct_change_vs_baseline": 0.0,
+    "target_lesion_count": 1
+   },
+   "tracker": "overlap_fallback",
+   "findings": [
+    {
+     "organ": "lung",
+     "status": "stable",
+     "baseline_long_axis_mm": 13.2,
+     "followup_long_axis_mm": 13.2,
+     "measurable": true,
+     "centroid_mm": [
+      40.0,
+      80.0,
+      40.0
+     ]
+    }
+   ]
+  },
+  {
+   "id": "S03",
+   "title": "lung 12 -> 16 mm (+33%, +4 mm)",
+   "got_statuses": [
+    "enlarged"
+   ],
+   "expect_statuses": [
+    "enlarged"
+   ],
+   "status_ok": true,
+   "got_category": "PD",
+   "reference_category_from_true_diameters": "SD",
+   "expect_category_registered": "SD",
+   "category_ok": false,
+   "reference_sld_true_mm": [
+    12.0,
+    16.0
+   ],
+   "recist": {
+    "category": "PD",
+    "baseline_sld_mm": 13.2,
+    "followup_sld_mm": 17.1,
+    "pct_change_vs_baseline": 29.5,
+    "target_lesion_count": 1
+   },
+   "tracker": "overlap_fallback",
+   "findings": [
+    {
+     "organ": "lung",
+     "status": "enlarged",
+     "baseline_long_axis_mm": 13.2,
+     "followup_long_axis_mm": 17.1,
+     "measurable": true,
+     "centroid_mm": [
+      40.0,
+      80.0,
+      40.0
+     ]
+    }
+   ]
+  },
+  {
+   "id": "S04",
+   "title": "lung 12 -> 20 mm (+67%, +8 mm)",
+   "got_statuses": [
+    "enlarged"
+   ],
+   "expect_statuses": [
+    "enlarged"
+   ],
+   "status_ok": true,
+   "got_category": "PD",
+   "reference_category_from_true_diameters": "PD",
+   "expect_category_registered": "PD",
+   "category_ok": true,
+   "reference_sld_true_mm": [
+    12.0,
+    20.0
+   ],
+   "recist": {
+    "category": "PD",
+    "baseline_sld_mm": 13.2,
+    "followup_sld_mm": 21.5,
+    "pct_change_vs_baseline": 62.9,
+    "target_lesion_count": 1
+   },
+   "tracker": "overlap_fallback",
+   "findings": [
+    {
+     "organ": "lung",
+     "status": "enlarged",
+     "baseline_long_axis_mm": 13.2,
+     "followup_long_axis_mm": 21.5,
+     "measurable": true,
+     "centroid_mm": [
+      40.0,
+      80.0,
+      40.0
+     ]
+    }
+   ]
+  },
+  {
+   "id": "S05",
+   "title": "lung 20 -> 12 mm (-40%)",
+   "got_statuses": [
+    "shrunk"
+   ],
+   "expect_statuses": [
+    "shrunk"
+   ],
+   "status_ok": true,
+   "got_category": "PR",
+   "reference_category_from_true_diameters": "PR",
+   "expect_category_registered": "PR",
+   "category_ok": true,
+   "reference_sld_true_mm": [
+    20.0,
+    12.0
+   ],
+   "recist": {
+    "category": "PR",
+    "baseline_sld_mm": 21.5,
+    "followup_sld_mm": 13.2,
+    "pct_change_vs_baseline": -38.6,
+    "target_lesion_count": 1
+   },
+   "tracker": "overlap_fallback",
+   "findings": [
+    {
+     "organ": "lung",
+     "status": "shrunk",
+     "baseline_long_axis_mm": 21.5,
+     "followup_long_axis_mm": 13.2,
+     "measurable": true,
+     "centroid_mm": [
+      40.0,
+      80.0,
+      40.0
+     ]
+    }
+   ]
+  },
+  {
+   "id": "S06",
+   "title": "lung 15 -> absent",
+   "got_statuses": [
+    "resolved"
+   ],
+   "expect_statuses": [
+    "resolved"
+   ],
+   "status_ok": true,
+   "got_category": "CR",
+   "reference_category_from_true_diameters": "CR",
+   "expect_category_registered": "CR",
+   "category_ok": true,
+   "reference_sld_true_mm": [
+    15.0,
+    0.0
+   ],
+   "recist": {
+    "category": "CR",
+    "baseline_sld_mm": 16.2,
+    "followup_sld_mm": 0.0,
+    "pct_change_vs_baseline": -100.0,
+    "target_lesion_count": 1
+   },
+   "tracker": "overlap_fallback",
+   "findings": [
+    {
+     "organ": "lung",
+     "status": "resolved",
+     "baseline_long_axis_mm": 16.2,
+     "followup_long_axis_mm": 0.0,
+     "measurable": true,
+     "centroid_mm": [
+      40.0,
+      80.0,
+      39.0
+     ]
+    }
+   ]
+  },
+  {
+   "id": "S07",
+   "title": "lung 15 -> absent, new liver 12 mm",
+   "got_statuses": [
+    "new",
+    "resolved"
+   ],
+   "expect_statuses": [
+    "new",
+    "resolved"
+   ],
+   "status_ok": true,
+   "got_category": "CR",
+   "reference_category_from_true_diameters": "PD",
+   "expect_category_registered": "PD",
+   "category_ok": false,
+   "reference_sld_true_mm": [
+    15.0,
+    0.0
+   ],
+   "recist": {
+    "category": "CR",
+    "baseline_sld_mm": 16.2,
+    "followup_sld_mm": 0.0,
+    "pct_change_vs_baseline": -100.0,
+    "target_lesion_count": 1
+   },
+   "tracker": "overlap_fallback",
+   "findings": [
+    {
+     "organ": "liver",
+     "status": "new",
+     "baseline_long_axis_mm": 0.0,
+     "followup_long_axis_mm": 13.2,
+     "measurable": true,
+     "centroid_mm": [
+      120.0,
+      80.0,
+      40.0
+     ]
+    },
+    {
+     "organ": "lung",
+     "status": "resolved",
+     "baseline_long_axis_mm": 16.2,
+     "followup_long_axis_mm": 0.0,
+     "measurable": true,
+     "centroid_mm": [
+      40.0,
+      80.0,
+      39.0
+     ]
+    }
+   ]
+  },
+  {
+   "id": "S08",
+   "title": "lung 15 stable, new liver 6 mm (under the 0.2 mL floor)",
+   "got_statuses": [
+    "stable"
+   ],
+   "expect_statuses": [
+    "stable"
+   ],
+   "status_ok": true,
+   "got_category": "SD",
+   "reference_category_from_true_diameters": "SD",
+   "expect_category_registered": null,
+   "category_ok": null,
+   "reference_sld_true_mm": [
+    15.0,
+    15.0
+   ],
+   "recist": {
+    "category": "SD",
+    "baseline_sld_mm": 16.2,
+    "followup_sld_mm": 16.2,
+    "pct_change_vs_baseline": 0.0,
+    "target_lesion_count": 1
+   },
+   "tracker": "overlap_fallback",
+   "findings": [
+    {
+     "organ": "lung",
+     "status": "stable",
+     "baseline_long_axis_mm": 16.2,
+     "followup_long_axis_mm": 16.2,
+     "measurable": true,
+     "centroid_mm": [
+      40.0,
+      80.0,
+      39.0
+     ]
+    }
+   ]
+  },
+  {
+   "id": "S09",
+   "title": "lung 15 stable, new liver 12 mm",
+   "got_statuses": [
+    "new",
+    "stable"
+   ],
+   "expect_statuses": [
+    "new",
+    "stable"
+   ],
+   "status_ok": true,
+   "got_category": "PD",
+   "reference_category_from_true_diameters": "PD",
+   "expect_category_registered": "PD",
+   "category_ok": true,
+   "reference_sld_true_mm": [
+    15.0,
+    15.0
+   ],
+   "recist": {
+    "category": "PD",
+    "baseline_sld_mm": 16.2,
+    "followup_sld_mm": 16.2,
+    "pct_change_vs_baseline": 0.0,
+    "target_lesion_count": 1
+   },
+   "tracker": "overlap_fallback",
+   "findings": [
+    {
+     "organ": "liver",
+     "status": "new",
+     "baseline_long_axis_mm": 0.0,
+     "followup_long_axis_mm": 13.2,
+     "measurable": true,
+     "centroid_mm": [
+      120.0,
+      80.0,
+      40.0
+     ]
+    },
+    {
+     "organ": "lung",
+     "status": "stable",
+     "baseline_long_axis_mm": 16.2,
+     "followup_long_axis_mm": 16.2,
+     "measurable": true,
+     "centroid_mm": [
+      40.0,
+      80.0,
+      39.0
+     ]
+    }
+   ]
+  },
+  {
+   "id": "S10",
+   "title": "4 lung + 3 liver lesions unchanged",
+   "got_statuses": [
+    "stable",
+    "stable",
+    "stable",
+    "stable",
+    "stable",
+    "stable",
+    "stable"
+   ],
+   "expect_statuses": [
+    "stable",
+    "stable",
+    "stable",
+    "stable",
+    "stable",
+    "stable",
+    "stable"
+   ],
+   "status_ok": true,
+   "got_category": "SD",
+   "reference_category_from_true_diameters": "SD",
+   "expect_category_registered": "SD",
+   "category_ok": true,
+   "reference_sld_true_mm": [
+    61.0,
+    61.0
+   ],
+   "recist": {
+    "category": "SD",
+    "baseline_sld_mm": 65.8,
+    "followup_sld_mm": 65.8,
+    "pct_change_vs_baseline": 0.0,
+    "target_lesion_count": 4
+   },
+   "tracker": "overlap_fallback",
+   "findings": [
+    {
+     "organ": "lung",
+     "status": "stable",
+     "baseline_long_axis_mm": 21.5,
+     "followup_long_axis_mm": 21.5,
+     "measurable": true,
+     "centroid_mm": [
+      25.0,
+      40.0,
+      40.0
+     ]
+    },
+    {
+     "organ": "lung",
+     "status": "stable",
+     "baseline_long_axis_mm": 19.4,
+     "followup_long_axis_mm": 19.4,
+     "measurable": true,
+     "centroid_mm": [
+      25.0,
+      80.0,
+      40.0
+     ]
+    },
+    {
+     "organ": "lung",
+     "status": "stable",
+     "baseline_long_axis_mm": 17.1,
+     "followup_long_axis_mm": 17.1,
+     "measurable": true,
+     "centroid_mm": [
+      25.0,
+      120.0,
+      40.0
+     ]
+    },
+    {
+     "organ": "lung",
+     "status": "stable",
+     "baseline_long_axis_mm": 15.1,
+     "followup_long_axis_mm": 15.1,
+     "measurable": true,
+     "centroid_mm": [
+      60.0,
+      40.0,
+      40.0
+     ]
+    },
+    {
+     "organ": "liver",
+     "status": "stable",
+     "baseline_long_axis_mm": 13.2,
+     "followup_long_axis_mm": 13.2,
+     "measurable": true,
+     "centroid_mm": [
+      100.0,
+      40.0,
+      40.0
+     ]
+    },
+    {
+     "organ": "liver",
+     "status": "stable",
+     "baseline_long_axis_mm": 11.7,
+     "followup_long_axis_mm": 11.7,
+     "measurable": true,
+     "centroid_mm": [
+      100.0,
+      80.0,
+      39.0
+     ]
+    },
+    {
+     "organ": "liver",
+     "status": "stable",
+     "baseline_long_axis_mm": 11.2,
+     "followup_long_axis_mm": 11.2,
+     "measurable": true,
+     "centroid_mm": [
+      100.0,
+      120.0,
+      40.0
+     ]
+    }
+   ]
+  }
+ ],
+ "measurement_sweep": [
+  {
+   "spacing": "A",
+   "spacing_xyz_mm": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "true_mm": 4,
+   "reported": false
+  },
+  {
+   "spacing": "A",
+   "spacing_xyz_mm": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "true_mm": 6,
+   "reported": false
+  },
+  {
+   "spacing": "A",
+   "spacing_xyz_mm": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "true_mm": 8,
+   "reported": true,
+   "measured_mm": 9.2,
+   "error_mm": 1.2,
+   "error_pct": 15.0,
+   "tolerance_mm": 1.5,
+   "lk1_ok": true,
+   "centroid_mm": [
+    80.0,
+    80.0,
+    40.0
+   ],
+   "centroid_error_mm": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "lk4_ok": true
+  },
+  {
+   "spacing": "A",
+   "spacing_xyz_mm": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "true_mm": 10,
+   "reported": true,
+   "measured_mm": 11.2,
+   "error_mm": 1.2,
+   "error_pct": 12.0,
+   "tolerance_mm": 1.5,
+   "lk1_ok": true,
+   "centroid_mm": [
+    80.0,
+    80.0,
+    40.0
+   ],
+   "centroid_error_mm": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "lk4_ok": true
+  },
+  {
+   "spacing": "A",
+   "spacing_xyz_mm": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "true_mm": 12,
+   "reported": true,
+   "measured_mm": 13.2,
+   "error_mm": 1.2,
+   "error_pct": 10.0,
+   "tolerance_mm": 1.5,
+   "lk1_ok": true,
+   "centroid_mm": [
+    80.0,
+    80.0,
+    40.0
+   ],
+   "centroid_error_mm": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "lk4_ok": true
+  },
+  {
+   "spacing": "A",
+   "spacing_xyz_mm": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "true_mm": 16,
+   "reported": true,
+   "measured_mm": 17.1,
+   "error_mm": 1.1,
+   "error_pct": 6.9,
+   "tolerance_mm": 1.6,
+   "lk1_ok": true,
+   "centroid_mm": [
+    80.0,
+    80.0,
+    40.0
+   ],
+   "centroid_error_mm": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "lk4_ok": true
+  },
+  {
+   "spacing": "A",
+   "spacing_xyz_mm": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "true_mm": 20,
+   "reported": true,
+   "measured_mm": 21.5,
+   "error_mm": 1.5,
+   "error_pct": 7.5,
+   "tolerance_mm": 2.0,
+   "lk1_ok": true,
+   "centroid_mm": [
+    80.0,
+    80.0,
+    40.0
+   ],
+   "centroid_error_mm": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "lk4_ok": true
+  },
+  {
+   "spacing": "A",
+   "spacing_xyz_mm": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "true_mm": 30,
+   "reported": true,
+   "measured_mm": 31.4,
+   "error_mm": 1.4,
+   "error_pct": 4.7,
+   "tolerance_mm": 3.0,
+   "lk1_ok": true,
+   "centroid_mm": [
+    80.0,
+    80.0,
+    40.0
+   ],
+   "centroid_error_mm": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "lk4_ok": true
+  },
+  {
+   "spacing": "B",
+   "spacing_xyz_mm": [
+    0.7,
+    0.7,
+    1.25
+   ],
+   "true_mm": 4,
+   "reported": false
+  },
+  {
+   "spacing": "B",
+   "spacing_xyz_mm": [
+    0.7,
+    0.7,
+    1.25
+   ],
+   "true_mm": 6,
+   "reported": false
+  },
+  {
+   "spacing": "B",
+   "spacing_xyz_mm": [
+    0.7,
+    0.7,
+    1.25
+   ],
+   "true_mm": 8,
+   "reported": true,
+   "measured_mm": 8.8,
+   "error_mm": 0.8,
+   "error_pct": 10.0,
+   "tolerance_mm": 1.5,
+   "lk1_ok": true,
+   "centroid_mm": [
+    79.8,
+    79.8,
+    40.0
+   ],
+   "centroid_error_mm": [
+    -0.2,
+    -0.2,
+    0.0
+   ],
+   "lk4_ok": true
+  },
+  {
+   "spacing": "B",
+   "spacing_xyz_mm": [
+    0.7,
+    0.7,
+    1.25
+   ],
+   "true_mm": 10,
+   "reported": true,
+   "measured_mm": 11.0,
+   "error_mm": 1.0,
+   "error_pct": 10.0,
+   "tolerance_mm": 1.5,
+   "lk1_ok": true,
+   "centroid_mm": [
+    80.1,
+    80.1,
+    40.0
+   ],
+   "centroid_error_mm": [
+    0.1,
+    0.1,
+    0.0
+   ],
+   "lk4_ok": true
+  },
+  {
+   "spacing": "B",
+   "spacing_xyz_mm": [
+    0.7,
+    0.7,
+    1.25
+   ],
+   "true_mm": 12,
+   "reported": true,
+   "measured_mm": 12.9,
+   "error_mm": 0.9,
+   "error_pct": 7.5,
+   "tolerance_mm": 1.5,
+   "lk1_ok": true,
+   "centroid_mm": [
+    79.8,
+    79.8,
+    40.0
+   ],
+   "centroid_error_mm": [
+    -0.2,
+    -0.2,
+    0.0
+   ],
+   "lk4_ok": true
+  },
+  {
+   "spacing": "B",
+   "spacing_xyz_mm": [
+    0.7,
+    0.7,
+    1.25
+   ],
+   "true_mm": 16,
+   "reported": true,
+   "measured_mm": 16.9,
+   "error_mm": 0.9,
+   "error_pct": 5.6,
+   "tolerance_mm": 1.6,
+   "lk1_ok": true,
+   "centroid_mm": [
+    79.8,
+    79.8,
+    40.0
+   ],
+   "centroid_error_mm": [
+    -0.2,
+    -0.2,
+    0.0
+   ],
+   "lk4_ok": true
+  },
+  {
+   "spacing": "B",
+   "spacing_xyz_mm": [
+    0.7,
+    0.7,
+    1.25
+   ],
+   "true_mm": 20,
+   "reported": true,
+   "measured_mm": 20.8,
+   "error_mm": 0.8,
+   "error_pct": 4.0,
+   "tolerance_mm": 2.0,
+   "lk1_ok": true,
+   "centroid_mm": [
+    80.1,
+    80.1,
+    40.0
+   ],
+   "centroid_error_mm": [
+    0.1,
+    0.1,
+    0.0
+   ],
+   "lk4_ok": true
+  },
+  {
+   "spacing": "B",
+   "spacing_xyz_mm": [
+    0.7,
+    0.7,
+    1.25
+   ],
+   "true_mm": 30,
+   "reported": true,
+   "measured_mm": 31.1,
+   "error_mm": 1.1,
+   "error_pct": 3.7,
+   "tolerance_mm": 3.0,
+   "lk1_ok": true,
+   "centroid_mm": [
+    79.8,
+    79.8,
+    40.0
+   ],
+   "centroid_error_mm": [
+    -0.2,
+    -0.2,
+    0.0
+   ],
+   "lk4_ok": true
+  },
+  {
+   "spacing": "C",
+   "spacing_xyz_mm": [
+    0.8,
+    0.8,
+    3.0
+   ],
+   "true_mm": 4,
+   "reported": false
+  },
+  {
+   "spacing": "C",
+   "spacing_xyz_mm": [
+    0.8,
+    0.8,
+    3.0
+   ],
+   "true_mm": 6,
+   "reported": false
+  },
+  {
+   "spacing": "C",
+   "spacing_xyz_mm": [
+    0.8,
+    0.8,
+    3.0
+   ],
+   "true_mm": 8,
+   "reported": true,
+   "measured_mm": 7.9,
+   "error_mm": -0.1,
+   "error_pct": -1.2,
+   "tolerance_mm": 1.5,
+   "lk1_ok": true,
+   "centroid_mm": [
+    80.0,
+    80.0,
+    39.0
+   ],
+   "centroid_error_mm": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "lk4_ok": true
+  },
+  {
+   "spacing": "C",
+   "spacing_xyz_mm": [
+    0.8,
+    0.8,
+    3.0
+   ],
+   "true_mm": 10,
+   "reported": true,
+   "measured_mm": 10.9,
+   "error_mm": 0.9,
+   "error_pct": 9.0,
+   "tolerance_mm": 1.5,
+   "lk1_ok": true,
+   "centroid_mm": [
+    80.0,
+    80.0,
+    39.0
+   ],
+   "centroid_error_mm": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "lk4_ok": true
+  },
+  {
+   "spacing": "C",
+   "spacing_xyz_mm": [
+    0.8,
+    0.8,
+    3.0
+   ],
+   "true_mm": 12,
+   "reported": true,
+   "measured_mm": 12.9,
+   "error_mm": 0.9,
+   "error_pct": 7.5,
+   "tolerance_mm": 1.5,
+   "lk1_ok": true,
+   "centroid_mm": [
+    80.0,
+    80.0,
+    39.0
+   ],
+   "centroid_error_mm": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "lk4_ok": true
+  },
+  {
+   "spacing": "C",
+   "spacing_xyz_mm": [
+    0.8,
+    0.8,
+    3.0
+   ],
+   "true_mm": 16,
+   "reported": true,
+   "measured_mm": 16.6,
+   "error_mm": 0.6,
+   "error_pct": 3.8,
+   "tolerance_mm": 1.6,
+   "lk1_ok": true,
+   "centroid_mm": [
+    80.0,
+    80.0,
+    39.0
+   ],
+   "centroid_error_mm": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "lk4_ok": true
+  },
+  {
+   "spacing": "C",
+   "spacing_xyz_mm": [
+    0.8,
+    0.8,
+    3.0
+   ],
+   "true_mm": 20,
+   "reported": true,
+   "measured_mm": 21.0,
+   "error_mm": 1.0,
+   "error_pct": 5.0,
+   "tolerance_mm": 2.0,
+   "lk1_ok": true,
+   "centroid_mm": [
+    80.0,
+    80.0,
+    39.0
+   ],
+   "centroid_error_mm": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "lk4_ok": true
+  },
+  {
+   "spacing": "C",
+   "spacing_xyz_mm": [
+    0.8,
+    0.8,
+    3.0
+   ],
+   "true_mm": 30,
+   "reported": true,
+   "measured_mm": 31.1,
+   "error_mm": 1.1,
+   "error_pct": 3.7,
+   "tolerance_mm": 3.0,
+   "lk1_ok": true,
+   "centroid_mm": [
+    80.0,
+    80.0,
+    39.0
+   ],
+   "centroid_error_mm": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "lk4_ok": true
+  }
+ ],
+ "shift_sweep": [
+  {
+   "d_mm": 8,
+   "shift_mm": 0,
+   "statuses": [
+    "stable"
+   ],
+   "category": "no-target"
+  },
+  {
+   "d_mm": 8,
+   "shift_mm": 2,
+   "statuses": [
+    "stable"
+   ],
+   "category": "no-target"
+  },
+  {
+   "d_mm": 8,
+   "shift_mm": 4,
+   "statuses": [
+    "stable"
+   ],
+   "category": "no-target"
+  },
+  {
+   "d_mm": 8,
+   "shift_mm": 6,
+   "statuses": [
+    "new",
+    "resolved"
+   ],
+   "category": "no-target"
+  },
+  {
+   "d_mm": 8,
+   "shift_mm": 8,
+   "statuses": [
+    "new",
+    "resolved"
+   ],
+   "category": "no-target"
+  },
+  {
+   "d_mm": 8,
+   "shift_mm": 10,
+   "statuses": [
+    "new",
+    "resolved"
+   ],
+   "category": "no-target"
+  },
+  {
+   "d_mm": 8,
+   "shift_mm": 14,
+   "statuses": [
+    "new",
+    "resolved"
+   ],
+   "category": "no-target"
+  },
+  {
+   "d_mm": 12,
+   "shift_mm": 0,
+   "statuses": [
+    "stable"
+   ],
+   "category": "SD"
+  },
+  {
+   "d_mm": 12,
+   "shift_mm": 2,
+   "statuses": [
+    "stable"
+   ],
+   "category": "SD"
+  },
+  {
+   "d_mm": 12,
+   "shift_mm": 4,
+   "statuses": [
+    "stable"
+   ],
+   "category": "SD"
+  },
+  {
+   "d_mm": 12,
+   "shift_mm": 6,
+   "statuses": [
+    "stable"
+   ],
+   "category": "SD"
+  },
+  {
+   "d_mm": 12,
+   "shift_mm": 8,
+   "statuses": [
+    "stable"
+   ],
+   "category": "SD"
+  },
+  {
+   "d_mm": 12,
+   "shift_mm": 10,
+   "statuses": [
+    "new",
+    "resolved"
+   ],
+   "category": "CR"
+  },
+  {
+   "d_mm": 12,
+   "shift_mm": 14,
+   "statuses": [
+    "new",
+    "resolved"
+   ],
+   "category": "CR"
+  },
+  {
+   "d_mm": 20,
+   "shift_mm": 0,
+   "statuses": [
+    "stable"
+   ],
+   "category": "SD"
+  },
+  {
+   "d_mm": 20,
+   "shift_mm": 2,
+   "statuses": [
+    "stable"
+   ],
+   "category": "SD"
+  },
+  {
+   "d_mm": 20,
+   "shift_mm": 4,
+   "statuses": [
+    "stable"
+   ],
+   "category": "SD"
+  },
+  {
+   "d_mm": 20,
+   "shift_mm": 6,
+   "statuses": [
+    "stable"
+   ],
+   "category": "SD"
+  },
+  {
+   "d_mm": 20,
+   "shift_mm": 8,
+   "statuses": [
+    "stable"
+   ],
+   "category": "SD"
+  },
+  {
+   "d_mm": 20,
+   "shift_mm": 10,
+   "statuses": [
+    "stable"
+   ],
+   "category": "SD"
+  },
+  {
+   "d_mm": 20,
+   "shift_mm": 14,
+   "statuses": [
+    "stable"
+   ],
+   "category": "SD"
+  }
+ ],
+ "small_lesion_noise": [
+  {
+   "from_mm": 6,
+   "to_mm": 7.5,
+   "statuses": [
+    "new"
+   ],
+   "measured": [
+    [
+     0.0,
+     8.1
+    ]
+   ],
+   "category": "no-target"
+  },
+  {
+   "from_mm": 8,
+   "to_mm": 9.5,
+   "statuses": [
+    "stable"
+   ],
+   "measured": [
+    [
+     9.2,
+     9.8
+    ]
+   ],
+   "category": "no-target"
+  }
+ ],
+ "split_case": {
+  "findings": [
+   {
+    "organ": "lung",
+    "status": "new",
+    "baseline_long_axis_mm": 0.0,
+    "followup_long_axis_mm": 13.2,
+    "measurable": true,
+    "centroid_mm": [
+     51.0,
+     80.0,
+     40.0
+    ]
+   },
+   {
+    "organ": "lung",
+    "status": "shrunk",
+    "baseline_long_axis_mm": 21.5,
+    "followup_long_axis_mm": 13.2,
+    "measurable": true,
+    "centroid_mm": [
+     34.0,
+     80.0,
+     40.0
+    ]
+   }
+  ],
+  "category": "PD"
+ },
+ "criteria_results": {
+  "LK1_measurement": [],
+  "LK2_status_failed": [],
+  "LK3_category_failed": [
+   "S03",
+   "S07"
+  ],
+  "LK4_centroid": [],
+  "LK5_S10": {
+   "target_lesion_count": 4,
+   "baseline_sld_mm": 65.8,
+   "ok": false
+  }
+ },
+ "predictions": {
+  "P1_S03_returns_PD": true,
+  "P2_S07_returns_CR": true,
+  "P3_positive_bias_of_at_most_1p6_mm": true,
+  "P4_shift_6mm_or_more_resolved_and_new_for_8mm": true,
+  "P5_S10_passes_LK5": false,
+  "P6_S01_S02_S04_S05_S06_S09_pass": true,
+  "P7_6mm_to_7p5mm_reported_as_new": true
+ }
+}

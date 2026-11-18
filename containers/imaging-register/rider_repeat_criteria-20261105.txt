@@ -1,0 +1,8 @@
+Registered 2026-11-05 before the first run of rider_repeat.py. Data: RIDER Lung CT same-day repeat scans (TCIA, CC BY 4.0).
+Pairs: the two lung-kernel 1.25 mm series of one patient and day, ordered by acquisition time; each segmented on its own.
+Minimum 8 pairs, otherwise the result is INSUFFICIENT_PAIRS and nothing is concluded.
+C1: lung_volume.compare_lung_volume at its shipped thresholds (mass change over 10 percent, left/right difference over 15 points) flags none of the pairs.
+C2: the 95th percentile of the absolute whole-label aerated-mass difference between the two scans is at most 5 percent, so that the 10 percent line has a margin of 2 over same-day repeat noise.
+C3: the largest absolute left/right volume-change asymmetry between the two scans is at most 7.5 percent, half of the 15 point line.
+Reading: PASS says the same-day, same-protocol floor is well below the lines. It says nothing about differences between days or between breaths.
+FAIL of C2 means the shipped whole-label mass cannot support a 10 percent line even for same-day repeats.

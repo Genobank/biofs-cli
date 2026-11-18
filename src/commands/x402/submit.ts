@@ -55,7 +55,7 @@ export interface X402SubmitOptions {
   originlab?: string;    // opencravat: lab hint for sqlite path allocation (e.g. caris)
   caller?: string;       // clara caller: deepvariant (germline, default) | mutect (somatic tumor-only)
   somatic?: boolean;     // shorthand: --somatic ⇒ caller=mutect
-  skipPay?: boolean;     // dispatch the job through biofs-node WITHOUT settling x402 (processing runs; /agent/job is unpaid)
+  skipPay?: boolean;     // no patient x402; biofs-node treasury subsidizes and ledgers the job
   sources?: any[];       // genoclaw multi-source twin: [{sqlite_gs_uri, source_biocid, label, lab}]
   expression?: any;      // genoclaw RNA expression layer: {gs_uri, kind, label, lab}
   fusions?: any;         // genoclaw gene-fusions layer: {gs_uri (STAR-Fusion tsv), label, lab}
@@ -167,9 +167,11 @@ async function dispatchJob(
   if (opts.dryRun) {
     return { endpoint, jobId: `${agent.key}-dryrun-${biosample}`, status: 'simulated', simulated: true };
   }
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (paymentHeader) headers['X-PAYMENT'] = paymentHeader;
   const resp = await axios.post(endpoint, route.body(), {
     timeout: 60_000,
-    headers: { 'X-PAYMENT': paymentHeader, 'Content-Type': 'application/json' },
+    headers,
     validateStatus: (s) => s < 500,
   });
   if (resp.status >= 400) {
@@ -206,8 +208,8 @@ export async function x402SubmitCommand(options: X402SubmitOptions = {}): Promis
   const recipient: PayRecipient = { recipient: agent.wallet, amountUsdc: priceUsdc, description: `${agent.name} (${agent.serviceType})` };
   let settlement;
   if (skipPay) {
-    settlement = { txHash: '0x' + 'ee'.repeat(32), payer: wallet, token: options.native ? 'native' : 'seqUSDC', simulated: true };
-    if (spinner) spinner.text = `dispatch-only (x402 settlement skipped) → ${agent.wallet.slice(0, 10)}…`;
+    settlement = { txHash: '', payer: wallet, token: 'treasury-subsidy', simulated: false };
+    if (spinner) spinner.text = `treasury subsidy (no patient x402) → biofs-node will ledger the job`;
   } else {
     const patientKey = patientKeyFromEnv();
     if (spinner) spinner.text = `settling ${priceUsdc} ${options.native ? 'native' : 'seqUSDC'} → ${agent.wallet.slice(0, 10)}…`;
@@ -242,7 +244,7 @@ export async function x402SubmitCommand(options: X402SubmitOptions = {}): Promis
   }
 
   // 3. Build X-PAYMENT and dispatch the job.
-  const paymentHeader = buildPaymentHeader({
+  const paymentHeader = skipPay ? '' : buildPaymentHeader({
     agent, agentWallet: agent.wallet, payer: settlement.payer, assetId,
     settlementTx: settlement.txHash, proofTx: proof.txHash, paymentId: proof.paymentId, agentId: proof.agentId,
     amountUsdc: priceUsdc,

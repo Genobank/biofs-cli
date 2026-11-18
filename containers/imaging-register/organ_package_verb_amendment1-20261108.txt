@@ -1,0 +1,12 @@
+Amendment 1 to organ_package_verb_criteria-20261106.txt. Written 2026-11-08 after the node side was finished (16 of 16 mutants caught, 80 node tests pass) and before any CLI code or CLI test.
+
+What the criteria said: CN2, "the printed summary names the organs count, the files count, the bytes, verify and the floors hash when present, and prints the biocid".
+The contract's result object had no organs count. So the contract gains one optional field and CN2 reads as follows.
+  Contract: result on done may also carry organs_built, an integer (organs with at least one timepoint present in the package). The node stores the result as the executor sent it.
+  CN2: the summary prints organs_built when it is present; when it is absent it prints the organs that were requested ("default list" or the number of named organs). The files count, the bytes, verify and
+       the floors hash (when present) and the biocid are printed as before.
+Also fixed here, as a reading of CN1: "Not logged in stops before any network call" means the verb prints the error, returns null and sets process.exitCode to 1; it does not call process.exit inside the
+function (the existing register verb does; the package verb is testable without that). A --organs value that is empty after splitting on commas stops before any network call as well.
+Nothing else in the criteria or the predictions changes. Baseline recorded before any CLI change, for P-V4: clean clone of origin/master (d275baa, 3.20.8), jest 3 suites 42 tests all pass, npm run build OK
+with 239 command signatures; P-V4 (an existing failure) is false. P-V1 (node tests fail first run) was false: 14 of 14 passed on the first run. P-V2 was false in the other direction: 15 of 16 mutants were
+caught on the first mutation run (M16 survived because my path test used a string the first-character rule already refused); the test was strengthened, not the module, and all 16 are caught now.

@@ -89,6 +89,59 @@ export async function fluencyBuildCommand(biocid: string, options: FluencyOption
   }
 }
 
+export interface FluencyPackOptions extends FluencyOptions {
+  wallet?: string;
+  layer?: string;
+  build?: boolean;
+}
+
+export async function fluencyPackCommand(options: FluencyPackOptions = {}): Promise<void> {
+  const spinner = options.quiet || options.json ? null : ora('biofs fluency pack → biofs-node').start();
+  try {
+    const c = await getCredentials();
+    if (!c) { spinner?.fail('Not authenticated. Run: biofs login'); process.exit(1); }
+    const params: Record<string, string> = {
+      wallet: c.wallet_address,
+      signature: c.user_signature,
+      layer: options.layer || 'advanced_patient',
+    };
+    if (options.wallet) params.owner = options.wallet;
+    const r = await axios.get(`${BIOFS_NODE_BASE}/conversation_pack`, {
+      params,
+      timeout: 60_000,
+      validateStatus: (s) => s < 500,
+    });
+    if (r.status >= 400) {
+      spinner?.fail(`conversation_pack ${r.status}: ${r.data?.error || 'unknown'}`);
+      if (options.json) console.log(JSON.stringify(r.data, null, 2));
+      process.exit(1);
+    }
+    const d = r.data || {};
+    const primary = d.primary_store && d.primary_store.biocid;
+    if (options.build && primary) {
+      if (spinner) spinner.text = 'fluency build on primary store';
+      await fluencyBuildCommand(primary, { quiet: true });
+    }
+    spinner?.succeed(`advanced-patient pack (${d.n_index_files || 0} indexed files)`);
+    if (options.json) { console.log(JSON.stringify(d, null, 2)); return; }
+    console.log(`  layer          ${d.layer || 'advanced_patient'}`);
+    console.log(`  audience       advanced patient (disease-literate, genomics-literate)`);
+    if (d.primary_store) console.log(`  primary_store  ${d.primary_store.biocid}`);
+    if (d.clinical_report) console.log(`  clinical       ${d.clinical_report.biocid}`);
+    if (d.prior_finding) console.log(`  prior_finding  ${d.prior_finding.filename}`);
+    if (Array.isArray(d.structural)) console.log(`  structural     ${d.structural.length} SV/TRGT files`);
+    if (d.phased_store) console.log(`  phased         ${d.phased_store.filename} (use only with coverage caveat)`);
+    if (Array.isArray(d.caveats)) {
+      console.log('  caveats');
+      for (const cve of d.caveats) console.log(`    ${cve}`);
+    }
+    if (d.note) console.log(chalk.gray(`  ${d.note}`));
+  } catch (error) {
+    spinner?.fail(`fluency pack failed: ${error}`);
+    process.exit(1);
+  }
+}
+
 export async function fluencyStateCommand(biocid: string, options: FluencyOptions = {}): Promise<void> {
   requireBiocid(biocid);
   const spinner = options.quiet || options.json ? null : ora('biofs fluency state → biofs-node').start();

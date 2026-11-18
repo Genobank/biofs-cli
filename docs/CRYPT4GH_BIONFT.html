@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BioNFT-gated crypt4gh in BioFS · GenoBank.io</title>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: true,
+      securityLevel: 'strict',
+      theme: 'base',
+      themeVariables: {
+        darkMode: false,
+        background: '#ffffff',
+        fontFamily: 'Iowan Old Style, Palatino Linotype, Palatino, Georgia, serif',
+        primaryColor: '#ffffff',
+        primaryTextColor: '#000000',
+        primaryBorderColor: '#1D1652',
+        secondaryColor: '#E8F6F0',
+        tertiaryColor: '#ffffff',
+        lineColor: '#1D1652',
+        textColor: '#000000',
+        mainBkg: '#ffffff',
+        nodeBorder: '#1D1652',
+        clusterBkg: '#F4F1FA',
+        clusterBorder: '#1D1652',
+        titleColor: '#000000',
+        edgeLabelBackground: '#ffffff',
+        actorBkg: '#ffffff',
+        actorBorder: '#1D1652',
+        actorTextColor: '#000000',
+        actorLineColor: '#1D1652',
+        signalColor: '#1D1652',
+        signalTextColor: '#000000',
+        labelBoxBkgColor: '#ffffff',
+        labelBoxBorderColor: '#1D1652',
+        labelTextColor: '#000000',
+        noteBkgColor: '#E8F6F0',
+        noteBorderColor: '#1D1652',
+        noteTextColor: '#000000',
+        activationBkgColor: '#E8F6F0',
+        activationBorderColor: '#1D1652',
+        sequenceNumberColor: '#ffffff'
+      }
+    });
+  </script>
+  <style>
+    :root {
+      --ink: #000000;
+      --navy: #1D1652;
+      --leaf: #0B6B3A;
+      --paper: #FFFcf6;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      font-size: 18px;
+      line-height: 1.55;
+    }
+    header {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 36px 24px 12px;
+    }
+    header img.logo { height: 40px; width: auto; display: block; }
+    .meta {
+      margin-top: 18px;
+      font-size: 15px;
+      color: var(--navy);
+    }
+    main {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 8px 24px 80px;
+    }
+    h1 {
+      font-size: 32px;
+      line-height: 1.2;
+      color: var(--navy);
+      margin: 18px 0 12px;
+      font-weight: 700;
+    }
+    h2 {
+      font-size: 22px;
+      color: var(--navy);
+      margin: 36px 0 12px;
+      padding-top: 8px;
+      border-top: 2px solid var(--navy);
+    }
+    p { margin: 0 0 14px; }
+    ol, ul { margin: 0 0 16px; padding-left: 1.3em; }
+    li { margin: 0 0 6px; }
+    code, pre {
+      font-family: "IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.88em;
+    }
+    code {
+      background: #E8F6F0;
+      padding: 0.08em 0.28em;
+    }
+    pre {
+      background: #0B0A1A;
+      color: #ffffff;
+      padding: 14px 16px;
+      overflow-x: auto;
+      margin: 0 0 18px;
+    }
+    pre code { background: transparent; color: inherit; padding: 0; }
+    .diagram {
+      background: #ffffff;
+      border: 2px solid var(--navy);
+      padding: 16px 8px;
+      margin: 0 0 20px;
+      overflow-x: auto;
+    }
+    nav.toc {
+      background: #ffffff;
+      border: 2px solid var(--navy);
+      padding: 14px 18px;
+      margin: 0 0 24px;
+    }
+    nav.toc ol { margin: 0; }
+    nav.toc a { color: var(--navy); }
+    a { color: var(--navy); }
+    .call {
+      border-left: 6px solid var(--leaf);
+      padding: 8px 14px;
+      margin: 0 0 18px;
+      background: #ffffff;
+    }
+    @media print {
+      header, main { max-width: 100%; }
+      .diagram { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img class="logo" alt="GenoBank.io"
+         src="file:///Users/danieluribe/Downloads/genobank.io/images/GenoBank.io_logo@2x.svg">
+    <p class="meta">21 September 2026 · biofs-cli 3.22.0 · biofs-node 0.4.30</p>
+    <h1>BioNFT-gated crypt4gh in BioFS</h1>
+  </header>
+  <main>
+    <p>crypt4gh encrypts bytes. A BioNFT grants consent. BioFS keeps those as two different acts and then pairs them, so a GA4GH envelope cannot be minted or unwrapped without a living grant on the biosample serial.</p>
+    <p>This note is the protocol companion for that pairing. It is not a journal manuscript.</p>
+
+    <nav class="toc">
+      <ol>
+        <li><a href="#complements">How it complements BioFS</a></li>
+        <li><a href="#not-keys">Three things that are never the reader secret</a></li>
+        <li><a href="#dual">Dual consent: the CLI does not get to be believed</a></li>
+        <li><a href="#kex">Key exchange</a></li>
+        <li><a href="#encrypt">Encrypt</a></li>
+        <li><a href="#decrypt">Decrypt</a></li>
+        <li><a href="#revoke">Revoke</a></li>
+        <li><a href="#unbound">Unbound EGA path</a></li>
+        <li><a href="#limits">What this does not do yet</a></li>
+        <li><a href="#commands">Commands and routes</a></li>
+      </ol>
+    </nav>
+
+    <h2 id="complements">How it complements BioFS</h2>
+    <p>BioFS is already a legal-act filesystem. A biosample is named by a <code>biocid://</code>. Access is a BioNFT grant (Metamorphic Consent). Bytes live as ciphertext in GCS. Erasure is <code>unlink</code>. Streaming is htsget. Jobs (Clara, OpenCRAVAT, imaging) re-check consent on the node.</p>
+    <p>crypt4gh does not replace any of that. It is an optional GA4GH File Encryption Standard v1 envelope around object bytes so htslib and the EGA crypt4gh tool can read the same ciphertext BioFS stores. The envelope names a reader by a static X25519 public key baked at write time. That key is not consent, it cannot revoke, and it is not an Ethereum wallet.</p>
+    <p>BioFS therefore holds the X25519 secret on biofs-node, keyed by biosample serial, and releases it only while the BioNFT grant is active. The BioNFT remains the right. crypt4gh remains the codec. GCS remains the store. <code>biocid://</code> remains the name. <code>unlink</code> remains erasure.</p>
+
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart TB
+  subgraph legal ["1. Legal act"]
+    B["BioNFT consent grant<br/>active sequentia_bionfts row<br/>plus the grant transaction on Sequentia"]
+  end
+  subgraph name ["2. Name"]
+    C["biocid://lab/wallet/type/dataset"]
+  end
+  subgraph store ["3. Store"]
+    G["GCS object: ciphertext only"]
+  end
+  subgraph env ["4. Optional GA4GH envelope"]
+    E["crypt4gh v1<br/>X25519 header packets<br/>ChaCha20-IETF-Poly1305 in 64 KiB segments"]
+  end
+  B -->|"admits the caller"| C
+  C -->|"resolves to"| G
+  E -->|"is what lands in"| G
+  B -->|"gates reader-secret mint and release"| E
+      </pre>
+    </div>
+
+    <p>Default vault objects are not bulk-converted. The 8,547-sample census is not crypt4gh. <code>biofs crypt4gh</code> and <code>biofs upload --envelope crypt4gh --serial</code> are opt-in.</p>
+
+    <h2 id="not-keys">Three things that are never the reader secret</h2>
+    <p>An Ethereum wallet is secp256k1. crypt4gh readers are X25519. Those curves do not convert. The BioFS login <code>user_signature</code> is a bearer over the GenoBank.io login message. It authenticates who is asking. It is never hashed, derived, or used as a crypt4gh secret.</p>
+
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart LR
+  W["Ethereum wallet<br/>secp256k1"]
+  S["biofs login<br/>user_signature"]
+  X["Per-serial crypt4gh reader<br/>X25519, 32 bytes<br/>minted on biofs-node"]
+  W -.->|"not a crypt4gh key"| X
+  S -.->|"never used as a secret"| X
+      </pre>
+    </div>
+
+    <p>The node mints the X25519 pair. The CLI never sends a reader secret at write time. Client-supplied <code>secret_key_hex</code> on <code>POST /agent/crypt4gh/register</code> is refused.</p>
+
+    <h2 id="dual">Dual consent: the CLI does not get to be believed</h2>
+    <p><code>biofs crypt4gh encrypt --serial</code> and <code>decrypt --serial</code> call <code>BioNFTClient.checkAccess</code> first. That hits <code>GET /api_biofs_fuse/check_consent</code> with the biosample serial and the logged-in wallet. Fuse admits the call only when both of these hold:</p>
+    <ol>
+      <li>An <code>active</code> row in <code>genobank-api.sequentia_bionfts</code> for that serial whose <code>agent_wallet</code> or <code>patient_wallet</code> matches the caller.</li>
+      <li>The row's <code>tx_hash</code> exists on Sequentia (<code>eth_getTransactionByHash</code>). A Mongo-only row is stale and is denied (<code>blockchain_verified</code> must be true).</li>
+    </ol>
+    <p>biofs-node then re-reads the same collection and re-checks the same transaction. A forged CLI, a skipped client check, or a wallet header that does not recover from the login signature all fail closed on the node.</p>
+
+    <div class="diagram">
+      <pre class="mermaid">
+sequenceDiagram
+  participant CLI as biofs CLI
+  participant Fuse as api_biofs_fuse check_consent
+  participant Mongo as sequentia_bionfts
+  participant Seq as Sequentia
+  participant Node as biofs-node
+  CLI->>CLI: biofs login credentials
+  CLI->>Fuse: checkAccess serial, wallet
+  Fuse->>Mongo: active row for serial and wallet
+  alt no active row
+    Fuse-->>CLI: hasAccess false
+    CLI-->>CLI: exit DENIED
+  else row present
+    Fuse->>Seq: eth_getTransactionByHash
+    alt tx missing
+      Fuse-->>CLI: blockchain_verified false
+      CLI-->>CLI: exit DENIED
+    else tx on chain
+      Fuse-->>CLI: hasAccess true
+      CLI->>Node: signed register or release-key
+      Node->>Node: recoverSigner from login signature
+      Node->>Mongo: loadActive sequentia_bionfts
+      Node->>Seq: getTransaction tx_hash
+      alt grant still active
+        Node-->>CLI: proceed
+      else grant gone, RPC error, or no patient_wallet
+        Node-->>CLI: 403 DENIED
+      end
+    end
+  end
+      </pre>
+    </div>
+
+    <p>Envelope ownership is the BioNFT <code>patient_wallet</code>, not the agent who happened to encrypt. A grant with no <code>patient_wallet</code> cannot mint an envelope.</p>
+
+    <h2 id="kex">Key exchange</h2>
+    <p>One X25519 pair per biosample serial. Every crypt4gh object of that serial shares the reader. After revoke, register rotates: a new pair is minted so later objects are not readable with the old secret.</p>
+    <p>The secret is sealed at rest in <code>biofs_node.crypt4gh_envelopes</code> with the node's existing AES-256-GCM at-rest wrap (<code>enc:v1:</code>). Public facts (serial, public key, status, owner) can be read after consent. The secret leaves the node only on <code>POST /agent/crypt4gh/release-key</code>.</p>
+
+    <div class="diagram">
+      <pre class="mermaid">
+sequenceDiagram
+  participant CLI as biofs CLI
+  participant Node as biofs-node
+  participant Store as crypt4gh_envelopes
+  Note over CLI,Store: After both BioNFT checks have passed
+  CLI->>Node: POST /agent/crypt4gh/register serial
+  Node->>Store: load serial
+  alt active envelope for this patient_wallet
+    Store-->>Node: existing public_key_hex
+    Node-->>CLI: 200 public_key_hex only
+  else none, or previously revoked
+    Node->>Node: generateKeyPair X25519
+    Node->>Store: seal secret AES-256-GCM, status active
+    Node-->>CLI: 201 public_key_hex only
+  end
+  CLI->>CLI: crypt4gh encrypt to that public key
+  Note over CLI: optional extra GA4GH recipient PEM still allowed
+      </pre>
+    </div>
+
+    <ol>
+      <li><code>POST /agent/crypt4gh/register</code> mints or reuses the pair. Public key out. Secret never out.</li>
+      <li>CLI encrypts plaintext to that public key. Extra <code>--recipient-pk</code> adds a second header packet for EGA-side readers.</li>
+      <li>Secret stays sealed in <code>biofs_node.crypt4gh_envelopes</code>.</li>
+      <li><code>POST /agent/crypt4gh/release-key</code> unseals only while <code>status=active</code> and BioNFT consent still holds.</li>
+      <li><code>biofs crypt4gh revoke --serial</code> (envelope owner = BioNFT <code>patient_wallet</code>) sets <code>status=revoked</code>. Later release fails.</li>
+      <li>Unbound EGA interop is only <code>--allow-unbound</code>. <code>biofs upload --envelope crypt4gh</code> requires <code>--serial</code>.</li>
+    </ol>
+
+    <h2 id="encrypt">Encrypt</h2>
+<pre><code>biofs crypt4gh encrypt --serial 41221040804049 -i local.bin -o local.bin.c4gh</code></pre>
+
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart TD
+  A["encrypt --serial"] --> B{"logged in?"}
+  B -->|no| Z1["UNAUTHENTICATED"]
+  B -->|yes| C{"Fuse checkAccess?"}
+  C -->|no| Z2["DENIED"]
+  C -->|yes| D["POST /agent/crypt4gh/register"]
+  D --> E{"node BioNFT re-check?"}
+  E -->|no| Z3["DENIED"]
+  E -->|yes| F["node returns public_key_hex"]
+  F --> G["CLI wraps bytes as crypt4gh v1"]
+  G --> H["write ciphertext"]
+  D -.->|client sent a secret| Z4["BAD_REQUEST"]
+      </pre>
+    </div>
+
+    <p>If register fails, the CLI does not write an unbound envelope. Fail closed. <code>biofs upload --envelope crypt4gh --serial &lt;biosample&gt;</code> runs the same bound wrap before the upload.</p>
+
+    <h2 id="decrypt">Decrypt</h2>
+<pre><code>biofs crypt4gh decrypt --serial 41221040804049 -i local.bin.c4gh -o local.bin</code></pre>
+
+    <div class="diagram">
+      <pre class="mermaid">
+sequenceDiagram
+  participant CLI as biofs CLI
+  participant Fuse as check_consent
+  participant Node as biofs-node
+  participant Store as crypt4gh_envelopes
+  CLI->>Fuse: checkAccess serial, wallet
+  Fuse-->>CLI: hasAccess
+  CLI->>Node: POST /agent/crypt4gh/release-key
+  Node->>Node: recoverSigner
+  Node->>Node: sequentia_bionfts + Sequentia tx
+  Node->>Store: load serial
+  alt status active and consent granted
+    Store-->>Node: openSecret
+    Node-->>CLI: secret_key_hex
+    CLI->>CLI: crypt4gh decrypt
+  else status revoked
+    Node-->>CLI: 403 REVOKED
+  else no grant
+    Node-->>CLI: 403 DENIED
+  end
+      </pre>
+    </div>
+
+    <h2 id="revoke">Revoke</h2>
+<pre><code>biofs crypt4gh revoke --serial 41221040804049</code></pre>
+    <p>Only the envelope owner (the BioNFT <code>patient_wallet</code>) may revoke. An authorized agent who can decrypt cannot revoke.</p>
+
+    <div class="diagram">
+      <pre class="mermaid">
+stateDiagram-v2
+  [*] --> none
+  none --> active: register after BioNFT consent
+  active --> active: register reuses the same public key
+  active --> revoked: revoke by patient_wallet
+  revoked --> active: register after revoke mints a new pair
+      </pre>
+    </div>
+
+    <div class="call">
+      <p>Revoke stops later hand-out. It does not recall plaintext. crypt4gh is a static envelope: a reader who already obtained the secret can still open those bytes. Erasure of the object bytes is still <code>biofs unlink</code> / GCS delete, which is a different plane from key release.</p>
+    </div>
+
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart LR
+  R["revoke envelope"] --> S["later release-key fails"]
+  R -.->|"does not"| P["plaintext already on a laptop"]
+  U["unlink biocid"] --> G["GCS object gone"]
+  U -.->|"does not"| K["a secret released last week"]
+      </pre>
+    </div>
+
+    <p>Those two planes together are how BioFS complements a GA4GH codec: crypt4gh talks to genomic tools; BioNFT and unlink talk to consent and erasure.</p>
+
+    <h2 id="unbound">Unbound EGA path</h2>
+    <p>For synthetic bytes and EGA-tool interop with no BioNFT:</p>
+<pre><code>biofs crypt4gh encrypt --allow-unbound --recipient-pk recipient.pub -i in.bin -o out.c4gh
+biofs crypt4gh decrypt --allow-unbound --sk recipient.sk -i out.c4gh -o out.bin
+biofs crypt4gh keygen --out ~/.biofs/crypt4gh</code></pre>
+    <p>Without <code>--allow-unbound</code>, encrypt and decrypt require <code>--serial</code>. <code>upload --envelope crypt4gh</code> has no unbound switch.</p>
+
+    <h2 id="limits">What this does not do yet</h2>
+    <p>Stream, view, and htsget serving paths do not auto-unwrap crypt4gh objects. The gated paths in 3.22.0 / 0.4.30 are register, release-key, revoke, CLI encrypt/decrypt, and upload wrap. <code>BIOFS_CRYPT4GH_SK</code> is no longer a serving unwrap.</p>
+    <p>Lit Protocol KEK release, described elsewhere as the default object-key wrap, is a separate plane. It is not this crypt4gh bind.</p>
+
+    <h2 id="commands">Commands and routes</h2>
+<pre><code>biofs crypt4gh encrypt --serial &lt;biosample&gt; -i &lt;plain&gt; -o &lt;cipher&gt;
+biofs crypt4gh decrypt --serial &lt;biosample&gt; -i &lt;cipher&gt; -o &lt;plain&gt;
+biofs crypt4gh revoke  --serial &lt;biosample&gt;
+biofs crypt4gh inspect &lt;file.c4gh&gt;
+biofs upload &lt;file&gt; --envelope crypt4gh --serial &lt;biosample&gt;</code></pre>
+<pre><code>POST /agent/crypt4gh/register
+POST /agent/crypt4gh/release-key
+POST /agent/crypt4gh/revoke
+GET  /agent/crypt4gh/envelope?serial=
+GET  /agent/crypt4gh/status</code></pre>
+  </main>
+</body>
+</html>

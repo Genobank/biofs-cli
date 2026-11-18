@@ -1,0 +1,5 @@
+Correction to organ_package_amendment1-20261106.txt (sha256 f7075139b0d457237e46d96e5f172ecedc5d4f01b8da5aeeef38cb2663d33354, 2026-11-06T21:15:04Z).
+The amendment says the probe covered 12 real organs. It covered 7 organ and scan pairs of the abdomen job before it stopped on an error of my own script
+(a target above the face count of the smaller heart mesh): liver (jan9, oct21), lung_left (jan9, oct21), colon (jan9, oct21) and heart (jan9, oct21, the
+last one only partly). Stomach and spleen were not reached. The statements about non-manifold edges and about retrying larger targets are from those 7.
+Nothing else in the amendment changes.

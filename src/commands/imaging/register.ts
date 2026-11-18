@@ -27,6 +27,9 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import axios from 'axios';
+import { spawnSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 import { getCredentials } from '../../lib/auth/credentials';
 import { Logger } from '../../lib/utils/logger';
 
@@ -196,6 +199,24 @@ export async function imagingRegisterCommand(options: ImagingRegisterOptions = {
     Logger.error(`imaging register failed: ${msg}`);
     return null;
   }
+}
+
+export function imagingRegisterAdviseCommand(manifestPath: string, purpose?: string, pair?: string): void {
+  const candidates = [
+    process.env.IMAGING_REGISTER_CONTRACT,
+    path.resolve(__dirname, '../../../containers/imaging-register/frame_contract.py'),
+    path.resolve(process.cwd(), 'containers/imaging-register/frame_contract.py'),
+    '/Users/danieluribe/Downloads/imaging-register-v23/frame_contract.py',
+  ].filter((p): p is string => !!p);
+  const script = candidates.find((p) => fs.existsSync(p));
+  if (!script) {
+    throw new Error('frame_contract.py not found. Set IMAGING_REGISTER_CONTRACT.');
+  }
+  const args = [script, 'advise', manifestPath];
+  if (purpose) args.push(purpose);
+  if (pair) args.push(pair);
+  const run = spawnSync('python3', args, { stdio: 'inherit' });
+  if (run.status !== 0) throw new Error(`frame_contract.py exited ${run.status}`);
 }
 
 export async function imagingRegisterStatusCommand(jobId: string, options: ImagingRegisterStatusOptions = {}): Promise<RegisterRow | null> {

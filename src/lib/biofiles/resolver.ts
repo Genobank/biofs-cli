@@ -398,14 +398,18 @@ export class BioCIDResolver {
       for (const row of inv) {
         const owner = String(row.owner_wallet || targetOwner || callerWallet || '').toLowerCase();
         const objName: string = row.object_name || row.gcs_path || '';
-        const filename = row.biofile || row.dataset || (objName ? objName.split('/').pop() : '') || row.biocid || 'unknown';
         const parsed = BioCIDParser.parse(row.biocid || '');
+        let filename = row.biofile || row.dataset || (objName ? objName.split('/').pop() : '') || '';
+        if (!filename || /^biocid:/i.test(String(filename))) {
+          filename = parsed?.identifier || row.biocid || 'unknown';
+        }
         const type =
           parsed?.type ||
           row.filetype ||
           row.biodata_type ||
           row.file_type_guess ||
           BioCIDParser.detectFileType(filename);
+        // Address by biocid only. bucket/object_name stay behind the resolver.
         bioFiles.push({
           filename,
           biocid: row.biocid || `biocid://${owner || 'resolver_err/no-owner'}/biorouter/${row.sample_serial || 'na'}`,
@@ -414,7 +418,6 @@ export class BioCIDResolver {
           size: row.size_bytes || row.file_size,
           created_at: row.time_created || row.created_at,
           owner: owner || undefined,
-          gcs_path: row.gcs_path || (row.bucket && objName ? `gs://${row.bucket}/${objName}` : undefined),
         });
       }
     } catch (error) {

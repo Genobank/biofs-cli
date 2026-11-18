@@ -204,6 +204,36 @@ def lesionlocator_track(baseline_nii, followup_nii, baseline_inst_mask, outdir):
     return masks[-1]
 
 
+LL_MAX_LESIONS = int(os.getenv("LL_MAX_LESIONS", "30"))      # one LesionLocator call per lesion; above this the overlap fallback is used
+
+
+def lesionlocator_track_each(baseline_nii, followup_nii, b_inst, b_seg, labels, outdir):
+    """Track every baseline lesion with its own LesionLocator call and its own binary prompt.
+
+    A single call with a multi-label prompt came back as one binary mask (label 1), so the baseline instance id could not be read from the
+    result: on the detector known-answer test (2026-11-05) a lesion that shrank was reported as resolved and another lesion took its
+    follow-up. Here the label of each tracked mask is the baseline instance id by construction. Returns (label array on the follow-up grid,
+    path of the combined mask) or (None, None) when any call fails, in which case the caller uses the overlap fallback for every lesion."""
+    import SimpleITK as sitk
+    os.makedirs(outdir, exist_ok=True)
+    combined = None; ref_img = None
+    for lab in labels:
+        m = sitk.GetImageFromArray((b_inst == lab).astype(np.uint8)); m.CopyInformation(b_seg)
+        mp = os.path.join(outdir, f"prompt_{lab}.nii.gz"); sitk.WriteImage(m, mp)
+        out = lesionlocator_track(baseline_nii, followup_nii, mp, os.path.join(outdir, f"lesion_{lab}"))
+        if not out:
+            return None, None
+        img = sitk.ReadImage(out); arr = sitk.GetArrayFromImage(img) > 0
+        if combined is None:
+            combined = np.zeros(arr.shape, np.int32); ref_img = img
+        elif arr.shape != combined.shape:
+            log(f"tracked mask of lesion {lab} has another shape; using overlap fallback"); return None, None
+        combined[arr & (combined == 0)] = lab
+    path = os.path.join(outdir, "tracked_combined.nii.gz")
+    im = sitk.GetImageFromArray(combined.astype(np.int16)); im.CopyInformation(ref_img); sitk.WriteImage(im, path)
+    return combined, path
+
+
 def long_axis_of_instance(inst_arr, label, sp):
     """RECIST long-axis (mm) of one instance label in an instance array."""
     from skimage import measure
@@ -259,14 +289,15 @@ def analyze_interval(b_label, f_label, b_seg, f_seg, b_ct, f_ct, sp, wd, days, p
     # track baseline lesions into the follow-up with LesionLocator (prev_mask prompt)
     tracker = "LesionLocator"; tracked_inst = None; tracked_path = None
     if b_les:
-        b_mask_path = write_instance_mask(b_inst, b_seg, os.path.join(wd, f"{b_label}_inst.nii.gz"))
-        tracked_path = lesionlocator_track(b_ct, f_ct, b_mask_path,
-                                           os.path.join(wd, f"track_{b_label}_{f_label}"))
-        if tracked_path:
+        write_instance_mask(b_inst, b_seg, os.path.join(wd, f"{b_label}_inst.nii.gz"))
+        if len(b_les) <= LL_MAX_LESIONS:
             try:
-                tracked_inst = sitk.GetArrayFromImage(sitk.ReadImage(tracked_path))
+                tracked_inst, tracked_path = lesionlocator_track_each(b_ct, f_ct, b_inst, b_seg, [bl["inst"] for bl in b_les],
+                                                                      os.path.join(wd, f"track_{b_label}_{f_label}"))
             except Exception as e:
-                log(f"could not read tracked mask: {e}"); tracked_inst = None
+                log(f"LesionLocator tracking failed: {e}"); tracked_inst, tracked_path = None, None
+        else:
+            log(f"{len(b_les)} baseline lesions, over the {LL_MAX_LESIONS} LesionLocator limit; using overlap fallback")
     if tracked_inst is None:
         tracker = "overlap_fallback"
 
@@ -380,16 +411,21 @@ def recist_for_interval(findings, reg_reliable, phase_match, treatment):
     new_meas = [f for f in findings if f["new_lesion"] and f["measurable"]]
     pct = (round(100 * (foll_sld - base_sld) / base_sld, 1) if base_sld else None)
     basis = []
-    if sel and foll_sld == 0:
-        category = "CR"; basis.append("all target lesions absent on the follow-up scan")
-    elif new_meas:
+    rise_mm = round(foll_sld - base_sld, 1)
+    # RECIST 1.1: a new lesion is progression whatever happens to the targets (so it is tested before CR), and a rise
+    # in the sum of diameters is progression only if it is at least 20% AND at least 5 mm in absolute terms.
+    if new_meas:
         category = "PD"; basis.append(f"{len(new_meas)} new measurable lesion(s)")
+    elif sel and foll_sld == 0:
+        category = "CR"; basis.append("all target lesions absent on the follow-up scan")
     elif base_sld and pct is not None and pct <= -30:
         category = "PR"; basis.append(f"target SLD decreased {pct}% vs baseline")
-    elif base_sld and pct is not None and pct >= 20:
-        category = "PD"; basis.append(f"target SLD increased {pct}% vs baseline")
+    elif base_sld and pct is not None and pct >= 20 and rise_mm >= 5.0:
+        category = "PD"; basis.append(f"target SLD increased {pct}% ({rise_mm} mm) vs baseline")
     elif sel:
-        category = "SD"; basis.append("neither PR nor PD thresholds met")
+        category = "SD"; basis.append("neither PR nor PD thresholds met"
+                                      + (f" (the SLD rose {pct}%, by {rise_mm} mm; RECIST 1.1 needs at least 5 mm for progression)"
+                                         if pct is not None and pct >= 20 else ""))
     else:
         category = "no-target"; basis.append("no measurable target lesion identified by automated detection")
     # graded confidence, REPORTED not withheld

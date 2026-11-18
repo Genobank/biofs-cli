@@ -1,0 +1,64 @@
+Known-answer test of the findings logic (findings_runner.py: detect_lesions, analyze_interval, recist_for_interval)
+Pre-registration, written before any run of this test. Engineer: Daniel Uribe. Date 2026-11-05.
+
+WHAT IS TESTED
+The code that turns two lesion segmentations into findings and a RECIST category: measurement of the long axis, matching of a
+baseline lesion to a follow-up lesion, the status (new, enlarged, shrunk, resolved, stable) and the response category
+(CR, PR, SD, PD). The segmentations are INJECTED: spheres of known diameter written into label volumes, so every number
+has a known answer. No detector (VISTA-3D) and no LesionLocator run here; the tracker is the overlap fallback that the
+code uses when no checkpoint is found.
+
+WHAT IS NOT TESTED (stated before the run)
+1. The detector. Whether VISTA-3D finds a real or synthetic lesion is a different test (GPU, later).
+2. LesionLocator tracking (GPU and checkpoint). Only the overlap fallback is exercised.
+3. Real lesion shapes. Spheres on a label grid, no partial volume, no image noise, no registration error except where a
+   scenario shifts the lesion on purpose.
+4. The version of scikit-image in the image. This run uses the local one (0.26.0); the image version is checked and the
+   measurement scenarios are rerun there before any conclusion about the image is drawn.
+
+REFERENCE RULES (RECIST 1.1, Eisenhauer et al., Eur J Cancer 2009;45:228-247; the rules as I state them, not read again from the paper in this session)
+  target lesion: long axis at least 10 mm; at most 5 targets in all and 2 per organ
+  CR: all target lesions gone (and no new lesion)
+  PR: sum of long axes (SLD) down by at least 30% from baseline
+  PD: SLD up by at least 20% AND by at least 5 mm in absolute terms, OR any new unequivocal lesion
+  SD: none of the above
+For this test a new lesion with a long axis of at least 10 mm counts as unequivocal; a new lesion under 10 mm is reported, not graded.
+
+SCENARIOS (all spheres 1.0 mm isotropic unless stated; classes 23 lung tumor and 26 hepatic tumor)
+  S01 no lesion in either scan                       expect no finding; category no-target
+  S02 lung 12 mm in both, same place                 expect stable; SD
+  S03 lung 12 mm -> 16 mm (+33%, +4 mm)              expect enlarged; RECIST reference: SD
+  S04 lung 12 mm -> 20 mm (+67%, +8 mm)              expect enlarged; PD
+  S05 lung 20 mm -> 12 mm (-40%)                     expect shrunk; PR
+  S06 lung 15 mm -> absent                           expect resolved; CR
+  S07 lung 15 mm -> absent, new liver lesion 12 mm   expect resolved and new; RECIST reference: PD
+  S08 lung 15 mm stable, new liver lesion 6 mm       expect stable and new; category reported, not graded
+  S09 lung 15 mm stable, new liver lesion 12 mm      expect stable and new; PD
+  S10 4 lung (20, 18, 16, 14 mm) and 3 liver (12, 11, 10 mm), all unchanged
+                                                      expect 4 targets (20, 18, 12, 11), SLD 61 mm, SD
+  S11 shift sweep (report only): stable lesions of 8, 12, 20 mm; follow-up shifted 0, 2, 4, 6, 8, 10, 14 mm along x;
+      the status at each shift
+  S12 measurement sweep: one new sphere per diameter 4, 6, 8, 10, 12, 16, 20, 30 mm at three spacings
+      (x, y, z mm): 1.0 x 1.0 x 1.0, 0.7 x 0.7 x 1.25, 0.8 x 0.8 x 3.0; measured follow-up long axis against the true diameter
+  S13 centroid: the reported centroid against the true centre of each S12 sphere (index times spacing, x y z)
+  S14 small-lesion noise (report only): 6 mm -> 7.5 mm (+25%, +1.5 mm) and 8 mm -> 9.5 mm; the status
+  S15 split (report only): 20 mm lesion -> two 12 mm spheres with a 5 mm gap; what the code reports
+
+PASS CRITERIA (fixed now)
+  LK1 measurement: for true diameter 8 mm or more, in every spacing, |measured - true| <= max(1.5 mm, 10% of true)
+  LK2 status: the statuses expected above for S01 to S10 (S11, S14 and S15 are not graded)
+  LK3 category: the category expected above for S01, S02, S03, S04, S05, S06, S07, S09, S10 (the reference rules applied to the
+      TRUE diameters); S08 and S11 to S15 not graded
+  LK4 centroid: |reported - true| <= 1.5 mm on each axis for the S12 spheres of 8 mm or more
+  LK5 targets: S10 reports 4 target lesions and an SLD within 3 mm of 61
+Any criterion failed is a finding, reported as measured. A scenario is not removed or redefined after the run; a change is an
+amendment and is disclosed with what was seen first.
+
+PREDICTIONS FROM READING THE CODE, written before the run (scored after it)
+  P1 S03 returns PD (the code tests the 20% rise only, not the 5 mm absolute rise): LK3 fails on S03
+  P2 S07 returns CR (the code tests all-targets-absent before it looks for a new lesion): LK3 fails on S07
+  P3 the long axis is biased high, by up to 1 voxel (maximum Feret diameter of a pixel mask): positive error in S12
+  P4 a stable 8 mm lesion shifted by 6 mm or more is reported as resolved and new (no overlap)
+  P5 S10 passes LK5
+  P6 S01, S02, S04, S05, S06, S09 pass LK2 and LK3
+If a prediction is wrong, the report says so.

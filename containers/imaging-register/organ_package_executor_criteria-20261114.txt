@@ -1,0 +1,54 @@
+ORGAN PACKAGE EXECUTOR: criteria and predictions, registered before any code (2026-11-14)
+
+Scope of this step: write, locally and with tests, the two things the verb needs on the GPU executor, and nothing that touches a machine.
+  (1) organ_package_job.py: the program inside the imaging-register image that stages a register job from the vault, builds and verifies the organ package, uploads it and prints one result line.
+  (2) lib/organ_package_exec.js plus a thin insertion in the GPU node's index.js (POST /agent/organ_package, GET /agent/organ_package_status), as a patch against the snapshot of the VM file.
+  (3) two COPY lines in the Dockerfile.
+Source read: /opt/biofs-node/src/index.js on parabricks-gpu, copied as code to biofs-gpu-executor-sync-20261114/vm_snapshot/index.js, sha256 f75b2e653daaf85f1a746eb2e225529148bace83ba8be61c405e090e5a8bfb92 (equal to the VM file, read 2026-11-14 07:5xZ). The handler of imaging_register (lines 1192 to 1255) is the pattern: docker run, a result line, a state file, GET status.
+Not in this step, stated now: building the image, copying anything to the VM, restarting the VM node, installing the floors file on the VM, any real run, any push, deploy or publish.
+Contract kept from organ_package_verb_criteria-20261106.txt, with one disclosed difference: the POST answers 202 {job_id, status: "running"}, as the other executor endpoints do (the verb criteria wrote 200). The node module accepts any 2xx (r.ok) and checks status === "running".
+
+Governance questions for this addition (answered in writing, the rule of 2026-11-14):
+  Identity: the executor is the biofs-node daemon of this VM (biofs-node.service, port 8787). Its BioAgentRegistry entry on Sequentia is NOT verified in this step.
+  Start and stop: the VM is started and stopped outside this code; the idle autostop scripts and the 12 hourly guard decide. This step adds nothing that starts or stops an instance. The handler touches /var/run/biofs_last_job while a job runs, as imaging_register does.
+  Job record and anchor: the package job leaves a row in biofs_node.organ_package_jobs (node), a state file on the executor, and a biocid after verify. An on-chain job anchor is NOT written by this code and the imaging_register handler shows none either; stated as a gap.
+
+A. organ_package_job.py (inside the container; tests use fake_gcloud as gcloud and the synthetic job builder of test_organ_package.py; nothing leaves the machine)
+  Input by environment: WALLET, JOB_ID (package-<uuid>), REGISTER_JOB_ID (register-<uuid>), INPUT_GCS, OUTPUT_GCS, ORGANS ("default", "all" or a comma list), FLOORS (true or false), FLOORS_FILE, FLOORS_SHA256, WORKDIR.
+  A1 refusals. Each of these ends with exit code 2, a result line {"status": "error", "error": ...}, no gcloud call, and no folder created: WALLET not 0x and 40 hex; JOB_ID not package-<uuid>; REGISTER_JOB_ID not register-<uuid>;
+     INPUT_GCS not exactly gs://genobank-health-imaging/<WALLET>/imaging-register/<REGISTER_JOB_ID> (a different wallet segment, a different register id, another bucket, an extra path, all tested);
+     OUTPUT_GCS not exactly gs://genobank-health-imaging/<WALLET>/imaging-organ-package/<JOB_ID>; ORGANS holding an empty name, a slash, two dots, or more than 64 names; FLOORS neither true nor false;
+     FLOORS true and FLOORS_FILE missing, or its sha256 not equal to FLOORS_SHA256, or FLOORS_SHA256 absent.
+  A2 happy path with floors. Stages from the input prefix only what the build reads, as the proven run script did: manifest.json, native/<tp>/ct.nii.gz and labels.nii.gz, frame/<tp>_labels.nii.gz, pairs/<pair>/rigid.mat. Builds with organ_package.build_package and verifies with verify_package.
+     Uploads to OUTPUT_GCS and lists the destination: the object count and byte total equal the local package. The result line carries schema organ-twin-package/1, output_gcs, files, bytes, verify {ok: true}, floors_sha256 equal to the file's sha256, built_at, organs_built.
+     The gcloud log shows only storage cp and storage ls, only on the two prefixes of this job. The local work folder is removed after the upload verified.
+  A3 floors false: the package has no floors.json, floors_sha256 is null, the floors file is never read.
+  A4 an upload that lost an object (fake gcloud drops one) is an error, not done, and the work folder is kept.
+  A5 a package whose verify fails (a mesh file altered after the build) is an error, nothing is uploaded, the folder is kept.
+  A6 a register job whose manifest names a file the vault lacks is an error that names the missing path.
+  A7 the printed result for an error never contains the signature, a token, or the environment.
+  A8 mutation: at least 10 deliberate breaks of organ_package_job.py (skip the wallet check of INPUT_GCS, skip the OUTPUT_GCS check, accept a floors sha mismatch, upload before verify, trust the upload without listing, stage extra files, report verify ok when it is not, drop the cleanup,
+     read floors when FLOORS is false, accept two dots in an organ name) each caught by a test.
+B. lib/organ_package_exec.js (fake spawn, temporary state folder, fake clock and boot time; no docker, no network)
+  B1 POST validation, each 400 and no state file and no spawn: body not JSON; wallet not 0x and 40 hex; job_id not package-<uuid>; register_job_id not register-<uuid>; input_gcs not equal to the one derived from wallet and register id; output_gcs, when given, not equal to the derived one;
+     organs not "default", "all" or an array of 1 to 64 names of letters, digits, underscore and hyphen; floors not a boolean.
+  B2 floors preflight: floors true and the floors file missing or its sha256 different from the pinned one: 409 with a message, no state file, no spawn.
+  B3 happy POST: 202 {job_id, status: "running"}; the state file holds status running and started; docker is spawned once with arguments: run --rm --cpus N --entrypoint python, the work folder mount, the floors file mounted read-only only when floors is true, the image name, /app/organ_package_job.py;
+     no --gpus; the values reach the container only through the process environment and -e NAME pairs, never inside an argument; the heartbeat file is touched.
+  B4 a job_id whose state is running or done: 409 and no second spawn. One package job at a time per executor (ORGAN_PACKAGE_MAX_RUNNING, default 1): the next POST is 429.
+  B5 child close: status done only when the exit code is 0 and the last ORGAN_PACKAGE_RESULT line parses with schema organ-twin-package/1 and verify.ok true; otherwise error whose text is the result's error or, with no result line, the last 400 characters of output and the exit code.
+     A result line that says done with a non-zero exit code is an error.
+  B6 GET status: malformed id 400; unknown id 404; known id 200 with the state. A state still running whose start is older than the boot time of the executor host becomes an error "the executor restarted while the job ran" (written back).
+  B7 the output buffer is capped; a flood of output does not grow memory without bound.
+  B8 wiring (against the snapshot index.js): the patch applies with no fuzz and no offset; it adds lines only, removes none; node --check passes; exactly two routes are added; every other line of index.js is unchanged (the patched file minus the added block equals the snapshot byte for byte).
+  B9 mutation: at least 12 deliberate breaks of organ_package_exec.js, each caught.
+C. Dockerfile: the change is two added COPY lines (organ_package.py, organ_package_job.py) after the existing ones; nothing else; a backup first. The image is not built here.
+
+Predictions (registered now; scored honestly in AUDIT row A24)
+  P-X1: the wrapper tests of section A all pass on the first run: FALSE (probability of true 0.25).
+  P-X2: the executor module tests of section B all pass on the first run: FALSE (0.25).
+  P-X3: at least one mutant survives the first set of tests, so a test is strengthened: TRUE (0.7).
+  P-X4: organ_package.py needs no change to run inside the wrapper: TRUE (0.9).
+  P-X5: the patch applies to the snapshot and node --check passes: TRUE (0.95).
+  P-X6: the wrapper needs no library beyond the v27 image's (standard library, numpy, SimpleITK, trimesh, gcloud): TRUE (0.9).
+  P-X7: the real container build of the wrapper's imports works in the image on the VM: not testable in this step.

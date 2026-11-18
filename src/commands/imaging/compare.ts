@@ -32,6 +32,7 @@ export interface ImagingCompareOptions {
   region?: string;          // optional region label (e.g. "pelvis"); needs zlo/zhi
   zlo?: string;             // region z-fraction lower bound [0..1]
   zhi?: string;             // region z-fraction upper bound [0..1]
+  registerJob?: string;
   wait?: boolean;
   quiet?: boolean;
   json?: boolean;
@@ -70,6 +71,7 @@ export async function imagingCompareCommand(options: ImagingCompareOptions = {})
       baseline_label: options.baselineLabel || 'baseline',
       followup_label: options.followupLabel || 'follow-up',
       anatomy: options.anatomy || 'abdomen',
+      ...(options.registerJob ? { register_job_id: options.registerJob } : {}),
     };
     if (options.region && options.zlo && options.zhi) {
       body.region = options.region;

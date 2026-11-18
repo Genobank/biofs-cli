@@ -209,11 +209,31 @@ def link_tracks(per_tp, sp):
             tracks[tid]["members"][t + 1] = ib
             track_of[t + 1][ib] = tid; matched_b.add(ib)
             tracks[tid].setdefault("ious", []).append(round(1 - C[ia, ib], 2))
-        for ib, b in enumerate(B):       # unmatched B = appear
+        matched_a = {int(ia) for ia, ib in zip(ri, ci) if C[ia, ib] < 1.0}
+        for ib, b in enumerate(B):       # unmatched B = appear, or a split when it overlaps a lesion of A
             if ib in matched_b:
                 continue
-            tid = len(tracks); tracks.append({"id": tid, "members": {t + 1: ib}, "topology": "appear"})
+            parent, pov = None, 0.0
+            for ia, a in enumerate(A):
+                v = iou(a["mask"], b["mask"])
+                if v > pov:
+                    parent, pov = ia, v
+            tid = len(tracks); tracks.append({"id": tid, "members": {t + 1: ib}, "topology": "split" if parent is not None else "appear"})
             track_of[t + 1][ib] = tid
+            if parent is not None and track_of[t].get(parent) is not None:
+                tracks[track_of[t][parent]]["topology"] = "split"
+        for ia, a in enumerate(A):       # unmatched A that overlaps a lesion of B = merged into it
+            if ia in matched_a:
+                continue
+            into, mov = None, 0.0
+            for ib, b in enumerate(B):
+                v = iou(a["mask"], b["mask"])
+                if v > mov:
+                    into, mov = ib, v
+            if into is not None:
+                for tid in (track_of[t].get(ia), track_of[t + 1].get(into)):
+                    if tid is not None:
+                        tracks[tid]["topology"] = "merge"
     return tracks
 
 
@@ -381,19 +401,7 @@ def main():
         pct_base = (round(100 * (current_sld - baseline_sld) / baseline_sld, 1) if baseline_sld else None)
         pct_nadir = (round(100 * (current_sld - nadir_sld) / nadir_sld, 1) if nadir_sld else None)
         # category
-        reasons = []
-        if targets and current_sld == 0:
-            category = "CR"; reasons.append("all target lesions absent on the newest scan")
-        elif new_measurable:
-            category = "PD"; reasons.append(f"{len(new_measurable)} new measurable lesion(s)")
-        elif baseline_sld and pct_base is not None and pct_base <= -30:
-            category = "PR"; reasons.append(f"SLD decreased {pct_base}% vs baseline")
-        elif nadir_sld and pct_nadir is not None and pct_nadir >= 20 and (current_sld - nadir_sld) >= 5:
-            category = "PD"; reasons.append(f"SLD increased {pct_nadir}% vs nadir (+{round(current_sld-nadir_sld,1)}mm)")
-        elif targets:
-            category = "SD"; reasons.append("neither PR nor PD thresholds met")
-        else:
-            category = "no-target"; reasons.append("no measurable target lesion identified by automated segmentation")
+        category, reasons = recist_category(len(targets), baseline_sld, current_sld, nadir_sld, len(new_measurable))
         # suppression gates (a treated patient is never auto-reassured)
         response_assessable = bool(reg_reliable and phase_monotonic and treatment in ("naive",))
         human_review_forced = treatment not in ("naive",) or not reg_reliable or not phase_monotonic
@@ -444,6 +452,14 @@ def main():
                           "may be detected. Confirm against the radiology read and source images.",
             "elapsed_sec": round(time.time() - t0, 1),
         }
+        # Lesion voxels stay on the rigid grid. REGISTER_MANIFEST attaches the
+        # imaging-register contract (organ trust, cross-protocol) and does not
+        # replace this registration.
+        try:
+            import frame_contract
+            result = frame_contract.attach_if_configured(result, "lesion")
+        except Exception as _hook_err:
+            log(f"register frame not attached: {_hook_err}")
         # write A.nii.gz (newest reference) + lesion_tracks.json (drop-in)
         sitk.WriteImage(sitk.ReadImage(ref_ct), os.path.join(wd, "A.nii.gz"))
         V3.sh(["gcloud", "storage", "cp", os.path.join(wd, "A.nii.gz"), f"{prefix}/A.nii.gz"])
@@ -462,6 +478,27 @@ def main():
         log("ERROR", e); traceback.print_exc()
         print("LESION_TRACK_RESULT " + json.dumps({"status": "error", "error": str(e)[:300], "job_id": job}))
         sys.exit(1)
+
+
+def recist_category(n_targets, baseline_sld, current_sld, nadir_sld, n_new_measurable):
+    """RECIST 1.1 response category and its reasons. A new measurable lesion is progression whatever happens to the targets, so it is
+    tested before CR; PD on the sum of diameters needs a rise of at least 20% over the nadir AND at least 5 mm."""
+    pct_base = (round(100 * (current_sld - baseline_sld) / baseline_sld, 1) if baseline_sld else None)
+    pct_nadir = (round(100 * (current_sld - nadir_sld) / nadir_sld, 1) if nadir_sld else None)
+    reasons = []
+    if n_new_measurable:
+        category = "PD"; reasons.append(f"{n_new_measurable} new measurable lesion(s)")
+    elif n_targets and current_sld == 0:
+        category = "CR"; reasons.append("all target lesions absent on the newest scan")
+    elif baseline_sld and pct_base is not None and pct_base <= -30:
+        category = "PR"; reasons.append(f"SLD decreased {pct_base}% vs baseline")
+    elif nadir_sld and pct_nadir is not None and pct_nadir >= 20 and (current_sld - nadir_sld) >= 5:
+        category = "PD"; reasons.append(f"SLD increased {pct_nadir}% vs nadir (+{round(current_sld - nadir_sld, 1)}mm)")
+    elif n_targets:
+        category = "SD"; reasons.append("neither PR nor PD thresholds met")
+    else:
+        category = "no-target"; reasons.append("no measurable target lesion identified by automated segmentation")
+    return category, reasons
 
 
 def _band(vdt_days):

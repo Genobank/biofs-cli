@@ -59,6 +59,13 @@ export async function vaultMountCommand(options: VaultMountOptions): Promise<voi
       continue;
     }
 
+    if (process.env.BIOFS_ALLOW_LAPTOP_VCF !== '1') {
+      console.log(chalk.yellow(`  #${bionft.tokenId} — refusing to copy VCF bytes onto this machine.`));
+      console.log(chalk.gray('  Use `biofs stream` / `biofs tele` / `biofs fuse`. Set BIOFS_ALLOW_LAPTOP_VCF=1 only if you must.'));
+      skipped++;
+      continue;
+    }
+
     for (const [subdir, annotated, label] of [
       ['raw', false, 'raw VCF'],
       ['annotated', true, 'annotated VCF'],

@@ -41,7 +41,7 @@ export class BioNFTClient {
   private axios: AxiosInstance;
   private credManager: CredentialsManager;
   private readonly BIONFT_CONTRACT = '0x8C1fdECE83fA3F48777da16eb58ed801C676F8C1';
-  private readonly SEQUENTIA_RPC = 'http://52.90.163.112:8545';
+  private readonly SEQUENTIA_RPC = process.env.SEQUENTIA_RPC_URL || 'https://seqrpc.genobank.app';
   private readonly API_BASE = 'https://genobank.app';
 
   private constructor() {

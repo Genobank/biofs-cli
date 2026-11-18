@@ -44,6 +44,8 @@ export interface WorkspaceOptions {
   as?: string;
   role?: string;
   content?: string;
+  contentFile?: string;
+  model?: string;
   ref?: string[];
   // case
   status?: string;
@@ -83,8 +85,13 @@ export async function wsNode(
   base?: string,
 ): Promise<NodeResult> {
   const url = `${bioNodeBase(base)}${path}`;
+  // The node gates every workspace route on a wallet signature (requireMember): send the stored
+  // login signature as x-biofs-signature so a member's open, read and append are authenticated.
+  const creds = await getCredentials().catch(() => null);
+  const headers: Record<string, string> = {};
+  if (creds?.user_signature) headers['x-biofs-signature'] = creds.user_signature;
   try {
-    const res = await axios({ method, url, data: body, timeout: 60_000, validateStatus: () => true });
+    const res = await axios({ method, url, data: body, headers, timeout: 60_000, validateStatus: () => true });
     return { status: res.status, data: res.data };
   } catch (err: any) {
     return { status: 502, data: { error: 'biofs_node_unreachable', detail: err?.message, url } };
@@ -129,16 +136,21 @@ export async function workspaceReadCommand(caseId: string, options: WorkspaceOpt
 export async function workspaceAppendCommand(caseId: string, options: WorkspaceOptions = {}): Promise<void> {
   const agentId = options.as || 'operator';
   const refs = parseRefs(options.ref);
-  const turn = {
+  const content = options.contentFile ? fs.readFileSync(options.contentFile, 'utf8') : (options.content ?? '');
+  const turn: Record<string, any> = {
     agent_id: agentId,
     role: options.role || 'message',
-    content: options.content ?? '',
+    content,
     refs,
   };
-  const { status, data } = await wsNode('POST', '/workspace/append', { case_id: caseId, turn }, options.node);
+  if (options.model) turn.model = options.model;
+  // The node reads the turn fields at the top level (case_id, content, role, agent_id, model, refs);
+  // the nested `turn` is kept for older nodes.
+  const { status, data } = await wsNode('POST', '/workspace/append', { case_id: caseId, ...turn, turn }, options.node);
   if (status >= 400) { Logger.error(`workspace append ${status}: ${data?.error || ''}`); process.exit(1); }
   if (options.json) return out(data, options);
-  if (!options.quiet) console.log(chalk.green(`appended seq ${data.turn.seq}`) + chalk.gray(` by ${data.turn.agent_id}  hash ${String(data.turn.turn_hash).slice(0, 12)}…`));
+  const tr = (data && data.turn && data.turn.seq !== undefined) ? data.turn : (data?.turn?.turn ?? data?.turn ?? data);
+  if (!options.quiet) console.log(chalk.green(`appended seq ${tr?.seq}`) + chalk.gray(` by ${tr?.agent_id}  hash ${String(tr?.turn_hash).slice(0, 12)}…`));
 }
 
 // ---- biofs workspace case <case_id> (CAS header update) -------------------

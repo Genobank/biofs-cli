@@ -124,7 +124,7 @@ export async function annotateSubmitCommand(
       return null;
     }
     const submit = submitResp.data;
-    spinner?.succeed(`oc_job_id=${submit.oc_job_id}  sqlite=${submit.output_gs_uri}`);
+    spinner?.succeed(`oc_job_id=${submit.oc_job_id}  sqlite=${submit.sqlite_biocid}`);
 
     if (options.json) {
       console.log(JSON.stringify(submit, null, 2));

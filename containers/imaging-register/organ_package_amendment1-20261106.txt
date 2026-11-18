@@ -1,0 +1,35 @@
+Organ package, amendment 1 to organ_package_criteria-20261106.txt (sha256 60b7407d40032f100f5ca46d1b7a40b729bdea0593f2d7b40016051408b67623).
+Written after the first real run and before any change to organ_package.py. The registered criteria are not edited; this file adds to them.
+
+What was seen before this amendment (first real run, 2026-11-06 20:50 to 21:00Z, image imaging-register:v27-20261105, CPU only)
+  RD1 to RD3 and RD5, RD6 passed on both jobs; verify OK on 420 and 369 files; build 277 s and 251 s.
+  Anatomy sanity of the centroids in patient LPS (liver right of spleen, kidneys, lungs, heart left of the spine, heart above liver, spine
+  behind heart and liver, bladder below kidney): 11 of 11 on the abdomen job and 10 of 10 (1 not applicable) on the chest job, every timepoint.
+  Not asked for by the registered criteria, and found: 26 of 55 decimated native meshes of the abdomen job and 27 of 45 of the chest job are not
+  watertight; every undecimated mesh is. A probe on 12 real organs on the VM showed no open edge but 1 to 10 edges shared by three faces, at
+  every face target tried (40000, 50000, 60000, 80000); retrying a larger target is not reliable. Marching cubes at a coarser step on a smoothed
+  mask gave a closed manifold surface where the grid was padded by at least the step.
+  Frame (deformable) meshes of organs cut by the scan range have volumes 0.085 to 7.6 times the reference volume (chest job), against a median 1.00.
+  Volumes of hollow organs swing between scans (colon 961, 1943 and 2217 ml; stomach 174, 360 and 550 ml; pancreas 60, 46 and 27 ml in the abdomen job).
+  The package reports these; it calls none of them.
+
+Change decided: a mesh over the face budget is made by marching cubes at a coarser step (2 to 8 voxels, grid padded by the step, mask smoothed with a
+Gaussian of 0.3 times the step), taking the first step whose mesh is closed, manifold and within the budget. If no step does, the full-resolution mesh
+is kept and the record says so. The registered OP13 field "decimated" now means "reduced".
+
+Added criteria
+OP13b closed manifold. For synthetic organs that include a thin-walled hollow shell and a shape with a thin bridge, at face budgets 40000 and 5000 and
+      with no budget, every mesh the builder writes has 0 boundary edges and 0 edges shared by more than 2 faces, the mesh volume is within 5 percent
+      of the voxel volume, and the face count is within the budget when the record says it is.
+OP14  frame caution. A deformable-frame mesh record carries a caution naming the scans in which the organ is cut by the scan range, when the organ is cut
+      in either scan of the pair, and carries none otherwise.
+OP15  physiology note. Change rows carry volume_varies_with: filling (stomach, duodenum, small_bowel, colon, urinary_bladder, gallbladder, esophagus),
+      inspiration (lung organs), cardiac and contrast phase (heart, aorta, inferior_vena_cava, portal_vein_and_splenic_vein); no other organ carries one.
+      General physiology only, no threshold and no clinical call.
+RD7   closed manifold on the real jobs: the number of native meshes that are closed and manifold, and the list of those that are not, is reported for
+      both jobs. Bar: all closed manifold except organs for which no step up to 8 meets the budget with a manifold mesh (each listed with its faces).
+Prediction P7: at least 95 percent of native meshes of the two real jobs are closed manifold after the change.
+Predictions P1 to P6 of the registered file, scored after the first run: P1 false in the other direction (all of OP1 to OP13 passed at the first run; I
+expected one or two failures); P2 false (the first version already tested the sign of the volume, so the reflected matrix passed; the mutant without the
+check is caught); P3 true (rigid spine ASSD 0.77 to 1.02 mm); P4 true (worst lung volume difference 0.018 percent); P5 true (abdomen job: lungs, heart,
+aorta, spine cut at the scan edge, in at least one timepoint); P6 true (277 s and 251 s).

@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist-kiosk",
+    "rootDir": "./src",
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": ["src/commands/kiosk/**/*.ts"],
+  "exclude": ["node_modules", "dist", "dist-kiosk", "**/*.bkp*"]
+}

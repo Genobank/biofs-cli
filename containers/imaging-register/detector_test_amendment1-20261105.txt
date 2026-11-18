@@ -1,0 +1,16 @@
+Amendment 1 to detector_test_criteria-20261105.txt (sha256 80d0dd1e5b7b32905e706d37b79f62ba0630a38357f40e56ca2fade88a5179a8, 2026-11-05T21:36:43Z)
+Written after run 1 and before run 2. Date 2026-11-05.
+
+What run 1 showed that bears on this amendment: in pair D3 (three baseline nodules, LesionLocator tracker) the 20 mm nodule was reported "resolved" and the 16 mm nodule
+took the follow-up of the first one ("shrunk", 17.7 to 11.7 mm). The tracked mask file held a single label (1), located on the follow-up of the 20 mm nodule; the executor read
+the label under each baseline instance id, so with more than one baseline lesion an id was matched to whatever the mask held under that number. With one baseline lesion (D2) it
+works by coincidence. Cause found by reading the masks on the VM, not guessed.
+
+Change: findings_runner.py now tracks every baseline lesion with its own call and its own binary prompt (lesionlocator_track_each), so the label of each tracked mask is the
+baseline instance id by construction; a failed call sends every lesion to the overlap fallback. Backup of the previous file: findings_runner.py.bkp.pre_trackeach_20261105_141125.
+Unit test test_findings_tracking.py (a fake tracker that behaves as the real one did) fails on the previous code and passes on the new.
+
+Run 2: pairs D2 and D3 only (the only pairs with baseline lesions, so the only ones the change can touch), same series, same seeds, same criteria DT1 to DT6.
+D0 and D1 keep their run 1 results (no baseline lesion, the tracker is not called). Run 1 results are kept unchanged and reported beside run 2.
+New prediction, written before run 2: F1 the 20 mm nodule of D3 is reported "shrunk" with a follow-up long axis between 10 and 14 mm, and the 14 mm nodule "resolved".
+Criteria, predictions E1 to E6 and their scoring are unchanged.

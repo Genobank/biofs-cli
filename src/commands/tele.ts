@@ -61,6 +61,7 @@ export interface TeleCommonCli extends TeleCommonOpts {
   referenceName?: string;
   start?: number;
   end?: number;
+  persistTicket?: boolean;
 }
 
 function commonFrom(opts: TeleCommonCli): TeleCommonOpts {
@@ -387,12 +388,16 @@ export async function teleVtCommand(
 }
 
 export async function teleMosdepthCommand(id: string, opts: TeleCommonCli = {}): Promise<void> {
+  if (process.env.BIOFS_ALLOW_LAPTOP_BAM !== '1') {
+    throw new Error(
+      'Refusing to materialize a BAM on this machine. Use `biofs fuse` then mosdepth on the fused path, or set BIOFS_ALLOW_LAPTOP_BAM=1 only for a throwaway tmp you will delete.',
+    );
+  }
   requireTool('mosdepth', installHint('mosdepth'));
   process.stderr.write(
-    'note: mosdepth works best with an indexed local BAM (biofs fuse). Streaming is best-effort.\n',
+    'BIOFS_ALLOW_LAPTOP_BAM=1: mosdepth will write a temp BAM and delete it after. Prefer fuse.\n',
   );
   const outPrefix = opts.out || path.join(os.tmpdir(), `biofs-mosdepth-${Date.now()}`);
-  // mosdepth cannot read plain stdin BAM easily; materialize to temp via stream
   const resolved = await resolveTele(id, { ...commonFrom(opts), kind: opts.kind || 'reads' });
   const tmpBam = `${outPrefix}.stream.bam`;
   const curl = spawnSync(
@@ -415,6 +420,38 @@ export async function teleMosdepthCommand(id: string, opts: TeleCommonCli = {}):
 // ---------------------------------------------------------------------------
 export async function teleIgvCommand(id: string, opts: TeleCommonCli = {}): Promise<void> {
   const resolved = await resolveTele(id, commonFrom(opts));
+  if (!opts.persistTicket) {
+    const dir = path.join(os.homedir(), '.biofs', 'tele');
+    fs.mkdirSync(dir, { recursive: true });
+    const htmlPath = opts.out || path.join(dir, `${resolved.cleanId}.igv.html`);
+    const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><title>GenoBank.io TeleBioinformatics</title></head>
+<body style="font-family:system-ui;background:#fff;color:#000;padding:16px">
+<h1>IGV session not written</h1>
+<p>A stream URL embeds a user_signature. BioFS will not persist that capability in an HTML or batch file.</p>
+<p>Use <code>biofs fuse</code> and open the fused path in IGV, or pass <code>--persist-ticket</code> only if you will not share the file.</p>
+<p>id: ${escapeHtml(resolved.cleanId)}</p>
+</body></html>
+`;
+    fs.writeFileSync(htmlPath, html, { encoding: 'utf8', mode: 0o600 });
+    if (opts.json) {
+      process.stdout.write(JSON.stringify({
+        id: resolved.cleanId,
+        format: resolved.ticket.format,
+        html: htmlPath,
+        persisted_ticket: false,
+        note: 'Refused to embed user_signature in a file. Use biofs fuse, or --persist-ticket.',
+      }, null, 2) + '\n');
+    } else {
+      process.stderr.write(`IGV.js session (no capability URL): ${htmlPath}\n`);
+      process.stderr.write('Use biofs fuse, then IGV on the fused path. --persist-ticket writes a secret URL file.\n');
+    }
+    if (opts.web || opts.open) {
+      const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+      spawnSync(opener, [htmlPath], { stdio: 'ignore' });
+    }
+    return;
+  }
   const url = primaryUrl(resolved.ticket);
   const fmt = (resolved.ticket.format || '').toUpperCase();
   const isBam = fmt === 'BAM' || fmt === 'CRAM' || resolved.layer === 'reads';

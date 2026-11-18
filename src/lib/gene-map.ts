@@ -69,6 +69,14 @@ export const GENE_TO_UNIPROT: Record<string, string> = {
 
   // Case 1 son cross-reference (LCHAD candidate)
   HADHA:   'P40939',   // HADHA (alpha subunit MTP / LCHAD)
+
+  // MVA / spindle-checkpoint genes (hackathon + rare-disease n-of-1)
+  BUB1B:   'O60566',
+  BUB1:    'O43683',
+  LZTR1:   'Q8N653',
+  MAD1L1:  'Q9Y6D9',
+  CEP57:   'Q86XR8',
+  TRIP13:  'Q15645',
 };
 
 export const GENE_TO_PFAM: Record<string, string> = {
@@ -112,6 +120,13 @@ export const GENE_TO_PFAM: Record<string, string> = {
   LDLR:    'PF00057',  // Ldl_recept_a
 
   HADHA:   'PF00378',  // ECH_1
+
+  BUB1B:   'PF08311',  // Mad3_BUB1_I
+  BUB1:    'PF08311',
+  LZTR1:   'PF01344',  // Kelch
+  MAD1L1:  'PF05557',  // Mad1
+  CEP57:   'PF14735',
+  TRIP13:  'PF00004',  // AAA
 };
 
 export function getUniProt(gene: string): string | undefined {

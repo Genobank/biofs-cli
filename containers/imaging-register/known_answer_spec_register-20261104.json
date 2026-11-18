@@ -1,0 +1,114 @@
+{
+ "schema": "imaging-register-known-answer-spec/1",
+ "status": "Provisional. Set by the engineer before the first run of this test and before any result of it was read. Not derived from the literature and not validated. Changing a number after a run is an amendment and has to be said so in the report.",
+ "base_scan": "jun17",
+ "deformation": {
+  "seed": 20261104,
+  "mesh_cells": [
+   5,
+   5,
+   6
+  ],
+  "p95_mm": 8.0,
+  "max_mm_limit": 20.0,
+  "min_jacobian": 0.35,
+  "rigid_translation_mm": [
+   6.0,
+   -5.0,
+   12.0
+  ],
+  "rigid_rotation_deg": [
+   1.5,
+   0.0,
+   2.0
+  ],
+  "mass_conserving_in_lung": true
+ },
+ "kernel_emulation": {
+  "blur_sigma_mm": 0.6,
+  "noise_hu_sd": 12.0,
+  "seed": 7,
+  "note": "Gaussian blur and white noise. Not a reconstruction kernel."
+ },
+ "nodules": [
+  {
+   "diameter_mm": 4.0,
+   "hu": 30.0
+  },
+  {
+   "diameter_mm": 6.0,
+   "hu": 30.0
+  },
+  {
+   "diameter_mm": 8.0,
+   "hu": 30.0
+  },
+  {
+   "diameter_mm": 12.0,
+   "hu": 30.0
+  },
+  {
+   "diameter_mm": 12.0,
+   "hu": -500.0
+  }
+ ],
+ "nodule_rules": {
+  "min_edge_from_lung_mm": 12.0,
+  "min_spacing_mm": 35.0,
+  "seed": 31,
+  "parenchyma_hu_max": -780.0
+ },
+ "consolidation": {
+  "lobe": "lung_lower_lobe_right",
+  "fraction_from_bottom": 0.5,
+  "hu": 25.0,
+  "roi_margin_mm": 20.0
+ },
+ "points": {
+  "n_per_lung_zone": 20,
+  "n_body": 30,
+  "erode_vox": 6,
+  "seed": 99,
+  "exclude_near_nodule_mm": 12.0
+ },
+ "detection": {
+  "smooth_sigma_mm": 1.0,
+  "threshold_sd": 5.0,
+  "min_component_mm3": 30.0,
+  "region_erode_vox": 4,
+  "exclusion_mm": 15.0
+ },
+ "pass": {
+  "KA1_registration_error": {
+   "lung_points_outside_roi": {
+    "deformable_median_mm_max": 2.0,
+    "deformable_p90_mm_max": 5.0,
+    "lower_third_median_mm_max": 3.0,
+    "deformable_median_must_beat_rigid": true
+   },
+   "body_points": {
+    "deformable_median_mm_max": 3.0
+   },
+   "blob_lost_fraction_max": 0.05
+  },
+  "KA2_gate_against_truth": "report only. If KA1 fails while the gate verdict is PASS or PASS_WITH_WARNINGS, or KA1 passes while the gate verdict is FAIL, that disagreement is a finding.",
+  "KA3_new_nodules": {
+   "min_diameter_mm": 8.0,
+   "retained_volume_ratio_min": 0.8,
+   "must_be_detected_in_deformable_frame": true,
+   "false_alarms": "report only, rigid grid beside deformable frame. The detector is a plain smoothed difference image; a high count is a finding about that detector, not a pass or a fail of the registration."
+  },
+  "KA4_lung_volume": {
+   "mass_error_points_max": 0.02,
+   "consolidation_must_flag": true,
+   "deformation_only_must_not_flag": true
+  },
+  "KA4b_core_candidate": {
+   "erosion_mm": 4.0,
+   "kernel_effect_points_max": 0.02,
+   "meaning": "Candidate decision measure: the aerated mass of the lung core, deeper than 4 mm inside the label, which does not include the rim where blur moves tissue density across the label edge. It is judged on the same build, from the arrays: the change in the number caused by the emulated kernel alone (final against before-kernel) has to stay within the points given. Passing makes it eligible to replace the whole-label mass in the lung-volume step; it does not replace it by itself."
+  }
+ },
+ "reading": "PASS on a part means the pipeline met the number on a case built to be easier than a real pair. FAIL on a part is a finding about the pipeline. Nothing here is a clinical validation.",
+ "registered_at_utc": "2026-11-05T00:32:16Z"
+}

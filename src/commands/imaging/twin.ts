@@ -36,6 +36,7 @@ export interface ImagingTwinOptions {
   // "deformable" (default, SyNRA + Jacobian) or "rigid" (strict 6-DOF, spot-faithful;
   // each organ mesh is an exact isometry resampled into the reference grid).
   registration?: string;
+  registerJob?: string;
   wait?: boolean;
   quiet?: boolean;
   json?: boolean;
@@ -111,6 +112,7 @@ export async function imagingTwinCommand(options: ImagingTwinOptions = {}): Prom
       signature: credentials.user_signature,
       anatomy:   options.anatomy || 'abdomen',
       registration: reg,
+      ...(options.registerJob ? { register_job_id: options.registerJob } : {}),
     };
     if (tps) {
       body.timepoints = tps;                       // N-timepoint path

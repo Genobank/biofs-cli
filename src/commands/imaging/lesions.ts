@@ -20,6 +20,7 @@ export interface ImagingLesionsOptions {
   timepoints?: string;
   anatomy?: string;
   treatment?: string;
+  registerJob?: string;
   wait?: boolean;
   quiet?: boolean;
   json?: boolean;
@@ -59,7 +60,8 @@ export async function imagingLesionsCommand(options: ImagingLesionsOptions = {})
     const submitResp = await axios.post<{ compare_job_id?: string; status?: string; n_timepoints?: number; error?: string }>(
       `${BIOFS_NODE_BASE}/submit_imaging_lesions`,
       { wallet: credentials.wallet_address, signature: credentials.user_signature,
-        anatomy: options.anatomy || 'chest', treatment_context: options.treatment || 'unknown', timepoints: tps },
+        anatomy: options.anatomy || 'chest', treatment_context: options.treatment || 'unknown', timepoints: tps,
+        ...(options.registerJob ? { register_job_id: options.registerJob } : {}) },
       { timeout: 120_000, validateStatus: (s) => s < 500 },
     );
     if (submitResp.status >= 400) {

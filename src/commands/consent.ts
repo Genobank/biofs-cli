@@ -26,7 +26,7 @@ import { Logger } from '../lib/utils/logger';
 const BIOFS_NODE_BASE = process.env.BIOFS_NODE_URL
   || `${process.env.GENOBANK_API_URL || 'https://genobank.app'}/api_biofs_node`;
 
-export interface ConsentOptions { json?: boolean; quiet?: boolean; days?: string; }
+export interface ConsentOptions { json?: boolean; quiet?: boolean; days?: string; template?: string; }
 
 /** biofs consent payload --session <id> --biocid <biocid> [--days N] */
 export async function consentPayloadCommand(
@@ -42,8 +42,9 @@ export async function consentPayloadCommand(
   const spinner = options.quiet || options.json ? null : ora('Building consent terms...').start();
   const url = `${BIOFS_NODE_BASE}/consent_session_payload`
     + `?session=${encodeURIComponent(session)}&biocid=${encodeURIComponent(biocid)}`
-    + `&days=${encodeURIComponent(options.days || '1')}`
-    + `&wallet=${encodeURIComponent(creds.wallet_address)}&signature=${encodeURIComponent(creds.user_signature)}`;
+    + `&days=${encodeURIComponent(options.days || (options.template ? '30' : '1'))}`
+    + `&wallet=${encodeURIComponent(creds.wallet_address)}&signature=${encodeURIComponent(creds.user_signature)}`
+    + (options.template ? `&template=${encodeURIComponent(options.template)}` : '');
 
   const r = await axios.get(url, { validateStatus: (s) => s < 500 });
   if (r.status !== 200 || r.data?.error) {

@@ -1,3 +1,35 @@
+# v3.22.0 — crypt4gh encrypt/decrypt bound to BioNFT
+
+`biofs crypt4gh encrypt --serial` and `decrypt --serial` now require `BioNFTClient.checkAccess` and talk to biofs-node 0.4.30. The node mints the per-serial X25519 pair; the CLI never sends a reader secret at write time. Decrypt asks the node to release the secret. `biofs crypt4gh revoke --serial` stops later release. Unbound EGA interop stays behind `--allow-unbound`. `biofs upload --envelope crypt4gh` requires `--serial`. Ethereum wallets are not crypt4gh keys. Already-held plaintext is not recalled.
+
+# v3.21.0 — optional GA4GH crypt4gh v1 envelope
+
+`biofs crypt4gh keygen|encrypt|decrypt|inspect` implements the GA4GH File Encryption Standard (crypt4gh version 1): X25519 header packets, ChaCha20-IETF-Poly1305 64 KiB segments, PEM keys compatible with the EGA crypt4gh 1.8 reference. Production objects are not bulk-converted. 3.21.0 described BioNFT as still gating the reader secret; the CLI did not yet call checkAccess or a node key-release path. That pairing is 3.22.0.
+
+# v3.20.10 — Tele-Genomics A+ laptop bar
+
+`biofs tele igv` no longer writes a stream URL (it embeds `user_signature`) unless `--persist-ticket`. `biofs tele mosdepth` refuses to materialize a BAM unless `BIOFS_ALLOW_LAPTOP_BAM=1`. `biofs vault mount` refuses VCF copies onto the laptop unless `BIOFS_ALLOW_LAPTOP_VCF=1`. Use `biofs stream`, `biofs tele stats`, or `biofs fuse`.
+
+# v3.20.9 — ClinVar GRCh38 wave benchmark on biofs-node
+
+`biofs rrm-validate clinvar --wait` streams the public ClinVar GRCh38 allele VCF on the node (not the laptop), maps missense with review stars ≥ 1 to Swiss-Prot, scores EIIP + piezoelectric dipole + Morlet wavelet-at-residue, and reports per-gene ΔAUC versus AlphaMissense plus a collagen/repeat → globular/channel hold-out. Truncations get remaining-chain f_c ratios separately.
+
+# v3.20.8 — Cosic-RRM Fourier scoring that can actually move
+
+`biofs fourier-score` no longer L1-normalizes the full-protein DFT (that ratio sat at 1.00 for every missense). It scores native-length |X(f_c)|, the residue's phase alignment with the family harmonic (destructive vs constructive), stop-gains as truncations, and auto-widens the window to ~3× the consensus period so a 38-aa f_c is visible. `biofs rrm-consensus` falls back Swiss-Prot family → orthologs → TrEMBL when a rare-disease gene has fewer than 5 reviewed sequences, and uses `numpy.fft.rfftfreq`. JSON output is valid JSON again. `--null-model` ranks the observed amino acid among the 19 substitutions at that site.
+
+# v3.20.7 — Independent ClawBio + EVEE consensus via biofs-node
+
+`biofs clawbio submit <serial> --wait` dispatches ClawBio-compatible Ensembl VEP REST and EVEE (Evo 2, Pearce et al. 2026) on biofs-node. Only a small rare-coding candidate list is annotated. The genome never lands on the laptop. Report biocids are registered under the custodian biowallet.
+
+# v3.20.6 — Genome Governance Token for AI Agents
+
+`biofs governance show` prints the four hashed constraints that a BioNFT grant must carry: no recontact, delete within 30 days, outputs CC BY 4.0 (genome gated), not medical care. `biofs context create --kind GenomeGovernanceAI` defaults BioPIL 5, 30-day TTL, and the deny lists. `biofs consent payload --template genome-governance-ai-agent` sets ConsentGrant.termsRef to keccak256 of `genobank:consent-template:genome-governance-ai-agent:v1`.
+
+# v3.20.5 — Hugging Face gated-dataset on-ramp
+
+`biofs onramp huggingface --repo SageBio/mva-hackathon-2026-data --owner <custodian> --serial <serial>` submits a server-side stream through biofs-node (`POST /agent/submit_hf_onramp`). FASTQ/VCF never land on the laptop. The executor writes `gs://genobank-biorouter/biorouter/<owner>/<type>/<oid12>/<dataset>` and registers `biorouter.biocid_registry` plus `bioroutes.inventory` with a claimable custodian `owner_wallet`. Pair with `biofs login --wallet --signature` on `BIOFS_PROFILE=<custodian>`.
+
 # v3.20.2 — wallet-keyed cache, fuse default host, samples verb, no hardcoded HLA/cassette paths
 
 ## 3.21.1 (2026-11-14) biofs imaging package

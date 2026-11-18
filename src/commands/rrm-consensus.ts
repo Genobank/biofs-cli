@@ -281,39 +281,77 @@ export async function rrmConsensusCommand(gene: string, opts: RrmConsensusOption
     return;
   }
 
-  const source = (opts.source as 'family' | 'orthologs') || 'family';
+  const sourcePref = (opts.source as 'family' | 'orthologs') || 'family';
   const taxonomy = opts.taxonomy || '7742';
-  const reviewed = opts.reviewed !== false;
+  const reviewedPref = opts.reviewed !== false;
   const maxN = parseInt(opts.max || '100', 10);
   const pfam = opts.pfam || GENE_TO_PFAM[upper];
 
-  let query: string;
-  if (source === 'family') {
-    if (!pfam) throw new Error(`No Pfam mapping for ${upper}. Pass --pfam <PFXXXXX>.`);
-    query = `xref:pfam-${pfam}+AND+taxonomy_id:${taxonomy}`;
-  } else {
-    query = `gene_exact:${upper}+AND+taxonomy_id:${taxonomy}`;
+  const attempts: Array<{ source: 'family' | 'orthologs'; reviewed: boolean; label: string }> = [];
+  attempts.push({ source: sourcePref, reviewed: reviewedPref, label: `${sourcePref}${reviewedPref ? ' Swiss-Prot' : ' incl. TrEMBL'}` });
+  if (sourcePref === 'family') {
+    attempts.push({ source: 'orthologs', reviewed: true, label: 'orthologs Swiss-Prot' });
   }
-  if (reviewed) query += '+AND+reviewed:true';
+  attempts.push({ source: 'orthologs', reviewed: false, label: 'orthologs incl. TrEMBL' });
 
-  const url = `https://rest.uniprot.org/uniprotkb/search?query=${query}&format=fasta&size=${maxN}`;
-  const spinner = opts.quiet ? null : ora(`Fetching ${source} sequences from UniProt (taxonomy ${taxonomy})...`).start();
-  const fastaResult = spawnSync('curl', ['-sS', '-A', 'biofs/3.2.0', '--max-time', '60', url], {
-    encoding: 'utf8',
-    maxBuffer: 50 * 1024 * 1024,
-  });
-  if (fastaResult.status !== 0 || !fastaResult.stdout.startsWith('>')) {
+  const spinner = opts.quiet ? null : ora(`Fetching sequences from UniProt (taxonomy ${taxonomy})...`).start();
+  let fasta = '';
+  let source: 'family' | 'orthologs' = sourcePref;
+  let seqCount = 0;
+  let lastErr = '';
+  const seen = new Set<string>();
+  for (const att of attempts) {
+    const key = `${att.source}:${att.reviewed}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    let query: string;
+    if (att.source === 'family') {
+      if (!pfam) {
+        lastErr = `No Pfam mapping for ${upper}. Pass --pfam <PFXXXXX>.`;
+        continue;
+      }
+      query = `xref:pfam-${pfam}+AND+taxonomy_id:${taxonomy}`;
+    } else {
+      query = `gene_exact:${upper}+AND+taxonomy_id:${taxonomy}`;
+    }
+    if (att.reviewed) query += '+AND+reviewed:true';
+    const url = `https://rest.uniprot.org/uniprotkb/search?query=${query}&format=fasta&size=${Math.min(500, maxN)}`;
+    if (spinner) spinner.text = `Fetching ${att.label} from UniProt...`;
+    const fastaResult = spawnSync('curl', ['-sS', '-A', 'biofs/3.20.8', '--max-time', '90', url], {
+      encoding: 'utf8',
+      maxBuffer: 50 * 1024 * 1024,
+    });
+    if (fastaResult.status !== 0 || !fastaResult.stdout.startsWith('>')) {
+      lastErr = fastaResult.stderr || 'no FASTA returned';
+      continue;
+    }
+    const n = (fastaResult.stdout.match(/^>/gm) || []).length;
+    if (n >= 5) {
+      fasta = fastaResult.stdout;
+      source = att.source;
+      seqCount = n;
+      break;
+    }
+    lastErr = `${att.label} returned ${n} sequences`;
+  }
+  if (!fasta.startsWith('>')) {
     if (spinner) spinner.fail('UniProt fetch failed');
-    throw new Error(`UniProt fetch failed (HTTP/curl): ${fastaResult.stderr || 'no FASTA returned'}`);
+    throw new Error(`UniProt fetch failed: ${lastErr}`);
   }
-  const seqCount = (fastaResult.stdout.match(/^>/gm) || []).length;
-  if (spinner) spinner.succeed(`Fetched ${seqCount} sequences`);
+  if (spinner) spinner.succeed(`Fetched ${seqCount} sequences (${source})`);
 
-  const pyResult = spawnSync('python3', ['-c', PY_CONSENSUS], {
-    encoding: 'utf8',
-    input: fastaResult.stdout,
-    maxBuffer: 100 * 1024 * 1024,
-  });
+  const pyPath = path.join(__dirname, '..', 'lib', 'rrm_fft.py');
+  const pyResult = fs.existsSync(pyPath)
+    ? spawnSync('python3', [pyPath], {
+      encoding: 'utf8',
+      input: JSON.stringify({ op: 'consensus', fasta, encoding: 'eiip' }),
+      maxBuffer: 100 * 1024 * 1024,
+    })
+    : spawnSync('python3', ['-c', PY_CONSENSUS], {
+      encoding: 'utf8',
+      input: fasta,
+      maxBuffer: 100 * 1024 * 1024,
+    });
   if (pyResult.status !== 0) {
     throw new Error(`Consensus spectrum computation failed: ${pyResult.stderr || pyResult.stdout}`);
   }

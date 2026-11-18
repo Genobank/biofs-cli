@@ -1,0 +1,6 @@
+Correction to organ_package_verb_amendment1-20261108.txt. Written 2026-11-08 after the CLI tests and the end-to-end run, before this record was filed.
+That file says "P-V2 was false in the other direction: 15 of 16 mutants were caught on the first mutation run". The sentence is wrong. P-V2 predicted at least 9 of 10 caught on the first
+mutation run; 15 of 16 caught is better than that ratio, so P-V2 held. The facts in that sentence (15 of 16 caught on the first run, M16 surviving because my path test used a string the
+first-character rule already refused, the test strengthened and the module unchanged, 16 of 16 caught afterwards) are right. The read-only file is left as written.
+Scoring of the four predictions: P-V1 false (14 of 14 node tests passed on the first run), P-V2 true (15 of 16), P-V3 true (tsc built the verb on the first try), P-V4 false (the clean clone of
+origin/master passed 42 of 42).

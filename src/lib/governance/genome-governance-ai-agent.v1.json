@@ -1,0 +1,35 @@
+{
+  "id": "genobank:consent-template:genome-governance-ai-agent:v1",
+  "title": "Genome Governance Token for AI Agents",
+  "issuer": "GenoBank.io",
+  "bio_pil": 5,
+  "purpose_code": 1001,
+  "purpose_profile": "genobank:purpose:research-not-care:v1",
+  "ops": ["READ", "QUERY", "DERIVE"],
+  "ttl_days_max": 30,
+  "output_license": "CC BY 4.0",
+  "genome_license": "gated-not-open",
+  "constraints": [
+    {
+      "id": "no-recontact",
+      "must": "The agent shall not attempt to recontact the data subject, family members, or named points of contact.",
+      "deny_purposes": ["recontact", "family_outreach"],
+      "deny_skills": ["recontact", "family_outreach", "patient_messaging"]
+    },
+    {
+      "id": "delete-30-days",
+      "must": "All copies of the underlying biodata shall be deleted within 30 days of programme close. Revocation is immediate. Erasure is biofs erase.",
+      "erase_verb": "biofs erase"
+    },
+    {
+      "id": "outputs-cc-by-4.0",
+      "must": "Research outputs (code, methods, ranked variant lists, reports) are released under CC BY 4.0. The underlying genome, FASTQ, VCF, and BAM are not.",
+      "deny_skills": ["raw_sequence_export", "bulk_download"]
+    },
+    {
+      "id": "not-medical-care",
+      "must": "This grant is not medical care, diagnosis, or treatment. Purpose code is research (1001), never clinical-use (1002). BioPIL 5 (gdpr-research), not BioPIL 7 (clinical-use).",
+      "deny_purposes": ["clinical-care", "diagnosis", "treatment", "prescribe"]
+    }
+  ]
+}

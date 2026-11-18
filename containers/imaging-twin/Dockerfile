@@ -41,5 +41,6 @@ RUN python -c "from totalsegmentator.python_api import totalsegmentator" \
 
 COPY imaging_twin_runner.py /app/runner.py
 COPY imaging_attribute_runner.py /app/attribute.py
+COPY frame_contract.py /app/frame_contract.py
 WORKDIR /app
 ENTRYPOINT ["python", "/app/runner.py"]

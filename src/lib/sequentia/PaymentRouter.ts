@@ -18,7 +18,7 @@ import { ethers } from 'ethers';
 import { Logger } from '../utils/logger';
 
 // Sequentia Network Configuration
-const SEQUENTIA_RPC_URL = 'http://52.90.163.112:8545';
+const SEQUENTIA_RPC_URL = process.env.SEQUENTIA_RPC_URL || 'https://seqrpc.genobank.app';
 const PAYMENT_ROUTER_ADDRESS = '0x4b46D8A0533bc17503349F86a909C2FEcFD04489'; // Deployed Nov 24, 2025
 const USDC_TOKEN_ADDRESS = '0xD837B344e931cc265ec54879A0B388DE6F0015c9'; // SeqUSDC
 

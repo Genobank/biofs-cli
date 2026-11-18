@@ -47,6 +47,14 @@ const DEFAULT_ALLOW_BY_KIND: Record<string, string[]> = {
   RareDiseaseDx: [
     'variant_annotation', 'rare_disease_dx', 'alphagenome_interpret', 'pharmgx',
   ],
+  GenomeGovernanceAI: [
+    'variant_annotation', 'rare_disease_dx', 'drug_repurposing_hypothesis',
+    'alphagenome_interpret',
+  ],
+  RareDiseaseHackathon: [
+    'variant_annotation', 'rare_disease_dx', 'drug_repurposing_hypothesis',
+    'alphagenome_interpret',
+  ],
   AncestryProfile: ['ancestry_pca', 'variant_annotation'],
 };
 
@@ -57,11 +65,35 @@ const DEFAULT_DENY: string[] = [
   'bulk_download',
 ];
 
+const GOVERNANCE_DENY_SKILLS: string[] = [
+  ...DEFAULT_DENY,
+  'recontact',
+  'family_outreach',
+  'patient_messaging',
+  'clinical_care',
+  'prescribe',
+];
+
 const DEFAULT_DENIED_PURPOSES: string[] = [
   'insurance_underwriting',
   'employer_screening',
   'forensic_identification',
 ];
+
+const GOVERNANCE_DENIED_PURPOSES: string[] = [
+  ...DEFAULT_DENIED_PURPOSES,
+  'recontact',
+  'family_outreach',
+  'clinical-care',
+  'diagnosis',
+  'treatment',
+  'prescribe',
+  'sale',
+];
+
+function isGenomeGovernanceKind(kind: string): boolean {
+  return kind === 'GenomeGovernanceAI' || kind === 'RareDiseaseHackathon';
+}
 
 function parseDuration(s: string): number {
   const m = s.match(/^(\d+)([dwy])$/);
@@ -206,21 +238,22 @@ export async function contextCreateCommand(
   }
 
   const kind = options.kind || 'CancerDigitalTwin';
+  const gov = isGenomeGovernanceKind(kind);
   const bioPilId = parseInt(options.pil || '5', 10);
-  const commercial = options.commercial ?? (bioPilId === 6 || bioPilId === 8);
+  const commercial = options.commercial ?? (gov ? false : (bioPilId === 6 || bioPilId === 8));
   const consentExpires =
-    Math.floor(Date.now() / 1000) + parseDuration(options.expires || '365d');
+    Math.floor(Date.now() / 1000) + parseDuration(options.expires || (gov ? '30d' : '365d'));
   const manifestDeadline =
     Math.floor(Date.now() / 1000) + parseDuration(options.deadline || '30d');
   const deniedPurposes = options.denyPurpose
     ? options.denyPurpose.split(',').map(s => s.trim()).filter(Boolean)
-    : DEFAULT_DENIED_PURPOSES;
+    : (gov ? GOVERNANCE_DENIED_PURPOSES : DEFAULT_DENIED_PURPOSES);
   const skillsAllow = options.allowSkill
     ? options.allowSkill.split(',').map(s => s.trim()).filter(Boolean)
     : DEFAULT_ALLOW_BY_KIND[kind] || DEFAULT_ALLOW_BY_KIND.CancerDigitalTwin;
   const skillsDeny = options.denySkill
     ? options.denySkill.split(',').map(s => s.trim()).filter(Boolean)
-    : DEFAULT_DENY;
+    : (gov ? GOVERNANCE_DENY_SKILLS : DEFAULT_DENY);
 
   const input: BioContextInput = {
     caseId,
@@ -296,8 +329,13 @@ export async function contextCreateCommand(
     `  manifest TTL:  ${options.deadline || '30d'}  →  ${new Date(manifestDeadline * 1000).toISOString()}`
   );
   console.log(
-    `  consent TTL:   ${options.expires || '365d'}  →  ${new Date(consentExpires * 1000).toISOString()}`
+    `  consent TTL:   ${options.expires || (gov ? '30d' : '365d')}  →  ${new Date(consentExpires * 1000).toISOString()}`
   );
+  if (gov) {
+    console.log(`  denied:        ${deniedPurposes.join(', ')}`);
+    console.log(`  skills deny:   ${skillsDeny.join(', ')}`);
+    console.log(`  outputs:       CC BY 4.0; genome gated`);
+  }
   console.log('');
   console.log(
     `Next: ${chalk.cyan(`biofs context publish ${bionftPath}`)}`
