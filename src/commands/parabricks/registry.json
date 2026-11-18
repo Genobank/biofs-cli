@@ -110,6 +110,16 @@
   "hg38_noalt": {
    "alt_file": null,
    "assets": {
+    "agilent_v8_regions": {
+     "biocid": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/target-intervals/Agilent_SureSelect_V8_S33266436_Regions_hg38.noalt.bed",
+     "biodata_type": "target_intervals",
+     "file": "Agilent_SureSelect_V8_S33266436_Regions_hg38.noalt.bed",
+     "index": null,
+     "md5": {
+      "Agilent_SureSelect_V8_S33266436_Regions_hg38.noalt.bed": "7cMTIHPvesZ8iqQYAvtrAg=="
+     },
+     "object": "gs://deepvariant-fastq-to-vcf-genobank-app/reference/pacbio/human_GRCh38_no_alt_analysis_set/target_intervals/Agilent_SureSelect_V8_S33266436_Regions_hg38.noalt.bed"
+    },
     "dbsnp138": {
      "biocid": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/known-sites/Homo_sapiens_assembly38.dbsnp138.noalt.vcf.gz",
      "biodata_type": "known_sites",

@@ -8,7 +8,7 @@ const W = '0x5f5a60EaEf242c0D51A21c703f520347b96Ed19a';
 const bc = (type: string, name: string) => `biocid://genobank/${W}/${type}/${name}`;
 const SIG = '0xsig';
 const NODE_REGISTRY = path.join(__dirname, '..', '..', 'biofs-node-sync-20261107', 'repo', 'neoantigen', 'pbrun_registry.json');
-const EXPECTED_SHA = '06792f65c0fa4e92459ddda273fdf21df036055400747372c7056c5ee7b67dfb';     // 18 November 2026: hg38_noalt known sites by biocid (restricted to the no-alt contigs), MD5-pinned
+const EXPECTED_SHA = '98962ec8c8abbc6eb371ca8ed10fdaea702bc5f179eaf7052c216484055c35ea';     // 18 November 2026: hg38_noalt known sites and capture design by biocid (restricted to the no-alt contigs), MD5-pinned
 
 function program(): Command {
   const p = new Command();
