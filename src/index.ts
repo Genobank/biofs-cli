@@ -125,6 +125,7 @@ import { svCallSubmitCommand, SvCallSubmitOptions } from './commands/sv-call/sub
 import { svCallExecCommand, SvCallExecOptions } from './commands/sv-call/exec';
 import { qcSubmitCommand, QcSubmitOptions } from './commands/qc/submit';
 import { qcExecCommand, QcExecOptions } from './commands/qc/exec';
+import { registerProteinImpact } from './commands/protein-impact/register';
 import { verkkoSubmitCommand, VerkkoSubmitOptions } from './commands/verkko/submit';
 import { verkkoExecCommand, VerkkoExecOptions } from './commands/verkko/exec';
 import { ontVariantsSubmitCommand, OntVariantsSubmitOptions } from './commands/ont-variants/submit';
@@ -2518,6 +2519,9 @@ qcCmd
     try { await qcExecCommand(options); }
     catch (error) { Logger.error(`qc exec failed: ${error}`); process.exit(1); }
   });
+
+// protein-impact: protein-level impact of known missense substitutions (ITGA2B, ITGB3); analysis only, no design
+registerProteinImpact(program);
 
 // Verkko command group — telomere-to-telomere assembly (verkko 2.3.2), biocid-gated
 const verkkoCmd = program
