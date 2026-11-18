@@ -72,6 +72,14 @@ describe('reference-index body', () => {
     expect(() => buildRefIndexBody('x', { reference: 'hg38_noalt', codeSha256: H, mode: 'known_sites', sources: ['dbsnp138', 'dbsnp138'] }, W, 's')).toThrow(/sources/);
     expect(() => buildRefIndexBody('x', { reference: 'hg38_noalt', codeSha256: H, mode: 'other' }, W, 's')).toThrow(/mode/);
   });
+  it('mode intervals carries the catalog capture design names, never a path, and not a known-sites name', () => {
+    const b = buildRefIndexBody('REFBEDNOALT', { reference: 'hg38_noalt', codeSha256: H, mode: 'intervals', sources: ['agilent_v8_regions'] }, W, 's');
+    expect(b.mode).toBe('intervals');
+    expect(b.sources).toEqual(['agilent_v8_regions']);
+    expect(() => buildRefIndexBody('x', { reference: 'hg38_noalt', codeSha256: H, mode: 'intervals', sources: ['dbsnp138'] }, W, 's')).toThrow(/agilent_v8_regions/);
+    expect(() => buildRefIndexBody('x', { reference: 'hg38_noalt', codeSha256: H, mode: 'intervals', sources: ['gs://b/x.bed'] }, W, 's')).toThrow(/sources/);
+    expect(() => buildRefIndexBody('x', { reference: 'hg38_noalt', codeSha256: H, mode: 'known_sites', sources: ['agilent_v8_regions'] }, W, 's')).toThrow(/sources/);
+  });
 });
 
 describe('acmg-triage --smn body', () => {

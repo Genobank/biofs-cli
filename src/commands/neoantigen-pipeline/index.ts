@@ -843,11 +843,13 @@ export function buildRefIndexBody(caseId: string, o: RefIndexOptions, wallet: st
   const body: Record<string, unknown> = { wallet: ownerOr(o.owner, wallet), signature, case_id: caseId, reference: o.reference, code_sha256: parseSha256('--code-sha256', o.codeSha256), executor: 'worker' };
   if (o.mode && o.mode !== 'index') {
     // known_sites: copies of catalog known-sites VCFs restricted to the reference's contigs, checked record by record and written create-only beside the reference
-    if (o.mode !== 'known_sites') throw new Error('--mode must be index (default) or known_sites');
-    const known = ['dbsnp138', 'known_indels', 'mills_1000g'];
+    // intervals: copies of catalog capture designs (target Regions BEDs) restricted to the reference's contigs, checked line by line, written create-only beside the reference
+    const SOURCES: Record<string, string[]> = { known_sites: ['dbsnp138', 'known_indels', 'mills_1000g'], intervals: ['agilent_v8_regions'] };
+    const known = SOURCES[String(o.mode)];
+    if (!known) throw new Error('--mode must be index (default), known_sites or intervals');
     const src = (o.sources || []).flatMap((x) => String(x).split(',')).map((x) => x.trim()).filter(Boolean);
     if (!src.length || src.some((x) => !known.includes(x)) || new Set(src).size !== src.length) throw new Error(`--sources must be distinct names of ${known.join(', ')}`);
-    body.mode = 'known_sites';
+    body.mode = String(o.mode);
     body.sources = src;
   }
   return body;
