@@ -25,6 +25,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { spawn } from 'child_process';
 import chalk from 'chalk';
 
 import { CredentialsManager } from '../lib/auth/credentials';
@@ -65,6 +66,32 @@ function sha256OfFile(filePath: string): string {
   return h.digest('hex');
 }
 
+/**
+ * Size and SHA-256 of a GCS object by streaming it through `gcloud storage cat`
+ * into the hash. Nothing is written to disk; the object is never copied to a
+ * local path. Uses whatever gcloud account the environment selects
+ * (CLOUDSDK_CORE_ACCOUNT).
+ */
+function streamHashGcs(uri: string): Promise<{ size: number; sha256: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('gcloud', ['storage', 'cat', uri], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const h = crypto.createHash('sha256');
+    let size = 0;
+    let err = '';
+    child.stdout.on('data', (chunk: Buffer) => {
+      size += chunk.length;
+      h.update(chunk);
+    });
+    child.stderr.on('data', (c: Buffer) => { err += c.toString(); });
+    child.on('error', (e) => reject(new Error(`could not run gcloud: ${e.message}`)));
+    child.on('close', (code) => {
+      if (code !== 0) return reject(new Error(`gcloud storage cat ${uri} failed (exit ${code}): ${err.slice(0, 300)}`));
+      if (size === 0) return reject(new Error(`gcloud storage cat ${uri} returned 0 bytes`));
+      resolve({ size, sha256: h.digest('hex') });
+    });
+  });
+}
+
 function buildBiocid(ownerWallet: string, sampleSerial: string, filename: string, originlab: string): string {
   // Match the biocid convention in bioroutes.inventory for opencravat entries:
   // biocid://genobank/<owner_wallet_lower>/sqlite/<filename>
@@ -75,12 +102,17 @@ function buildBiocid(ownerWallet: string, sampleSerial: string, filename: string
 }
 
 export async function inventoryRegisterSqliteCommand(sqlitePath: string, opts: InventoryRegisterSqliteOptions): Promise<void> {
-  if (!fs.existsSync(sqlitePath)) {
-    throw new Error(`sqlite file not found: ${sqlitePath}`);
-  }
-  const stat = fs.statSync(sqlitePath);
-  if (!stat.isFile()) {
-    throw new Error(`not a file: ${sqlitePath}`);
+  const isGcs = sqlitePath.startsWith('gs://');
+  let stat: { size: number } = { size: 0 };
+  if (!isGcs) {
+    if (!fs.existsSync(sqlitePath)) {
+      throw new Error(`sqlite file not found: ${sqlitePath}`);
+    }
+    const st = fs.statSync(sqlitePath);
+    if (!st.isFile()) {
+      throw new Error(`not a file: ${sqlitePath}`);
+    }
+    stat = st;
   }
 
   const credManager = CredentialsManager.getInstance();
@@ -94,7 +126,20 @@ export async function inventoryRegisterSqliteCommand(sqlitePath: string, opts: I
   }
 
   const filename = path.basename(sqlitePath);
-  const sha256 = sha256OfFile(sqlitePath);
+  let sha256: string;
+  let gcsUriOut = opts.gcsUri;
+  if (isGcs) {
+    if (!opts.quiet) console.error(chalk.cyan(`Hashing ${sqlitePath} by stream (no local copy)...`));
+    const sh = await streamHashGcs(sqlitePath);
+    stat = { size: sh.size };
+    sha256 = sh.sha256;
+    if (opts.gcsUri && opts.gcsUri !== sqlitePath) {
+      throw new Error(`--gcs-uri (${opts.gcsUri}) differs from the gs:// path being registered (${sqlitePath})`);
+    }
+    gcsUriOut = sqlitePath;
+  } else {
+    sha256 = sha256OfFile(sqlitePath);
+  }
   const originlab = opts.originlab || 'genobank';
   const biocid = buildBiocid(ownerWallet, opts.sampleSerial, filename, originlab);
 
@@ -109,7 +154,7 @@ export async function inventoryRegisterSqliteCommand(sqlitePath: string, opts: I
     sample_serial: opts.sampleSerial,
     owner_wallet: ownerWallet,
     case_id: opts.caseId,
-    gcs_uri: opts.gcsUri,
+    gcs_uri: gcsUriOut,
     originlab,
     registered_at: new Date().toISOString(),
   };
