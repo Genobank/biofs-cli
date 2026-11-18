@@ -72,7 +72,7 @@ function sha256OfFile(filePath: string): string {
  * local path. Uses whatever gcloud account the environment selects
  * (CLOUDSDK_CORE_ACCOUNT).
  */
-function streamHashGcs(uri: string): Promise<{ size: number; sha256: string }> {
+export function streamHashGcs(uri: string): Promise<{ size: number; sha256: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn('gcloud', ['storage', 'cat', uri], { stdio: ['ignore', 'pipe', 'pipe'] });
     const h = crypto.createHash('sha256');
@@ -194,6 +194,13 @@ export async function inventoryRegisterSqliteCommand(sqlitePath: string, opts: I
     });
     if (!resp.ok) {
       const text = await resp.text();
+      if (resp.status === 404 || resp.status === 405) {
+        throw new Error(
+          `the server has no /api_bioroutes/register_sqlite endpoint (HTTP ${resp.status}), so nothing was registered. ` +
+          `For a sqlite that already sits in your own vault prefix, register it through the node instead: ` +
+          `biofs register-derived gcs <gs://uri> --type sqlite --parent <parent-biocid> --case-id <id>`
+        );
+      }
       throw new Error(`POST ${url} returned HTTP ${resp.status}: ${text.slice(0, 300)}`);
     }
     const body = await resp.json();

@@ -3928,7 +3928,7 @@ program
 // Inventory subcommand: register-sqlite (closes v2 audit gap §5 item 2).
 program
   .command('inventory-register-sqlite <sqlite-path>')
-  .description('Register an externally-produced OpenCRAVAT annotation sqlite into bioroutes.inventory (v3.8.0 endpoint)')
+  .description('Register an externally-produced OpenCRAVAT annotation sqlite into bioroutes.inventory (v3.8.0 endpoint; the path may be local or a gs:// object, which is hashed by stream with no local copy)')
   .requiredOption('--sample-serial <serial>', 'Biosample serial identifier (14-digit or lab-case-id form)')
   .option('--owner-wallet <addr>', 'Override owner biowallet (default: from `biofs login`)')
   .option('--case-id <id>', 'Optional lab case identifier (e.g., TN25-336147)')
