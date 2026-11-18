@@ -109,7 +109,41 @@
   },
   "hg38_noalt": {
    "alt_file": null,
-   "assets": {},
+   "assets": {
+    "dbsnp138": {
+     "biocid": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/known-sites/Homo_sapiens_assembly38.dbsnp138.noalt.vcf.gz",
+     "biodata_type": "known_sites",
+     "file": "Homo_sapiens_assembly38.dbsnp138.noalt.vcf.gz",
+     "index": ".tbi",
+     "md5": {
+      "Homo_sapiens_assembly38.dbsnp138.noalt.vcf.gz": "ybxI9rx2EmEq45rvlLcfMg==",
+      "Homo_sapiens_assembly38.dbsnp138.noalt.vcf.gz.tbi": "PNdeUhIliZam899tE8Bulw=="
+     },
+     "object": "gs://deepvariant-fastq-to-vcf-genobank-app/reference/pacbio/human_GRCh38_no_alt_analysis_set/known_sites/Homo_sapiens_assembly38.dbsnp138.noalt.vcf.gz"
+    },
+    "known_indels": {
+     "biocid": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/known-sites/Homo_sapiens_assembly38.known_indels.noalt.vcf.gz",
+     "biodata_type": "known_sites",
+     "file": "Homo_sapiens_assembly38.known_indels.noalt.vcf.gz",
+     "index": ".tbi",
+     "md5": {
+      "Homo_sapiens_assembly38.known_indels.noalt.vcf.gz": "lhyWaNtAVKzM11E/PCv6Cw==",
+      "Homo_sapiens_assembly38.known_indels.noalt.vcf.gz.tbi": "3kzdDiz+RHzHMklp02FhQg=="
+     },
+     "object": "gs://deepvariant-fastq-to-vcf-genobank-app/reference/pacbio/human_GRCh38_no_alt_analysis_set/known_sites/Homo_sapiens_assembly38.known_indels.noalt.vcf.gz"
+    },
+    "mills_1000g": {
+     "biocid": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/known-sites/Mills_and_1000G_gold_standard.indels.hg38.noalt.vcf.gz",
+     "biodata_type": "known_sites",
+     "file": "Mills_and_1000G_gold_standard.indels.hg38.noalt.vcf.gz",
+     "index": ".tbi",
+     "md5": {
+      "Mills_and_1000G_gold_standard.indels.hg38.noalt.vcf.gz": "zWoB1mtmWywLv0yPIWohKA==",
+      "Mills_and_1000G_gold_standard.indels.hg38.noalt.vcf.gz.tbi": "XATJJRxIqW5H4daJ/RphYg=="
+     },
+     "object": "gs://deepvariant-fastq-to-vcf-genobank-app/reference/pacbio/human_GRCh38_no_alt_analysis_set/known_sites/Mills_and_1000G_gold_standard.indels.hg38.noalt.vcf.gz"
+    }
+   },
    "biocid": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/reference-genome/human_GRCh38_no_alt_analysis_set.fasta",
    "biodata_type": "reference_genome",
    "bucket": "deepvariant-fastq-to-vcf-genobank-app",
