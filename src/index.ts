@@ -5261,6 +5261,8 @@ refIndexCmd
   .description('Submit the build; the worker checks the FASTA against its recorded MD5, builds fai, dict and index with bwa 0.7.17, proves the index with reference substrings, then uploads and reads back')
   .requiredOption('--reference <name>', 'Catalog reference: hg38_noalt')
   .requiredOption('--code-sha256 <hex>', 'SHA-256 of refindex.py as pinned; the worker refuses any other code')
+  .option('--mode <mode>', 'index (default: BWA index and dictionary) or known_sites (copies of the catalog known-sites VCFs restricted to the reference\'s contigs, checked record by record)')
+  .option('--sources <names...>', 'For --mode known_sites: dbsnp138, known_indels, mills_1000g')
   .option('--owner <biowallet>', 'Owner biowallet of the report (default: the signer)')
   .option('--wait', 'Poll until the job finishes')
   .option('--json', 'Emit JSON')

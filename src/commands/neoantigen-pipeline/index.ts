@@ -830,6 +830,8 @@ export interface RefIndexOptions {
   codeSha256: string;
   executor?: string;
   owner?: string;
+  mode?: string;
+  sources?: string[];
   wait?: boolean;
   json?: boolean;
 }
@@ -838,7 +840,17 @@ export interface RefIndexOptions {
 export function buildRefIndexBody(caseId: string, o: RefIndexOptions, wallet: string, signature: string): Record<string, unknown> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or -');
   if (!['hg38_noalt'].includes(String(o.reference))) throw new Error('--reference must be a catalog reference without an index: hg38_noalt');
-  return { wallet: ownerOr(o.owner, wallet), signature, case_id: caseId, reference: o.reference, code_sha256: parseSha256('--code-sha256', o.codeSha256), executor: 'worker' };
+  const body: Record<string, unknown> = { wallet: ownerOr(o.owner, wallet), signature, case_id: caseId, reference: o.reference, code_sha256: parseSha256('--code-sha256', o.codeSha256), executor: 'worker' };
+  if (o.mode && o.mode !== 'index') {
+    // known_sites: copies of catalog known-sites VCFs restricted to the reference's contigs, checked record by record and written create-only beside the reference
+    if (o.mode !== 'known_sites') throw new Error('--mode must be index (default) or known_sites');
+    const known = ['dbsnp138', 'known_indels', 'mills_1000g'];
+    const src = (o.sources || []).flatMap((x) => String(x).split(',')).map((x) => x.trim()).filter(Boolean);
+    if (!src.length || src.some((x) => !known.includes(x)) || new Set(src).size !== src.length) throw new Error(`--sources must be distinct names of ${known.join(', ')}`);
+    body.mode = 'known_sites';
+    body.sources = src;
+  }
+  return body;
 }
 
 export async function refIndexSubmitCommand(caseId: string, options: RefIndexOptions): Promise<void> {

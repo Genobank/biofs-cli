@@ -63,6 +63,15 @@ describe('reference-index body', () => {
     expect(() => buildRefIndexBody('x', { reference: 'hg38_noalt', codeSha256: 'abc' }, W, 's')).toThrow();
     expect(() => buildRefIndexBody('Maria Lopez', { reference: 'hg38_noalt', codeSha256: H }, W, 's')).toThrow(/case identifier/);
   });
+  it('mode known_sites carries the catalog source names, never a path', () => {
+    const b = buildRefIndexBody('REFSITES', { reference: 'hg38_noalt', codeSha256: H, mode: 'known_sites', sources: ['dbsnp138', 'known_indels,mills_1000g'] }, W, 's');
+    expect(b.mode).toBe('known_sites');
+    expect(b.sources).toEqual(['dbsnp138', 'known_indels', 'mills_1000g']);
+    expect(() => buildRefIndexBody('x', { reference: 'hg38_noalt', codeSha256: H, mode: 'known_sites', sources: [] }, W, 's')).toThrow(/sources/);
+    expect(() => buildRefIndexBody('x', { reference: 'hg38_noalt', codeSha256: H, mode: 'known_sites', sources: ['gs://b/x.vcf'] }, W, 's')).toThrow(/sources/);
+    expect(() => buildRefIndexBody('x', { reference: 'hg38_noalt', codeSha256: H, mode: 'known_sites', sources: ['dbsnp138', 'dbsnp138'] }, W, 's')).toThrow(/sources/);
+    expect(() => buildRefIndexBody('x', { reference: 'hg38_noalt', codeSha256: H, mode: 'other' }, W, 's')).toThrow(/mode/);
+  });
 });
 
 describe('acmg-triage --smn body', () => {
