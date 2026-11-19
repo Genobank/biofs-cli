@@ -7,7 +7,7 @@ import { registry, REGISTRY_SHA256, buildParabricksBody, registerParabricksComma
 const W = '0x5f5a60EaEf242c0D51A21c703f520347b96Ed19a';
 const bc = (type: string, name: string) => `biocid://genobank/${W}/${type}/${name}`;
 const SIG = '0xsig';
-const NODE_REGISTRY = path.join(__dirname, '..', '..', 'biofs-node-sync-20261107', 'repo', 'neoantigen', 'pbrun_registry.json');
+const NODE_REGISTRY = path.join(__dirname, '..', '..', 'biofs-node', 'neoantigen', 'pbrun_registry.json');
 const EXPECTED_SHA = '2e6fa14b29d725ea7a6a19b98906f61b3f2cac0d5fe531da5b4b93c859aeac4c';     // 19 November 2026: capture_kits of hg38_noalt (Twist Comprehensive Exome, Twist Exome 2.0) outside the template bodies, template sha256 unchanged
 
 function program(): Command {
@@ -156,6 +156,18 @@ describe('from the command line (--check prints the body and sends nothing)', ()
   });
   test('a bad value is refused before anything is sent', async () => {
     await expect(check(['deepvariant', 'S1', '--in-bam', 'gs://b/a.bam', '--ref', 'hg38'])).rejects.toThrow(/exit 1/);
+  });
+  test('--filter-mutect-calls on somatic sends postprocess.filter_mutect_calls; other tools do not have the option', async () => {
+    const body = await check(['somatic', 'P1', '--in-tumor-fq', bc('fastq', 'a'), bc('fastq', 'b'), '--in-normal-fq', bc('fastq', 'c'), bc('fastq', 'd'), '--ref', 'hg38',
+      '--tumor-sample', 'P1_T', '--normal-sample', 'P1_N', '--mutect-f1r2-tar-gz', '--filter-mutect-calls', '--acknowledge-untested']);
+    expect(body.postprocess).toEqual({ filter_mutect_calls: true });
+    expect(body.outputs).toEqual(['--mutect-f1r2-tar-gz']);
+    expect(body.flags?.['--filter-mutect-calls']).toBeUndefined();
+    const plain = await check(['somatic', 'P1', '--in-tumor-fq', bc('fastq', 'a'), bc('fastq', 'b'), '--in-normal-fq', bc('fastq', 'c'), bc('fastq', 'd'), '--ref', 'hg38',
+      '--tumor-sample', 'P1_T', '--normal-sample', 'P1_N', '--acknowledge-untested']);
+    expect(plain.postprocess).toBeUndefined();
+    await expect(check(['deepvariant', 'S1', '--in-bam', bc('bam', 'a.bam'), '--ref', 'hg38', '--filter-mutect-calls'])).rejects.toThrow();
+    expect(() => buildParabricksBody('deepvariant', 'S1', { flags: { '--in-bam': bc('bam', 'a.bam') }, ref: 'hg38', filterMutectCalls: true } as PbrunRaw, W, SIG)).toThrow(/applies only to somatic/);
   });
   test('an unknown option is refused by commander', async () => {
     await expect(check(['bam2fq', 'S1', '--in-bam', bc('bam', 'a.bam'), '--nonsense'])).rejects.toThrow();

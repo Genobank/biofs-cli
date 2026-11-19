@@ -30,7 +30,7 @@ export interface PbrunRegistry { schema: string; docs_version: string; image_ver
 export const registry = registryJson as unknown as PbrunRegistry;
 export const REGISTRY_SHA256: string = crypto.createHash('sha256').update(fs.readFileSync(require.resolve('./registry.json'))).digest('hex');
 
-const EXTRA_FLAGS = ['--out-name', '--sample-name', '--library', '--library-per-pair', '--platform', '--tumor-sample', '--normal-sample', '--acknowledge-untested', '--max-read-loss-fraction', '--owner', '--wait', '--json', '--check', '--ref', '--validate-with-bwa', '--validate-against-bam'];
+const EXTRA_FLAGS = ['--out-name', '--sample-name', '--library', '--library-per-pair', '--platform', '--tumor-sample', '--normal-sample', '--acknowledge-untested', '--max-read-loss-fraction', '--owner', '--wait', '--json', '--check', '--ref', '--validate-with-bwa', '--validate-against-bam', '--filter-mutect-calls'];
 const VARIADIC = ['fq_pairs', 'fq_single', 'known_sites', 'intervals'];
 const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const CASE_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -40,7 +40,7 @@ export interface PbrunRaw {
   flags: Record<string, string | string[] | boolean>;
   ref?: string; outName?: string; sampleName?: string; library?: string; libraryPerPair?: string[]; platform?: string; tumorSample?: string; normalSample?: string;
   acknowledgeUntested?: boolean; maxReadLossFraction?: string; owner?: string; wait?: boolean; json?: boolean; check?: boolean;
-  validateWithBwa?: boolean; validateAgainstBam?: string;
+  validateWithBwa?: boolean; validateAgainstBam?: string; filterMutectCalls?: boolean;
 }
 
 function biocidOf(flag: string, v: unknown): string {
@@ -106,6 +106,11 @@ export function buildParabricksBody(tool: string, caseId: string, raw: PbrunRaw,
     if (raw.validateWithBwa) v.bwa = true;
     if (raw.validateAgainstBam) v.against_bam = biocidOf('--validate-against-bam', raw.validateAgainstBam);
     body.validation = v;
+  }
+  if (raw.filterMutectCalls) {
+    // GATK 4.3.0.0 LearnReadOrientationModel (when --mutect-f1r2-tar-gz is asked) and FilterMutectCalls on the raw Mutect2 VCF, on the same worker inside the same governed job
+    if (tool !== 'somatic') throw new Error('--filter-mutect-calls applies only to somatic');
+    body.postprocess = { filter_mutect_calls: true };
   }
   if (raw.maxReadLossFraction !== undefined && raw.maxReadLossFraction !== '') {
     const x = Number(raw.maxReadLossFraction);
@@ -188,6 +193,9 @@ export function addToolOptions(cmd: Command, tool: string, meta: PbrunTool): voi
     cmd.option('--validate-with-bwa', 'Also run an independent CPU bwa mem 0.7.17 -K 10000000 on the same reads and compare every primary record; the comparison report is a sealed output (one read pair only)');
     cmd.option('--validate-against-bam <biocid>', 'Also compare the BAM record by record with the BAM of an earlier job of yours (run-to-run determinism)');
   }
+  if (tool === 'somatic') {
+    cmd.option('--filter-mutect-calls', 'Also run GATK 4.3.0.0 (the Mutect2 baseline NVIDIA lists for Parabricks 4.8) FilterMutectCalls on the raw calls, with LearnReadOrientationModel when --mutect-f1r2-tar-gz is given; the filtered VCF becomes the job result, every record checked against the raw VCF');
+  }
   cmd.option('--acknowledge-untested', 'Run a tool whose real run has not been validated yet; recorded in the run report');
   cmd.option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)');
   cmd.option('--check', 'Validate and print the job body without sending it');
@@ -209,7 +217,7 @@ export function rawFromCommand(cmd: Command, meta: PbrunTool): PbrunRaw {
   }
   return {
     flags, ref: opts.ref, outName: opts.outName, sampleName: opts.sampleName, library: opts.library, libraryPerPair: opts.libraryPerPair, platform: opts.platform, tumorSample: opts.tumorSample, normalSample: opts.normalSample,
-    acknowledgeUntested: opts.acknowledgeUntested, validateWithBwa: opts.validateWithBwa, validateAgainstBam: opts.validateAgainstBam, maxReadLossFraction: opts.maxReadLossFraction, owner: opts.owner, wait: opts.wait, json: opts.json, check: opts.check,
+    acknowledgeUntested: opts.acknowledgeUntested, validateWithBwa: opts.validateWithBwa, validateAgainstBam: opts.validateAgainstBam, filterMutectCalls: opts.filterMutectCalls, maxReadLossFraction: opts.maxReadLossFraction, owner: opts.owner, wait: opts.wait, json: opts.json, check: opts.check,
   };
 }
 
