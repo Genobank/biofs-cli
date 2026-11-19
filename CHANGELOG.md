@@ -1,3 +1,7 @@
+# v3.23.1 — lab case identifiers removed from the package
+
+Help text, source comments, tests and documentation no longer carry lab case identifiers; examples use neutral placeholder ids. No behavior change from 3.23.0.
+
 # v3.22.0 — crypt4gh encrypt/decrypt bound to BioNFT
 
 `biofs crypt4gh encrypt --serial` and `decrypt --serial` now require `BioNFTClient.checkAccess` and talk to biofs-node 0.4.30. The node mints the per-serial X25519 pair; the CLI never sends a reader secret at write time. Decrypt asks the node to release the secret. `biofs crypt4gh revoke --serial` stops later release. Unbound EGA interop stays behind `--allow-unbound`. `biofs upload --envelope crypt4gh` requires `--serial`. Ethereum wallets are not crypt4gh keys. Already-held plaintext is not recalled.
