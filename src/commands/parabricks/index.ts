@@ -43,6 +43,17 @@ export interface PbrunRaw {
   validateWithBwa?: boolean; validateAgainstBam?: string; filterMutectCalls?: boolean;
 }
 
+/** A reference value as the node takes it (lib/pbrun_spec.js refItem): a biocid, a gs:// object, or a catalog token build:asset whose build has no underscore (hg38:dbsnp138).
+ *  A token on a reference key such as hg38_noalt is refused here, with the biocid to give, rather than by the node after signing (19 November 2026). */
+export function refValue(flag: string, v: unknown, reg: PbrunRegistry = registry): string {
+  const s = String(v);
+  const m = /^([a-z0-9_]+):([a-z0-9_]+)$/.exec(s);
+  if (!m || /^[a-z0-9]+$/.test(m[1])) return s;
+  const asset: any = ((reg.references as any)[m[1]] || {}).assets?.[m[2]];
+  if (asset?.biocid) throw new Error(`${flag}: ${s} is not a catalog token (tokens name a build such as hg38); give the ${m[1]} dataset by its biocid: ${asset.biocid}`);
+  throw new Error(`${flag}: ${s} is not a catalog token (tokens name a build such as hg38) and ${m[1]} has no dataset ${m[2]} with a biocid`);
+}
+
 function biocidOf(flag: string, v: unknown): string {
   if (typeof v !== 'string' || !BIOCID_RE.test(v)) throw new Error(`${flag} must be a biocid of yours (biocid://...), never a path or a bucket URL`);
   return v;
@@ -74,15 +85,15 @@ export function buildParabricksBody(tool: string, caseId: string, raw: PbrunRaw,
       } else if (k === 'fq_single') {
         inputs[flag] = list.map((x) => biocidOf(flag, x));
       } else if (k === 'known_sites') {
-        inputs[flag] = list.map(String);
+        inputs[flag] = list.map((x) => refValue(flag, x, reg));
       } else if (k === 'intervals') {
-        inputs[flag] = list.map(String);
+        inputs[flag] = list.map((x) => refValue(flag, x, reg));
       } else if (['bam', 'recal', 'vcf', 'gvcf'].includes(k)) {
         if (list.length !== 1) throw new Error(`${flag} takes one value`);
         inputs[flag] = biocidOf(flag, list[0]);
       } else {
         if (list.length !== 1) throw new Error(`${flag} takes one value`);
-        inputs[flag] = String(list[0]);
+        inputs[flag] = refValue(flag, list[0], reg);
       }
     } else if (e.class === 'out') {
       if (given !== true) throw new Error(`${flag} is a switch: output files are named by the job, not by you`);

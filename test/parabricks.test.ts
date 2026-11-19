@@ -169,6 +169,15 @@ describe('from the command line (--check prints the body and sends nothing)', ()
     await expect(check(['deepvariant', 'S1', '--in-bam', bc('bam', 'a.bam'), '--ref', 'hg38', '--filter-mutect-calls'])).rejects.toThrow();
     expect(() => buildParabricksBody('deepvariant', 'S1', { flags: { '--in-bam': bc('bam', 'a.bam') }, ref: 'hg38', filterMutectCalls: true } as PbrunRaw, W, SIG)).toThrow(/applies only to somatic/);
   });
+  test('a token on a reference key (hg38_noalt:dbsnp138) is refused before signing, with the biocid to give; build tokens and biocids pass', async () => {
+    const fq = ['fq2bam', 'T1', '--in-fq', bc('fastq', 'r1'), bc('fastq', 'r2'), '--ref', 'hg38_noalt', '--sample-name', 'S'];
+    await expect(check([...fq, '--knownSites', 'hg38_noalt:dbsnp138'])).rejects.toThrow(/exit 1/);
+    const noalt = (registry.references as any).hg38_noalt.assets.dbsnp138.biocid;
+    expect(() => buildParabricksBody('fq2bam', 'T1', { flags: { '--in-fq': [bc('fastq', 'r1'), bc('fastq', 'r2')], '--knownSites': ['hg38_noalt:dbsnp138'] }, ref: 'hg38_noalt', sampleName: 'S' } as PbrunRaw, W, SIG))
+      .toThrow(new RegExp('not a catalog token.*' + noalt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    const ok = await check([...fq, '--knownSites', 'hg38:dbsnp138', noalt]);
+    expect(ok.inputs['--knownSites']).toEqual(['hg38:dbsnp138', noalt]);
+  });
   test('an unknown option is refused by commander', async () => {
     await expect(check(['bam2fq', 'S1', '--in-bam', bc('bam', 'a.bam'), '--nonsense'])).rejects.toThrow();
   });
