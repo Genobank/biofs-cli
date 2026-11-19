@@ -8,7 +8,7 @@ const W = '0x5f5a60EaEf242c0D51A21c703f520347b96Ed19a';
 const bc = (type: string, name: string) => `biocid://genobank/${W}/${type}/${name}`;
 const SIG = '0xsig';
 const NODE_REGISTRY = path.join(__dirname, '..', '..', 'biofs-node', 'neoantigen', 'pbrun_registry.json');
-const EXPECTED_SHA = '2e6fa14b29d725ea7a6a19b98906f61b3f2cac0d5fe531da5b4b93c859aeac4c';     // 19 November 2026: capture_kits of hg38_noalt (Twist Comprehensive Exome, Twist Exome 2.0) outside the template bodies, template sha256 unchanged
+const EXPECTED_SHA = 'c94a0760c6ce24808a3f2a567011266c778a8be363ada5c3af5524e4cc30c358';     // 19 November 2026: hg38_noalt gnomad_af_only (af-only gnomAD on the no-alt contigs, refindex neo-69af8ccd)
 
 function program(): Command {
   const p = new Command();

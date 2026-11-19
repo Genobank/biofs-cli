@@ -137,6 +137,17 @@
      },
      "object": "gs://deepvariant-fastq-to-vcf-genobank-app/reference/pacbio/human_GRCh38_no_alt_analysis_set/known_sites/Homo_sapiens_assembly38.dbsnp138.noalt.vcf.gz"
     },
+    "gnomad_af_only": {
+     "biocid": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/known-sites/af-only-gnomad.hg38.noalt.vcf.gz",
+     "biodata_type": "known_sites",
+     "file": "af-only-gnomad.hg38.noalt.vcf.gz",
+     "index": ".tbi",
+     "md5": {
+      "af-only-gnomad.hg38.noalt.vcf.gz": "ILz03A/UkgFdOp33HniyTQ==",
+      "af-only-gnomad.hg38.noalt.vcf.gz.tbi": "gXbX2nH7HJL7Tg73Ki3H+g=="
+     },
+     "object": "gs://deepvariant-fastq-to-vcf-genobank-app/reference/pacbio/human_GRCh38_no_alt_analysis_set/known_sites/af-only-gnomad.hg38.noalt.vcf.gz"
+    },
     "known_indels": {
      "biocid": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/known-sites/Homo_sapiens_assembly38.known_indels.noalt.vcf.gz",
      "biodata_type": "known_sites",
