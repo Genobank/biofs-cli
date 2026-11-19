@@ -5039,13 +5039,17 @@ program
   });
 
 program
-  .command('inventory-register <biocids...>')
+  .command('inventory-register [biocids...]')
   .description('NODE OPERATOR: copy file rows already in bioroutes.inventory into biocid_registry so jobs can resolve them (owner unchanged, consent custodian, your attestation recorded; dry run unless --yes)')
+  .option('--object <bucket/path...>', 'Select an inventory row that has no biocid by its storage location (bucket/path or gs://bucket/path); the node mints its biocid from the row owner, the vendor folder, the type and the file name, and writes it back to the row')
+  .option('--lab <name>', 'With --object: the lab segment of the minted biocid (default: the labs/<lab>/ folder of the path, else the row originlab)')
+  .option('--serial <id>', 'With --object: the sample serial to set (default: the casefiles/<serial>/ folder of the path)')
+  .option('--type <type>', 'With --object: fastq, bam, cram, vcf, gvcf or sqlite (default: the row file type)')
   .requiredOption('--attest <text>', 'The basis on which GenoBank.io holds and uses these files (at least 20 characters, recorded with the rows)')
   .option('--yes', 'Write the rows (default is a dry run that writes nothing)')
   .option('--json', 'Emit JSON')
-  .action(async (biocids: string[], options: { attest: string; yes?: boolean; json?: boolean }) => {
-    try { await inventoryRegisterCommand(biocids, options); } catch (e: any) { console.error(chalk.red(e.message)); process.exit(1); }
+  .action(async (biocids: string[], options: { attest: string; yes?: boolean; json?: boolean; object?: string[]; lab?: string; serial?: string; type?: string }) => {
+    try { await inventoryRegisterCommand(biocids || [], options); } catch (e: any) { console.error(chalk.red(e.message)); process.exit(1); }
   });
 
 const nodeReleaseCmd = program
