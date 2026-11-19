@@ -64,6 +64,12 @@ export interface NeoantigenDesignOptions {
   weights?: string;
   patient?: string;
   expect?: string;
+  engine?: string;
+  codeSha256?: string;
+  protocolSha256?: string;
+  ledgerRecord?: string;
+  proteomeSha256?: string;
+  modelsSha256?: string;
   executor?: string;
   owner?: string;
   wait?: boolean;
@@ -230,7 +236,68 @@ export function buildDesignBody(caseId: string, o: NeoantigenDesignOptions, wall
     patient: o.patient || caseId,
     expect_genes: o.expect ? o.expect.split(',').map((s) => s.trim()).filter(Boolean) : [],
     executor: parseExecutor(o.executor),
+    ...v5aDesignFields(o),
   };
+}
+
+/** Engine v5a of the design kind (ledger record 40): engine v2's own code with the two v5 gate changes and the environment pin. The pins are required with it and refused without it. */
+export function v5aDesignFields(o: NeoantigenDesignOptions): Record<string, unknown> {
+  const pins = [o.codeSha256, o.protocolSha256, o.ledgerRecord, o.proteomeSha256, o.modelsSha256];
+  if (o.engine !== undefined && o.engine !== 'v2' && o.engine !== 'v5a') throw new Error('--engine must be v2 or v5a');
+  if (o.engine !== 'v5a') {
+    if (pins.some((x) => x !== undefined)) throw new Error('--code-sha256, --protocol-sha256, --ledger-record, --proteome-sha256 and --models-sha256 apply only with --engine v5a');
+    return {};
+  }
+  const rec = Number(o.ledgerRecord);
+  if (!Number.isInteger(rec) || rec < 1) throw new Error('--ledger-record must be the pre-registration ledger record number');
+  const out: Record<string, unknown> = {
+    engine: 'v5a', code_sha256: parseSha256('--code-sha256', o.codeSha256 as string), protocol_sha256: parseSha256('--protocol-sha256', o.protocolSha256 as string), ledger_record: rec,
+  };
+  if (o.proteomeSha256 !== undefined) out.proteome_sha256 = parseSha256('--proteome-sha256', o.proteomeSha256);
+  if (o.modelsSha256 !== undefined) out.models_sha256 = parseSha256('--models-sha256', o.modelsSha256);
+  return out;
+}
+
+export interface RankV5Options {
+  design: string;
+  evidence: string;
+  indel: string;
+  fusion?: string;
+  n?: string;
+  patient?: string;
+  codeSha256: string;
+  protocolSha256: string;
+  ledgerRecord: string;
+  executor?: string;
+  owner?: string;
+  wait?: boolean;
+  json?: boolean;
+}
+
+/** The registered v5 ranking over a registered v5-gates design, the features table that design read, the indel result and (optionally) the fusion result; every input is a biocid and the code, protocol and ledger record are the frozen ones. */
+export function buildRankV5Body(caseId: string, o: RankV5Options, wallet: string, signature: string): Record<string, unknown> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  const rec = Number(o.ledgerRecord);
+  if (!Number.isInteger(rec) || rec < 1) throw new Error('--ledger-record must be the pre-registration ledger record number');
+  const body: Record<string, unknown> = {
+    wallet: ownerOr(o.owner, wallet), signature, case_id: caseId,
+    design_biocid: requireBiocid('--design', o.design), evidence_biocid: requireBiocid('--evidence', o.evidence), indel_biocid: requireBiocid('--indel', o.indel),
+    n: parseCount(o.n, 20, 1, 50, '--n'), patient: o.patient || caseId,
+    code_sha256: parseSha256('--code-sha256', o.codeSha256), protocol_sha256: parseSha256('--protocol-sha256', o.protocolSha256), ledger_record: rec,
+    executor: parseExecutor(o.executor),
+  };
+  if (o.fusion) body.fusion_biocid = requireBiocid('--fusion', o.fusion);
+  return body;
+}
+
+export async function rankV5SubmitCommand(caseId: string, options: RankV5Options): Promise<void> {
+  try {
+    const a = await auth();
+    await submit('rank_v5', buildRankV5Body(caseId, options, a.wallet, a.signature), a.headers, options);
+  } catch (e: any) {
+    Logger.error(`rank-v5 submit failed: ${e.message}`);
+    process.exit(1);
+  }
 }
 
 export interface SynapsePullOptions {
@@ -386,7 +453,7 @@ async function auth() {
   };
 }
 
-type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture' | 'windows' | 'rescore' | 'acmg' | 'refindex' | 'vcfcompare' | 'alphagenome' | 'twin' | 'library_profile';
+type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture' | 'windows' | 'rescore' | 'acmg' | 'refindex' | 'vcfcompare' | 'alphagenome' | 'twin' | 'library_profile' | 'rank_v5';
 const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: string }> = {
   evidence: { post: 'neoantigen_evidence', status: 'neoantigen_evidence_status', id: 'neoantigen_job_id', verb: 'neoantigen-evidence' },
   design: { post: 'neoantigen_design', status: 'neoantigen_design_status', id: 'neoantigen_job_id', verb: 'neoantigen-design' },
@@ -407,6 +474,7 @@ const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: stri
   alphagenome: { post: 'neoantigen_alphagenome', status: 'neoantigen_alphagenome_status', id: 'neoantigen_job_id', verb: 'alphagenome' },
   twin: { post: 'neoantigen_twin', status: 'neoantigen_twin_status', id: 'neoantigen_job_id', verb: 'twin' },
   library_profile: { post: 'neoantigen_library_profile', status: 'neoantigen_library_profile_status', id: 'neoantigen_job_id', verb: 'library-profile' },
+  rank_v5: { post: 'neoantigen_rank_v5', status: 'neoantigen_rank_v5_status', id: 'neoantigen_job_id', verb: 'rank-v5' },
 };
 
 async function fetchStatus(kind: Kind, id: string, headers: Record<string, string>): Promise<any> {

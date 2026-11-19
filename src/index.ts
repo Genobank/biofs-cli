@@ -163,7 +163,7 @@ import { alphagenomeSubmitCommand, AlphaGenomeOptions } from './commands/alphage
 import { inventoryDelegateCommand, DelegateOptions } from './commands/inventory-delegate';
 import { jobsCommand, jobLogCommand, JobsOptions, JobLogOptions } from './commands/job-view';
 import { inventoryListCommand, InventoryListOptions } from './commands/inventory-list';
-import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, captureSubmitCommand, CaptureOptions, acmgSubmitCommand, AcmgOptions, refIndexSubmitCommand, RefIndexOptions, libraryProfileSubmitCommand, LibraryProfileOptions, twinClassifySubmitCommand, TwinOptions, vcfCompareSubmitCommand, VcfCompareOptions, windowsSubmitCommand, WindowsOptions, rescoreSubmitCommand, RescoreOptions, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
+import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, captureSubmitCommand, CaptureOptions, acmgSubmitCommand, AcmgOptions, refIndexSubmitCommand, RefIndexOptions, libraryProfileSubmitCommand, LibraryProfileOptions, twinClassifySubmitCommand, TwinOptions, vcfCompareSubmitCommand, VcfCompareOptions, windowsSubmitCommand, WindowsOptions, rescoreSubmitCommand, RescoreOptions, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions, rankV5SubmitCommand, RankV5Options } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { neoantigenFabricateCommand, NeoantigenFabricateOptions } from './commands/neoantigen/fabricate';
 import { neoantigenStatusCommand as neoantigenSomaticStatusCommand } from './commands/neoantigen/status';
@@ -4885,6 +4885,12 @@ neoantigenDesignCmd
   .option('--weights <list>', 'presentation,foreignness,expression,clonality[,evidence] summing to 1 (default 0.45,0.25,0.20,0.10)')
   .option('--patient <label>', 'Case label (a case identifier, never a name)')
   .option('--expect <genes>', 'Comma separated genes, for a retrospective check only')
+  .option('--engine <name>', 'v2 (default) or v5a: engine v2 with the two v5 gate changes and the environment pin (the registered v5a chain); v5a needs the three frozen pins below')
+  .option('--code-sha256 <hex>', 'With --engine v5a: SHA-256 of the registered v5a code set; the node refuses any other code')
+  .option('--protocol-sha256 <hex>', 'With --engine v5a: SHA-256 of the registered protocol')
+  .option('--ledger-record <n>', 'With --engine v5a: the pre-registration ledger record number')
+  .option('--proteome-sha256 <hex>', 'With --engine v5a: the proteome SHA-256 of an earlier run; a machine that used another proteome refuses the job')
+  .option('--models-sha256 <hex>', 'With --engine v5a: the MHCflurry model release hash of an earlier run; a machine with other models refuses the job')
   .option('--executor <where>', 'auto (default): a healthy neoantigen worker agent, else this node; worker: only a worker, never falls back; local: only this node')
   .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
   .option('--wait', 'Poll until the job finishes')
@@ -5364,6 +5370,33 @@ windowsCmd
   .option('--wait', 'Poll until done or failed')
   .option('--json', 'Emit JSON')
   .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('windows' as any, id, options); });
+
+const rankV5Cmd = program
+  .command('rank-v5')
+  .description('The registered v5 ranking (expression order) over a registered v5-gates design, the features table it read, the indel result and the fusion result (dispatched through biofs-node)');
+rankV5Cmd
+  .command('submit <caseId>')
+  .description('Submit a rank-v5 job; every input is a biocid, and the code and protocol hashes must be the registered ones')
+  .requiredOption('--design <biocid>', 'Result biocid of a neoantigen-design job run with --engine v5a')
+  .requiredOption('--evidence <biocid>', 'Result biocid of the neoantigen-evidence job whose features table that design read')
+  .requiredOption('--indel <biocid>', 'Result biocid of a neoantigen-indel job (run with --tpm)')
+  .option('--fusion <biocid>', 'Result biocid of a neoantigen-fusion job')
+  .option('--n <count>', 'Cassette size, 1 to 50 (default 20; the registered protocol uses 20)')
+  .option('--patient <label>', 'Case label (a case identifier, never a name)')
+  .requiredOption('--code-sha256 <hex>', 'SHA-256 of the registered v5a code set; the node refuses any other code')
+  .requiredOption('--protocol-sha256 <hex>', 'SHA-256 of the registered protocol')
+  .requiredOption('--ledger-record <n>', 'The pre-registration ledger record number')
+  .option('--executor <where>', 'auto (default): a healthy neoantigen worker agent, else this node; worker: only a worker, never falls back; local: only this node')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: RankV5Options) => { await rankV5SubmitCommand(caseId, options); });
+rankV5Cmd
+  .command('status <job>')
+  .description('Show a rank-v5 job (only the signer who submitted it can read it)')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('rank_v5' as any, id, options); });
 
 const rescoreCmd = program
   .command('rescore')
