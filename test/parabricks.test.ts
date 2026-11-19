@@ -254,6 +254,22 @@ describe('reference datasets by biocid (17 November 2026)', () => {
 });
 
 describe('pbrun template: the node operates a frozen template; the CLI sends only the per-run fields', () => {
+  it('--capture-map sends kit own_capture_map with the map of a capture-compare job, only for a WES template and only of the job owner', () => {
+    const owner = '0x' + 'b'.repeat(40);
+    const cmap = `biocid://genobank/${owner}/neoantigen-capture-file/neo-0123abcd-0000-4000-8000-00000000abcd.empirical_capture.bed`;
+    const base = { inFq: [`biocid://lab/${'0x' + 'a'.repeat(40)}/fastq/1/S_R1.fastq.gz`, `biocid://lab/${'0x' + 'a'.repeat(40)}/fastq/2/S_R2.fastq.gz`], sampleName: 'S', library: 'L1', outName: 'run_a', owner };
+    const b = buildTemplateBody('germline_wes_v1', 'C1', { ...base, captureMap: cmap }, '0x' + '1'.repeat(40), 'sig');
+    expect([b.kit, b.capture_map, b.wallet]).toEqual(['own_capture_map', cmap, owner]);
+    expect(buildTemplateBody('germline_wes_v1', 'C1', { ...base, kit: 'own_capture_map', captureMap: cmap }, '0x' + '1'.repeat(40), 'sig').capture_map).toBe(cmap);
+    expect(() => buildTemplateBody('germline_wes_v1', 'C1', { ...base, kit: 'agilent_v8', captureMap: cmap }, '0x' + '1'.repeat(40), 'sig')).toThrow(/one or the other/);
+    expect(() => buildTemplateBody('germline_wes_v1', 'C1', { ...base, kit: 'own_capture_map' }, '0x' + '1'.repeat(40), 'sig')).toThrow(/must be the biocid/);
+    for (const bad of ['gs://b/x.bed', cmap.replace('.empirical_capture.bed', '.bed'), cmap.replace('neoantigen-capture-file', 'target-intervals')]) {
+      expect(() => buildTemplateBody('germline_wes_v1', 'C1', { ...base, captureMap: bad }, '0x' + '1'.repeat(40), 'sig')).toThrow(/must be the biocid/);
+    }
+    expect(() => buildTemplateBody('germline_wes_v1', 'C1', { ...base, owner: '0x' + 'c'.repeat(40), captureMap: cmap }, '0x' + '1'.repeat(40), 'sig')).toThrow(/not to the job's owner/);
+    expect(() => buildTemplateBody('germline_wgs_v1', 'C1', { ...base, captureMap: cmap }, '0x' + '1'.repeat(40), 'sig')).toThrow(/no capture kit/);
+    expect(buildTemplateBody('germline_wes_v1', 'C1', { ...base, kit: 'agilent_v8' }, '0x' + '1'.repeat(40), 'sig')).not.toHaveProperty('capture_map');
+  });
   const fq = (n: number, r: number) => `biocid://augenomics/0x${'a'.repeat(40)}/fastq/x${n}${r}/S${n}_R${r}.fastq.gz`;
   const raw = { inFq: [fq(1, 1), fq(1, 2)], sampleName: 'SAMPLE1', library: 'LIB1', kit: 'agilent_v8', outName: 'C1_LIB1_germline' };
   it('carries the template id, the FASTQ pairs, the names, the kit, the stem and the owner, and never a flag, a reference or an image', () => {

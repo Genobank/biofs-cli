@@ -216,13 +216,18 @@ export function rawFromCommand(cmd: Command, meta: PbrunTool): PbrunRaw {
 // ---- frozen run templates (18 November 2026) ------------------------------------------------------------------------------------------------------------------------------
 // biofs-node is the job operator: a template fixes the tool, the image digest, the reference genome, the known sites, the capture design, every flag, the outputs and the
 // read-group form. This verb sends only the per-run fields; the node expands them from its catalog and the worker re-checks the expansion against its own copy.
-export interface TemplateRaw { inFq: string[]; sampleName: string; library: string; libraryPerPair?: string[]; kit?: string; outName: string; owner?: string; wait?: boolean; json?: boolean; check?: boolean }
+export interface TemplateRaw { inFq: string[]; sampleName: string; library: string; libraryPerPair?: string[]; kit?: string; captureMap?: string; outName: string; owner?: string; wait?: boolean; json?: boolean; check?: boolean }
 
 /** The capture kits a template accepts: its own (the frozen kit) and the catalog's capture_kits of its reference (19 November 2026), as the node's templateKits. */
 export function templateKits(t: PbrunTemplate, reg: PbrunRegistry = registry): Record<string, string> {
   const key = Object.keys(reg.references || {}).find((k) => String((reg.references[k] || {}).biocid || '').toLowerCase() === String(t.reference).toLowerCase());
   return { ...((key && (reg.capture_kits || {})[key]) || {}), ...t.kits };
 }
+
+/** A WES template on the library's own enrichment map (biofs-node, 19 November 2026): kit own_capture_map with capture_map, the empirical_capture.bed biocid a capture-compare job wrote
+ * for the same owner. The template, its sha256 and the catalog do not change; the node refuses a map of another owner and the worker checks the map against the reference. */
+export const OWN_CAPTURE_MAP = 'own_capture_map';
+const CAPTURE_MAP_RE = /^biocid:\/\/genobank\/(0x[0-9a-f]{40})\/neoantigen-capture-file\/neo-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.empirical_capture\.bed$/;
 
 export function buildTemplateBody(templateId: string, caseId: string, raw: TemplateRaw, wallet: string, signature: string, reg: PbrunRegistry = registry, sha: string = REGISTRY_SHA256): Record<string, unknown> {
   const t = (reg.templates || {})[templateId];
@@ -241,11 +246,19 @@ export function buildTemplateBody(templateId: string, caseId: string, raw: Templ
     if (pl.length !== pairs.length || pl.some((x) => !NAME_RE.test(x))) throw new Error(`--library-per-pair needs one library name for each of the ${pairs.length} FASTQ pairs`);
     body.pair_libraries = pl;
   }
-  if (t.kit_flag !== null) {
+  if (t.kit_flag !== null && (raw.captureMap || raw.kit === OWN_CAPTURE_MAP)) {
+    if (raw.kit && raw.kit !== OWN_CAPTURE_MAP) throw new Error(`--capture-map replaces --kit: give one or the other`);
+    const m = CAPTURE_MAP_RE.exec(String(raw.captureMap || ''));
+    if (!m) throw new Error('--capture-map must be the biocid of the empirical_capture.bed a capture-compare job wrote (biocid://genobank/<owner>/neoantigen-capture-file/neo-<job>.empirical_capture.bed)');
+    const owner = String(body.wallet).toLowerCase();
+    if (raw.owner && m[1] !== owner) throw new Error(`--capture-map belongs to ${m[1]}, not to the job's owner ${owner}: a template runs on the owner's own map only`);
+    body.kit = OWN_CAPTURE_MAP;
+    body.capture_map = raw.captureMap;
+  } else if (t.kit_flag !== null) {
     const kits = templateKits(t, reg);
-    if (!raw.kit || !(raw.kit in kits)) throw new Error(`${templateId} is a ${t.assay} template: --kit must be one of ${Object.keys(kits).sort().join(', ')}`);
+    if (!raw.kit || !(raw.kit in kits)) throw new Error(`${templateId} is a ${t.assay} template: --kit must be one of ${Object.keys(kits).sort().join(', ')}, or --capture-map`);
     body.kit = raw.kit;
-  } else if (raw.kit) throw new Error(`${templateId} is a ${t.assay} template: it takes no capture kit`);
+  } else if (raw.kit || raw.captureMap) throw new Error(`${templateId} is a ${t.assay} template: it takes no capture kit`);
   return body;
 }
 
@@ -293,6 +306,7 @@ export function registerParabricksCommands(program: Command): void {
     .requiredOption('--library <name>', 'Library name (LB; read-group ID and PU are <library>.<n>)')
     .option('--library-per-pair <names...>', 'One library name per FASTQ pair, when libraries are pooled')
     .option('--kit <name>', 'Capture kit of a WES template: its frozen kit (agilent_v8) or a catalog kit of its reference (twist_comprehensive_exome, twist_exome_v2); see biofs pbrun templates')
+    .option('--capture-map <biocid>', "Instead of --kit, for a WES template whose library no catalog design matches: the library's own enrichment map, the empirical_capture.bed biocid a capture-compare job wrote for the same owner")
     .requiredOption('--out-name <stem>', 'Stem of every output file name')
     .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
     .option('--check', 'Print the request and send nothing')
