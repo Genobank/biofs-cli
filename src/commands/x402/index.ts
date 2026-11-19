@@ -11,8 +11,8 @@ import { Logger } from '../../lib/utils/logger';
  *
  *   biofs x402 list-services
  *   biofs x402 pay --service …
- *   biofs x402 submit --agent clara --biosample TN25-336147 [--dry-run]
- *   biofs x402 pipeline cancer-twin TN25-336147 [--from fastq] [--dry-run] [--wait]
+ *   biofs x402 submit --agent clara --biosample AB00-000000 [--dry-run]
+ *   biofs x402 pipeline cancer-twin AB00-000000 [--from fastq] [--dry-run] [--wait]
  */
 export function createX402Command(): Command {
   const command = new Command('x402')

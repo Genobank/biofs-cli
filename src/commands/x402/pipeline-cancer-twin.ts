@@ -19,8 +19,8 @@
  * (FASTQ → VCF → SQLITE → REPORT). The run emits JSON-line events (like
  * `biofs pipeline run-wes`) and returns a single traceable manifest.
  *
- *   biofs x402 pipeline cancer-twin TN25-336147 --dry-run
- *   biofs x402 pipeline cancer-twin TN25-336147 --from fastq --wait
+ *   biofs x402 pipeline cancer-twin AB00-000000 --dry-run
+ *   biofs x402 pipeline cancer-twin AB00-000000 --from fastq --wait
  */
 
 import chalk from 'chalk';

@@ -35,7 +35,7 @@ export interface BodeOptions {
   panel?: string;
   output?: string;
   pdf?: boolean;
-  rnaTpm?: string;          // case_id to pull RNA TPM for (e.g. TN25-336147)
+  rnaTpm?: string;          // case_id to pull RNA TPM for (e.g. AB00-000000)
   apiBase?: string;
   noRrm?: boolean;
   noPsm?: boolean;

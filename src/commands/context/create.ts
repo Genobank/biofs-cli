@@ -131,7 +131,7 @@ export async function contextCreateCommand(
 ): Promise<void> {
   if (!/^[A-Z]{2}\d{2}-\d{6}$/.test(caseId)) {
     Logger.error(
-      `Invalid caseId format. Expected like "TN25-336147" (pattern ^[A-Z]{2}\\d{2}-\\d{6}$)`
+      `Invalid caseId format. Expected like "AB00-000000" (pattern ^[A-Z]{2}\\d{2}-\\d{6}$)`
     );
     process.exit(1);
   }

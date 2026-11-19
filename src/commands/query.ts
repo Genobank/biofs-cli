@@ -20,8 +20,8 @@
  * Examples:
  *   biofs query biocid://genobank/0xabc.../sqlite/NA12878.sqlite \
  *     "SELECT base__hugo, base__so, clinvar__sig FROM variant WHERE clinvar__sig LIKE '%Pathogenic%' LIMIT 50"
- *   biofs query TN25-336147 "SELECT COUNT(*) n FROM variant" --json
- *   biofs query TN25-336147 --schema        # list tables in the annotated sqlite
+ *   biofs query AB00-000000 "SELECT COUNT(*) n FROM variant" --json
+ *   biofs query AB00-000000 --schema        # list tables in the annotated sqlite
  */
 
 import * as fs from 'fs';

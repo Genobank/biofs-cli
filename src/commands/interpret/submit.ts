@@ -7,7 +7,7 @@
  * report. Thin client over biofs-node POST /agent/interpret (which proxies the
  * genoclaw-api /interpret endpoint), mirroring `biofs annotate submit`.
  *
- *   biofs interpret submit TN25-336147 --package cancer_twin --wait
+ *   biofs interpret submit AB00-000000 --package cancer_twin --wait
  */
 
 import chalk from 'chalk';

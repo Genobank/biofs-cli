@@ -6,7 +6,7 @@ const bc = (type: string, name: string, agent = 'natera') => `biocid://${agent}/
 describe('neoantigen verbs: biocid-only inputs', () => {
   test('accepts both registry spellings of a biocid', () => {
     expect(BIOCID_RE.test(bc('bam', 'a.bam'))).toBe(true);
-    expect(BIOCID_RE.test(`Biocid:caris/${W}/bam/DNA_TN25-336147.bam`)).toBe(true);
+    expect(BIOCID_RE.test(`Biocid:caris/${W}/bam/DNA_AB00-000000.bam`)).toBe(true);
   });
   test.each(['gs://bucket/a.bam', 'https://storage.googleapis.com/b/a.bam', '/Users/x/a.bam', 'a.bam', `biocid://natera/0x123/bam/a.bam`, ''])('rejects %p', (v) => {
     expect(() => requireBiocid('--tumor', v)).toThrow(/biocid/);
@@ -40,20 +40,20 @@ describe('neoantigen verbs: argument validation', () => {
 describe('neoantigen verbs: request bodies', () => {
   const ev = { somaticSqlite: bc('sqlite', 's.sqlite'), filteredVcf: bc('vcf', 'f.vcf.gz'), tumor: bc('bam', 't.bam'), normal: bc('bam', 'n.bam') };
   test('evidence body carries only biocids and the signer', () => {
-    const b: any = buildEvidenceBody('TN25-336147', { ...ev, secondDna: [bc('bam', 'd.bam', 'caris')], rna: bc('bam', 'r.bam', 'caris') }, W, '0xsig');
-    expect(b.case_id).toBe('TN25-336147');
+    const b: any = buildEvidenceBody('AB00-000000', { ...ev, secondDna: [bc('bam', 'd.bam', 'caris')], rna: bc('bam', 'r.bam', 'caris') }, W, '0xsig');
+    expect(b.case_id).toBe('AB00-000000');
     expect(b.second_dna_biocid).toHaveLength(1);
     expect(b.min_mapq).toBe(20);
     expect(JSON.stringify(b)).not.toMatch(/gs:\/\//);
     expect(b.tpm_biocid).toBe('');
   });
   test('evidence refuses a raw path in any input and a person-like case id', () => {
-    expect(() => buildEvidenceBody('TN25-336147', { ...ev, tumor: 'gs://b/t.bam' }, W, 's')).toThrow(/biocid/);
+    expect(() => buildEvidenceBody('AB00-000000', { ...ev, tumor: 'gs://b/t.bam' }, W, 's')).toThrow(/biocid/);
     expect(() => buildEvidenceBody('Jane Doe', ev, W, 's')).toThrow(/case identifier/);
   });
   test('design body', () => {
-    const b: any = buildDesignBody('TN25-336147', { evidence: bc('neoantigen_evidence', 'e.json', 'genobank'), hla: 'HLA-A*02:01,HLA-B*38:01', n: '10', weights: '0.35,0.20,0.15,0.15,0.15' }, W, 's');
-    expect(b.n).toBe(10); expect(b.hla).toHaveLength(2); expect(b.weights).toHaveLength(5); expect(b.patient).toBe('TN25-336147'); expect(b.expect_genes).toEqual([]);
+    const b: any = buildDesignBody('AB00-000000', { evidence: bc('neoantigen_evidence', 'e.json', 'genobank'), hla: 'HLA-A*02:01,HLA-B*38:01', n: '10', weights: '0.35,0.20,0.15,0.15,0.15' }, W, 's');
+    expect(b.n).toBe(10); expect(b.hla).toHaveLength(2); expect(b.weights).toHaveLength(5); expect(b.patient).toBe('AB00-000000'); expect(b.expect_genes).toEqual([]);
     expect(() => buildDesignBody('c1', { evidence: 'e.json', hla: 'HLA-A*02:01' }, W, 's')).toThrow(/biocid/);
   });
 });
@@ -84,7 +84,7 @@ describe('onramp-https verb', () => {
   test('body refuses a placeholder serial, a bad owner and a person-like case id', () => {
     const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'onr-')), 'm.json');
     fs.writeFileSync(f, JSON.stringify([{ url: 'https://h.example/a.bam', sha256: sha, bytes: 5 }]));
-    const base = { owner, serial: 'TN25-112103', caseId: 'TN25-112103', originlab: 'public-r2', manifest: f };
+    const base = { owner, serial: 'AB00-000001', caseId: 'AB00-000001', originlab: 'public-r2', manifest: f };
     expect((buildOnrampBody(base, '0xw', 's') as any).objects).toHaveLength(1);
     expect(() => buildOnrampBody({ ...base, serial: 'UNKNOWN' }, 'w', 's')).toThrow(/UNKNOWN/);
     expect(() => buildOnrampBody({ ...base, owner: '0x123' }, 'w', 's')).toThrow(/biowallet/);
@@ -203,7 +203,7 @@ describe('neoantigen-fusion verb', () => {
   const fe = bc('neoantigen_fusion_evidence', 'fe.json', 'genobank');
   const base = { fusionEvidence: fe, fiveGene: 'CDH1', threeGene: 'NRG1', hla: 'HLA-A*01:01,HLA-B*08:01' };
   test('body: biocid in, two gene symbols, alleles, defaults', () => {
-    const b: any = buildFusionBody('TN25-112103', base, W, 's');
+    const b: any = buildFusionBody('AB00-000001', base, W, 's');
     expect([b.five_gene, b.three_gene, b.min_templates, b.executor, b.proteome_biocid]).toEqual(['CDH1', 'NRG1', 10, 'auto', '']);
     expect(b.hla).toEqual(['HLA-A*01:01', 'HLA-B*08:01']);
     expect(b.fusion_evidence_biocid).toBe(fe);
@@ -234,10 +234,10 @@ describe('neoantigen-fusion verb', () => {
 });
 
 describe('neoantigen-indel verb', () => {
-  const sq = bc('sqlite', 'TN25-112103.mutect2.filtered.sqlite', 'genobank');
+  const sq = bc('sqlite', 'AB00-000001.mutect2.filtered.sqlite', 'genobank');
   const base = { somaticSqlite: sq, hla: 'HLA-A*01:01,HLA-C*07:02' };
   test('body: defaults, optional references and genes', () => {
-    const b: any = buildIndelBody('TN25-112103', base, W, 's');
+    const b: any = buildIndelBody('AB00-000001', base, W, 's');
     expect([b.somatic_sqlite_biocid, b.min_alt, b.executor, b.gtf_biocid, b.transcripts_biocid, b.proteome_biocid, b.genes]).toEqual([sq, 8, 'auto', '', '', '', undefined]);
     const g: any = buildIndelBody('C1', { ...base, genes: 'TGFBR2, KMT2A,TGFBR2', minAlt: '12', gtf: bc('ref', 'g.gtf.gz', 'genobank'), transcripts: bc('ref', 't.fa.gz', 'genobank') }, W, 's');
     expect([g.genes, g.min_alt]).toEqual([['TGFBR2', 'KMT2A'], 12]);

@@ -4,7 +4,7 @@
 Let the biodata owner (`0x5f5a60…`) select individual biocids or serial-scoped sets from the full vault inventory, then mint/bind a time-boxed GA4GH-style researcher Passport (LabNFT + room + BioPIL) that admits only those files.
 
 ## Surfaces already live
-1. **Cancer map twin**: https://genoclaw.genobank.app/cancer-map/0x5f5a60EaEf242c0D51A21c703f520347b96Ed19a/ (case TN25-336147)
+1. **Cancer map twin**: https://genoclaw.genobank.app/cancer-map/0x5f5a60EaEf242c0D51A21c703f520347b96Ed19a/ (case AB00-000000)
 2. **Biodata room protocol** (biofs-node): create → request → admit (EIP-191) → list_inventory scoped → revoke
 3. **htsget inventory fallback**: any `bioroutes.inventory` VCF/BAM/CRAM is streamable by filename or biocid last segment (owner or open-room researcher)
 4. **submit_cravat room ACL**: admitted researcher with skill `annotate` and serial in room.biocids
@@ -24,7 +24,7 @@ Let the biodata owner (`0x5f5a60…`) select individual biocids or serial-scoped
 ### A. Inventory picker (owner dashboard)
 1. Extend `consent/biofile` (or new `/consent/passport/`) with a multi-select tree:
    - Group by **serial** → filetype → individual biocid
-   - Filters: genomic-only, cancer-map case TN25-336147, PENDING_REGISTRATION vs REGISTERED
+   - Filters: genomic-only, cancer-map case AB00-000000, PENDING_REGISTRATION vs REGISTERED
    - Selection model: `{ biocids: string[], serials: string[], skills: ('stream'|'annotate'|'view')[] }`
 2. Data API (already partially exists):
    - `list_inventory` with room_id OR owner signature (full vault)
@@ -45,7 +45,7 @@ Let the biodata owner (`0x5f5a60…`) select individual biocids or serial-scoped
 
 ### D. Cancer-map bridge
 1. "Share twin files" button on cancer-map loads the 16 Caris (+ Natera/Invitae/Langebio when registry-complete) biocids into the picker pre-selected
-2. Keep clinical names off; case_id TN25-336147 and biocids only in clinical-scope exports
+2. Keep clinical names off; case_id AB00-000000 and biocids only in clinical-scope exports
 
 ## Implementation slices
 1. **Slice D0 (done this session)**: htsget inventory + stream CLI stdout fix + worker gcsfuse download + room ACL code path

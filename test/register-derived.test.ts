@@ -1,10 +1,10 @@
 import { buildRegisterDerivedGcsBody } from '../src/commands/register-derived';
 const W = '0xFD1f085f8d10375df8A1c7C9ffA4FD0eB80B0b1d';
-const P = `biocid://public-r2/${W}/bam/DNA_TN25-112103.bam`;
+const P = `biocid://public-r2/${W}/bam/DNA_AB00-000001.bam`;
 const U = `gs://genobank-parabricks-output/biowallet/${W.toLowerCase()}/somatic-mutect/j/x.vcf.gz`;
 describe('register-derived gcs', () => {
   test('builds the body with lineage', () => {
-    const b: any = buildRegisterDerivedGcsBody(U, { type: 'vcf', parent: [P], caseId: 'TN25-112103' });
+    const b: any = buildRegisterDerivedGcsBody(U, { type: 'vcf', parent: [P], caseId: 'AB00-000001' });
     expect(b.gcs_uri).toBe(U); expect(b.filename).toBe('x.vcf.gz'); expect(b.parent_biocids).toEqual([P]); expect(b.data_category).toBe('dna');
   });
   test('refuses non-gs, missing parents, bad parents, bad type, name-like case id', () => {

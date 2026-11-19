@@ -50,7 +50,7 @@ interface IngestPayload {
 }
 
 export async function ingestRnaTpmCommand(caseId: string, opts: IngestRnaTpmOptions): Promise<void> {
-  if (!caseId) throw new Error('<case-id> is required (e.g., TN25-336147)');
+  if (!caseId) throw new Error('<case-id> is required (e.g., AB00-000000)');
   if (!opts.biocid && !opts.gcsPath) {
     throw new Error('Either --biocid <id> or --gcs-path <gs://...> is required to locate the RNA TPM CSV');
   }

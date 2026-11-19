@@ -122,7 +122,7 @@ export async function inventoryRegisterSqliteCommand(sqlitePath: string, opts: I
     throw new Error('No owner wallet. Pass --owner-wallet <addr> or run `biofs login` first.');
   }
   if (!opts.sampleSerial) {
-    throw new Error('--sample-serial <serial> is required (e.g., 55052008714000 or caris-TN25-336147)');
+    throw new Error('--sample-serial <serial> is required (e.g., 55052008714000 or caris-AB00-000000)');
   }
 
   const filename = path.basename(sqlitePath);

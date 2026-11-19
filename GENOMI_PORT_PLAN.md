@@ -88,7 +88,7 @@ Returned **alongside, never replacing**, the existing `{columns,rows,count}` / `
   "source_coverage": [
     { "source": "opencravat_sqlite",
       "biocid": "biocid://lab/wallet/sqlite/...",  // NEVER UNKNOWN (lineage rule)
-      "sample_serial": "TN25-336147",
+      "sample_serial": "AB00-000000",
       "state": "consulted_and_returned" | "consulted_but_unavailable" | "in_scope_empty" | "out_of_scope",
       "reason_code": null }
   ],

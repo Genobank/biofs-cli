@@ -3,7 +3,7 @@
  *
  * Thin client over biofs-node POST /agent/cancermap. Use only when the
  * grounded generator should replace the published map. Do not fire this
- * against TN25-336147 until interpret prefers arcasHLA over kallisto.
+ * against AB00-000000 until interpret prefers arcasHLA over kallisto.
  */
 import axios from 'axios';
 import chalk from 'chalk';

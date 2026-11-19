@@ -455,8 +455,8 @@ program
   .description('Mount a biosample as a consent-gated read-only filesystem')
   .addHelpText('after', `
 Examples:
-  biofs mount DNA_TN25-336147.vcf /mnt/study     mount one biosample (FUSE)
-  biofs mount TN25-336147 /mnt/study             the bare serial also resolves
+  biofs mount DNA_AB00-000000.vcf /mnt/study     mount one biosample (FUSE)
+  biofs mount AB00-000000 /mnt/study             the bare serial also resolves
   biofs mount ./my-files                         legacy: copy granted files here
 
 Every read is re-authorized server-side against the BioNFT consent grant on
@@ -2723,7 +2723,7 @@ const contextCmd = program
 
 contextCmd
   .command('create <caseId>')
-  .description('Build + EIP-712 sign a .bionft manifest for a caseId (e.g. TN25-336147)')
+  .description('Build + EIP-712 sign a .bionft manifest for a caseId (e.g. AB00-000000)')
   .option('--kind <string>', 'Manifest kind', 'CancerDigitalTwin')
   .option('--pil <n>', 'BioPIL license id (1-9)', '5')
   .option('--commercial', 'Commercial use permitted')
@@ -3950,7 +3950,7 @@ program
   .description('Register an externally-produced OpenCRAVAT annotation sqlite into bioroutes.inventory (v3.8.0 endpoint; the path may be local or a gs:// object, which is hashed by stream with no local copy)')
   .requiredOption('--sample-serial <serial>', 'Biosample serial identifier (14-digit or lab-case-id form)')
   .option('--owner-wallet <addr>', 'Override owner biowallet (default: from `biofs login`)')
-  .option('--case-id <id>', 'Optional lab case identifier (e.g., TN25-336147)')
+  .option('--case-id <id>', 'Optional lab case identifier (e.g., AB00-000000)')
   .option('--gcs-uri <uri>', 'Optional GCS URI if the sqlite is also stored in GCS')
   .option('--originlab <name>', 'Source lab name (e.g., caris, augenomics, genobank)', 'genobank')
   .option('--api-base <url>', 'GenoBank API base (default https://genobank.app)')
