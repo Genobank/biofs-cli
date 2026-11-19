@@ -9,6 +9,7 @@
  * A thin client: biofs-node (POST /agent/inventory_register) checks the signer is a node operator, reads both tables and writes only what it validates.
  */
 import axios from 'axios';
+import type { Command } from 'commander';
 import chalk from 'chalk';
 import { getCredentials } from '../../lib/auth/credentials';
 import { nodeErrorMessage } from '../../lib/utils/node_roles';
@@ -16,6 +17,20 @@ import { nodeErrorMessage } from '../../lib/utils/node_roles';
 const BIOFS_NODE_BASE = process.env.BIOFS_NODE_URL
   || `${process.env.GENOBANK_API_URL || 'https://genobank.app'}/api_biofs_node`;
 const BIOCID_RE = /^biocid:\/\/[A-Za-z0-9_-]+\/0x[0-9a-fA-F]{40}\/[A-Za-z0-9_-]+\/\S+$/;
+
+// --object is a repeatable single-value option (not variadic), so a biocid written after it is never swallowed as an object path.
+export function collectObject(value: string, previous: string[] = []): string[] { return [...previous, value]; }
+
+export function addInventoryRegisterOptions(cmd: Command): Command {
+  return cmd
+    .option('--object <bucket/path>', 'Select an inventory row that has no biocid by its storage location (bucket/path or gs://bucket/path), repeat for more rows; the node mints its biocid from the row owner, the vendor folder, the type and a path hash, and writes it back to the row', collectObject, [] as string[])
+    .option('--lab <name>', 'With one --object: the lab segment of the minted biocid; must equal the labs/<lab>/ folder of the path or the row originlab')
+    .option('--serial <id>', 'With one --object: the sample serial; must agree with the casefiles/<serial>/ folder and with any serial the row already has')
+    .option('--type <type>', 'With --object: fastq, bam, cram, vcf, gvcf or sqlite; must agree with the row file type and the file name')
+    .requiredOption('--attest <text>', 'The basis on which GenoBank.io holds and uses these files (at least 20 characters, recorded with the rows)')
+    .option('--yes', 'Write the rows (default is a dry run that writes nothing)')
+    .option('--json', 'Emit JSON');
+}
 
 export interface InventoryRegisterOptions {
   attest: string;
@@ -39,6 +54,7 @@ export function buildInventoryRegisterBody(biocids: string[], options: Inventory
   if (!biocids.length && !objectArgs.length) throw new Error('give at least one biocid or --object');
   for (const b of biocids) if (!BIOCID_RE.test(b)) throw new Error(`not a biocid (a gs:// path, URL or file name is never accepted here; use --object to select an inventory row that has no biocid): ${b}`);
   if (!objectArgs.length && (options.lab || options.serial || options.type)) throw new Error('--lab, --serial and --type apply to --object rows only');
+  if (objectArgs.length > 1 && (options.lab || options.serial)) throw new Error('--lab and --serial apply to one --object; run one invocation per file when you override them (a serial given for several files would be written to all of them)');
   const attestation = String(options.attest || '').replace(/\s+/g, ' ').trim();
   if (attestation.length < 20) throw new Error('--attest needs at least 20 characters: the basis on which GenoBank.io holds and uses these files');
   const objects = objectArgs.map((a) => {
@@ -63,7 +79,7 @@ export async function inventoryRegisterCommand(biocids: string[], options: Inven
   console.log(chalk.bold(d.dry_run ? 'Dry run: nothing was written. Add --yes to register.' : 'Registered.'));
   for (const x of d.registered || []) console.log(chalk.green(`  ${d.dry_run ? 'would register' : 'registered'}  ${x.biocid}  owner ${x.owner_wallet}  ${x.file_size} bytes`));
   for (const x of d.exists || []) console.log(chalk.gray(`  already registered  ${x}`));
-  for (const x of d.minted || []) console.log(chalk.cyan(`  ${d.dry_run ? 'would mint' : 'minted'}  ${x.biocid}  serial ${x.sample_serial || 'none'}  from ${x.object}`));
+  for (const x of d.minted || []) console.log(chalk.cyan(`  ${d.dry_run ? 'would mint' : 'minted'}  ${x.biocid}  serial ${x.sample_serial || 'none'} (${x.serial_source || 'n/a'})  owner state ${x.owner_state || 'n/a'}  from ${x.object}`));
   for (const x of d.errors || []) console.log(chalk.red(`  refused  ${x.biocid || x.object}: ${x.reason}`));
   if ((d.errors || []).length) process.exitCode = 1;
 }

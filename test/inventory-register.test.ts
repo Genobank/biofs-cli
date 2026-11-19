@@ -1,4 +1,5 @@
-import { buildInventoryRegisterBody, parseObjectArg } from '../src/commands/inventory-register';
+import { Command } from 'commander';
+import { buildInventoryRegisterBody, parseObjectArg, addInventoryRegisterOptions, collectObject } from '../src/commands/inventory-register';
 
 const W = '0x01a2d260d2fe8cc13ae70b6868deb4f3ddcdb797';
 const B1 = `biocid://augenomics/${W}/fastq/0d5ce2bc7767/S1_R1.fastq.gz`;
@@ -22,9 +23,8 @@ describe('inventory-register body', () => {
 describe('inventory-register --object (rows that have no biocid yet)', () => {
   const T = 'genobank-vault/labs/natera/casefiles/30000001/00000000-0000-7000-8000-000000000001.bam';
   it('selects rows by bucket and object path and sends them with the overrides', () => {
-    const b: any = buildInventoryRegisterBody([], { attest: ATT, object: [T, `gs://${T}`], lab: 'natera', serial: '30000001', type: 'bam' });
+    const b: any = buildInventoryRegisterBody([], { attest: ATT, object: [`gs://${T}`], lab: 'natera', serial: '30000001', type: 'bam' });
     expect(b.objects).toEqual([
-      { bucket: 'genobank-vault', object: 'labs/natera/casefiles/30000001/00000000-0000-7000-8000-000000000001.bam', lab: 'natera', serial: '30000001', type: 'bam' },
       { bucket: 'genobank-vault', object: 'labs/natera/casefiles/30000001/00000000-0000-7000-8000-000000000001.bam', lab: 'natera', serial: '30000001', type: 'bam' },
     ]);
     expect(b.dry_run).toBe(true);
@@ -40,5 +40,22 @@ describe('inventory-register --object (rows that have no biocid yet)', () => {
     expect(() => parseObjectArg('x.bam')).toThrow(/not a bucket\/object path/);
     expect(() => parseObjectArg('genobank-vault//x.bam')).toThrow(/not a bucket\/object path/);
     expect(() => buildInventoryRegisterBody([B1], { attest: ATT, lab: 'natera' })).toThrow(/--object rows only/);
+  });
+  it('refuses one --serial or --lab for several --object rows, and accepts several rows without overrides', () => {
+    const N = 'genobank-vault/labs/natera/casefiles/30000001/normal.bam';
+    expect(() => buildInventoryRegisterBody([], { attest: ATT, object: [T, N], serial: '30000001' })).toThrow(/one --object/);
+    expect(() => buildInventoryRegisterBody([], { attest: ATT, object: [T, N], lab: 'natera' })).toThrow(/one --object/);
+    const b: any = buildInventoryRegisterBody([], { attest: ATT, object: [T, N] });
+    expect(b.objects).toHaveLength(2);
+    expect(b.objects[0]).not.toHaveProperty('serial');
+  });
+  it('parses --object as a repeatable single-value option: a biocid after it is not swallowed as an object path', () => {
+    const cmd = addInventoryRegisterOptions(new Command('inventory-register').argument('[biocids...]'));
+    let got: any = null;
+    cmd.action((biocids: string[], options: any) => { got = { biocids, options }; });
+    cmd.parse(['node', 'x', '--object', T, '--object', 'genobank-vault/labs/natera/casefiles/30000001/normal.bam', B1, '--attest', ATT]);
+    expect(got.biocids).toEqual([B1]);
+    expect(got.options.object).toEqual([T, 'genobank-vault/labs/natera/casefiles/30000001/normal.bam']);
+    expect(collectObject('b', ['a'])).toEqual(['a', 'b']);
   });
 });
