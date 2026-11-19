@@ -1,3 +1,7 @@
+# v3.24.0 — frozen pbrun templates, catalog capture kits, reference-index design mode, library-profile
+
+`biofs pbrun templates` lists the frozen biofs-node templates (germline_wes_v1, germline_wgs_v1) and `biofs pbrun template` requests one with only the per-run fields (FASTQ pairs, sample, library, kit, output stem, owner). The pbrun catalog (sha256 2e6fa14b29d7) carries the governed validation of germline_wes_v1 and catalog capture kits of hg38_noalt (Twist Comprehensive Exome, Twist Exome 2.0) outside the template bodies, so the template sha256 does not change; `--kit` takes a frozen kit or a catalog kit of the template's reference. `biofs reference-index submit --mode design` fetches vendor capture designs pinned by sha256. `biofs library-profile submit|status` reports what the reads of a library say about how it was sequenced (read length, instrument and flowcell from the read names, index sequences, pair consistency). Requires biofs-node with catalog 2e6fa14b29d7.
+
 # v3.23.1 — lab case identifiers removed from the package
 
 Help text, source comments, tests and documentation no longer carry lab case identifiers; examples use neutral placeholder ids. No behavior change from 3.23.0.
