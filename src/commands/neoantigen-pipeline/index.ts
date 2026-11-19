@@ -463,6 +463,7 @@ async function submit(kind: Kind, body: Record<string, unknown>, headers: Record
     }
     return;
   }
+  console.error(`${ROUTE[kind].id}=${id} status=${r.data.status} (waiting; also: biofs ${ROUTE[kind].verb} status ${id})`);       // stderr: the id is known before the wait, --json stdout stays one document
   await waitFor(kind, id, headers, opts.json);
 }
 

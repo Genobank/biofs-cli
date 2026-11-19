@@ -8,7 +8,7 @@ const W = '0x5f5a60EaEf242c0D51A21c703f520347b96Ed19a';
 const bc = (type: string, name: string) => `biocid://genobank/${W}/${type}/${name}`;
 const SIG = '0xsig';
 const NODE_REGISTRY = path.join(__dirname, '..', '..', 'biofs-node-sync-20261107', 'repo', 'neoantigen', 'pbrun_registry.json');
-const EXPECTED_SHA = 'dd4b796f3e12d121509a6e17d4458c33d4be50128ec963cc2485229c6f099fb2';     // 18 November 2026: frozen run templates germline_wes_v1 and germline_wgs_v1 operated by biofs-node
+const EXPECTED_SHA = 'f79d12edf88e38ab812345551a1b3443687d0e545f0130ea98fe4e5459e2ea90';     // 19 November 2026: template_validation (germline_wes_v1 governed_run_passed), template bodies unchanged
 
 function program(): Command {
   const p = new Command();

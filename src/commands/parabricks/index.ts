@@ -25,7 +25,7 @@ import { jobLogCommand } from '../job-view';
 export interface PbrunFlag { class: 'in' | 'out' | 'pass' | 'engine' | 'unsupported'; nargs: number | '*' | null; repeatable: boolean; required: boolean; group: string; metavar: string; aliases: string[]; desc: string; kind?: string; optional?: boolean; needs?: string[]; reason?: string; biodata_type?: string; shape?: string }
 export interface PbrunTool { family: string; main: string | null; fastq: boolean; align: boolean; somatic_fastq: boolean; index_only: boolean; category: string; doc_sha256: string; validation: { status: string; record: string | null }; flags: Record<string, PbrunFlag> }
 export interface PbrunTemplate { assay: string; tool: string; status: string; frozen: string; image: string; image_digest: string; reference: string; inputs: Record<string, string[]>; kit_flag: string | null; kits: Record<string, string>; flags: Record<string, unknown>; outputs: string[]; platform: string; rg_id: string }
-export interface PbrunRegistry { schema: string; docs_version: string; image_version: string; references: Record<string, any>; refdirs: Record<string, any>; already_a_verb: Record<string, string>; tools: Record<string, PbrunTool>; templates?: Record<string, PbrunTemplate>; template_sha256?: Record<string, string> }
+export interface PbrunRegistry { schema: string; docs_version: string; image_version: string; references: Record<string, any>; refdirs: Record<string, any>; already_a_verb: Record<string, string>; tools: Record<string, PbrunTool>; templates?: Record<string, PbrunTemplate>; template_sha256?: Record<string, string>; template_validation?: Record<string, { status: string; date: string | null; evidence: string | null }> }
 
 export const registry = registryJson as unknown as PbrunRegistry;
 export const REGISTRY_SHA256: string = crypto.createHash('sha256').update(fs.readFileSync(require.resolve('./registry.json'))).digest('hex');
@@ -273,9 +273,9 @@ export function registerParabricksCommands(program: Command): void {
     .option('--json', 'Emit JSON')
     .action((o: { json?: boolean }) => {
       const ts = registry.templates || {};
-      if (o.json) { console.log(JSON.stringify({ registry_sha256: REGISTRY_SHA256, templates: ts, template_sha256: registry.template_sha256 || {} }, null, 2)); return; }
+      if (o.json) { console.log(JSON.stringify({ registry_sha256: REGISTRY_SHA256, templates: ts, template_sha256: registry.template_sha256 || {}, template_validation: registry.template_validation || {} }, null, 2)); return; }
       for (const [id, t] of Object.entries(ts)) {
-        console.log(`${chalk.cyan(id.padEnd(18))} ${t.assay.padEnd(4)} ${t.tool.padEnd(22)} ${t.status.padEnd(18)} kits: ${Object.keys(t.kits).join(', ') || '-'}  sha ${((registry.template_sha256 || {})[id] || '').slice(0, 12)}`);
+        console.log(`${chalk.cyan(id.padEnd(18))} ${t.assay.padEnd(4)} ${t.tool.padEnd(22)} ${(((registry.template_validation || {})[id] || {}).status || t.status).padEnd(20)} kits: ${Object.keys(t.kits).join(', ') || '-'}  sha ${((registry.template_sha256 || {})[id] || '').slice(0, 12)}`);
         console.log(chalk.gray(`  ${t.image}@${t.image_digest.slice(0, 19)}  flags ${Object.entries(t.flags).map(([f, v]) => (v === true ? f : `${f} ${v}`)).join(' ')}`));
       }
     });
