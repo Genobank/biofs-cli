@@ -157,6 +157,7 @@ import { hifiAlignExecCommand, HifiAlignExecOptions } from './commands/hifi-alig
 import { registerDerivedGcsCommand, readDerivedCommand, RegisterDerivedGcsOptions } from './commands/register-derived';
 import { registerParabricksCommands } from './commands/parabricks';
 import { inventoryRegisterCommand } from './commands/inventory-register';
+import { nodeReleasePlan, nodeReleaseSubmit, nodeReleaseStatus } from './commands/node-release';
 import { referenceRegisterCommand } from './commands/reference-register';
 import { alphagenomeSubmitCommand, AlphaGenomeOptions } from './commands/alphagenome';
 import { inventoryDelegateCommand, DelegateOptions } from './commands/inventory-delegate';
@@ -5039,6 +5040,33 @@ program
   .option('--json', 'Emit JSON')
   .action(async (biocids: string[], options: { attest: string; yes?: boolean; json?: boolean }) => {
     try { await inventoryRegisterCommand(biocids, options); } catch (e: any) { console.error(chalk.red(e.message)); process.exit(1); }
+  });
+
+const nodeReleaseCmd = program
+  .command('node-release')
+  .description('NODE OPERATOR: governed code releases of biofs-node and its worker agents: a manifest signed by a node admin key, checked on every host, installed one host at a time by each host\'s root applier, sealed and anchored');
+nodeReleaseCmd
+  .command('plan <spec>')
+  .description('Build the release manifest from a spec (hosts, roots, services, files with the SHA-256 each replaces and the local file of its new bytes) and print it with its SHA-256')
+  .option('--json', 'Emit JSON')
+  .action(async (spec: string, options: { json?: boolean }) => {
+    try { await nodeReleasePlan(spec, options); } catch (e: any) { console.error(chalk.red(e.message)); process.exit(1); }
+  });
+nodeReleaseCmd
+  .command('submit <spec>')
+  .description('Sign the release with a node admin key and send it to biofs-node (dry run unless --yes)')
+  .requiredOption('--key-file <path>', 'File holding the node admin private key (kept on this machine; only the signature is sent)')
+  .option('--yes', 'Send the release (default is a dry run that prints the signed plan and sends nothing)')
+  .option('--json', 'Emit JSON')
+  .action(async (spec: string, options: { keyFile: string; yes?: boolean; json?: boolean }) => {
+    try { await nodeReleaseSubmit(spec, options); } catch (e: any) { console.error(chalk.red(e.message)); process.exit(1); }
+  });
+nodeReleaseCmd
+  .command('status <releaseId>')
+  .description('Show a release: its state, each host\'s check and install result, and its seal')
+  .option('--json', 'Emit JSON')
+  .action(async (releaseId: string, options: { json?: boolean }) => {
+    try { await nodeReleaseStatus(releaseId, options); } catch (e: any) { console.error(chalk.red(e.message)); process.exit(1); }
   });
 
 program
