@@ -1,4 +1,4 @@
-import { buildAcmgBody, buildRefIndexBody, buildVcfCompareBody, HPO_RELEASES } from '../src/commands/neoantigen-pipeline';
+import { buildAcmgBody, buildRefIndexBody, buildVcfCompareBody, buildLibraryProfileBody, HPO_RELEASES } from '../src/commands/neoantigen-pipeline';
 
 const W = '0x5f5a60EaEf242c0D51A21c703f520347b96Ed19a';
 const OWNER = '0x01a2D260d2fE8cc13AE70b6868dEB4F3DdCDb797';
@@ -159,5 +159,39 @@ describe('acmg-triage --list-all', () => {
   it('is off by default and sends list_all only when asked', () => {
     expect(buildAcmgBody('AD3', o, W, 's').list_all).toBeUndefined();
     expect(buildAcmgBody('AD3', { ...o, listAll: true }, W, 's').list_all).toBe(true);
+  });
+});
+
+describe('reference-index --mode design (19 November 2026)', () => {
+  const H = 'c'.repeat(64);
+  const W = '0x' + '1'.repeat(40);
+  it('takes only the pinned vendor design names', () => {
+    const b = buildRefIndexBody('REFNOALT', { reference: 'hg38_noalt', codeSha256: H, mode: 'design', sources: ['twist_comprehensive_exome,twist_exome_v2'] }, W, '0xsig');
+    expect(b.mode).toBe('design');
+    expect(b.sources).toEqual(['twist_comprehensive_exome', 'twist_exome_v2']);
+    expect(() => buildRefIndexBody('x', { reference: 'hg38_noalt', codeSha256: H, mode: 'design', sources: ['agilent_v8_regions'] }, W, 's')).toThrow(/twist_exome_v2/);
+    expect(() => buildRefIndexBody('x', { reference: 'hg38_noalt', codeSha256: H, mode: 'design', sources: ['https://www.twistbioscience.com/x.bed'] }, W, 's')).toThrow();
+    expect(() => buildRefIndexBody('x', { reference: 'hg38_noalt', codeSha256: H, mode: 'other', sources: ['twist_exome_v2'] }, W, 's')).toThrow(/design/);
+  });
+});
+
+describe('library-profile', () => {
+  const H = 'd'.repeat(64);
+  const W = '0x' + '1'.repeat(40);
+  const OWNER = '0x' + 'b'.repeat(40);
+  const F = (n: number) => `biocid://lab/0x${'a'.repeat(40)}/fastq/x${n}/S_R${n % 2 ? 1 : 2}.fastq.gz`;
+  it('carries the FASTQs by biocid, pairs by default, 10000 records by default, the code pin, a worker and the owner', () => {
+    const b = buildLibraryProfileBody('LIBPROF1', { fastq: [F(1), F(2)], codeSha256: H, owner: OWNER }, W, '0xsig');
+    expect(b).toEqual({ wallet: OWNER, signature: '0xsig', case_id: 'LIBPROF1', fastq_biocids: [F(1), F(2)], paired: true, records: 10000, code_sha256: H, executor: 'worker' });
+    expect(buildLibraryProfileBody('L', { fastq: [`${F(1)},${F(2)}`, F(3), F(4)], records: '2000', codeSha256: H }, W, 's').fastq_biocids).toHaveLength(4);
+    expect(buildLibraryProfileBody('L', { fastq: [F(1)], single: true, codeSha256: H }, W, 's').paired).toBe(false);
+  });
+  it('refuses an odd count when paired, a path, a repeat, a person name as case, records out of range, no code pin', () => {
+    expect(() => buildLibraryProfileBody('L', { fastq: [F(1)], codeSha256: H }, W, 's')).toThrow(/even number/);
+    expect(() => buildLibraryProfileBody('L', { fastq: ['gs://b/x_R1.fastq.gz', F(2)], codeSha256: H }, W, 's')).toThrow(/not a biocid/);
+    expect(() => buildLibraryProfileBody('L', { fastq: [F(1), F(1)], codeSha256: H }, W, 's')).toThrow(/distinct/);
+    expect(() => buildLibraryProfileBody('Maria Lopez', { fastq: [F(1), F(2)], codeSha256: H }, W, 's')).toThrow(/case identifier/);
+    expect(() => buildLibraryProfileBody('L', { fastq: [F(1), F(2)], records: '99', codeSha256: H }, W, 's')).toThrow(/records/);
+    expect(() => buildLibraryProfileBody('L', { fastq: [F(1), F(2)], codeSha256: 'abc' }, W, 's')).toThrow();
   });
 });

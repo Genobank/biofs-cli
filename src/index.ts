@@ -162,7 +162,7 @@ import { alphagenomeSubmitCommand, AlphaGenomeOptions } from './commands/alphage
 import { inventoryDelegateCommand, DelegateOptions } from './commands/inventory-delegate';
 import { jobsCommand, jobLogCommand, JobsOptions, JobLogOptions } from './commands/job-view';
 import { inventoryListCommand, InventoryListOptions } from './commands/inventory-list';
-import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, captureSubmitCommand, CaptureOptions, acmgSubmitCommand, AcmgOptions, refIndexSubmitCommand, RefIndexOptions, twinClassifySubmitCommand, TwinOptions, vcfCompareSubmitCommand, VcfCompareOptions, windowsSubmitCommand, WindowsOptions, rescoreSubmitCommand, RescoreOptions, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
+import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, captureSubmitCommand, CaptureOptions, acmgSubmitCommand, AcmgOptions, refIndexSubmitCommand, RefIndexOptions, libraryProfileSubmitCommand, LibraryProfileOptions, twinClassifySubmitCommand, TwinOptions, vcfCompareSubmitCommand, VcfCompareOptions, windowsSubmitCommand, WindowsOptions, rescoreSubmitCommand, RescoreOptions, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { neoantigenFabricateCommand, NeoantigenFabricateOptions } from './commands/neoantigen/fabricate';
 import { neoantigenStatusCommand as neoantigenSomaticStatusCommand } from './commands/neoantigen/status';
@@ -5261,8 +5261,8 @@ refIndexCmd
   .description('Submit the build; the worker checks the FASTA against its recorded MD5, builds fai, dict and index with bwa 0.7.17, proves the index with reference substrings, then uploads and reads back')
   .requiredOption('--reference <name>', 'Catalog reference: hg38_noalt')
   .requiredOption('--code-sha256 <hex>', 'SHA-256 of refindex.py as pinned; the worker refuses any other code')
-  .option('--mode <mode>', 'index (default: BWA index and dictionary), known_sites (copies of the catalog known-sites VCFs restricted to the reference\'s contigs, checked record by record) or intervals (copies of the catalog capture designs restricted to the reference\'s contigs, checked line by line)')
-  .option('--sources <names...>', 'For --mode known_sites: dbsnp138, known_indels, mills_1000g. For --mode intervals: agilent_v8_regions')
+  .option('--mode <mode>', 'index (default: BWA index and dictionary), known_sites (copies of the catalog known-sites VCFs restricted to the reference\'s contigs, checked record by record), intervals (copies of the catalog capture designs restricted to the reference\'s contigs, checked line by line) or design (vendor capture designs fetched from their publisher, pinned by sha256, restricted to the reference\'s contigs)')
+  .option('--sources <names...>', 'For --mode known_sites: dbsnp138, known_indels, mills_1000g. For --mode intervals: agilent_v8_regions. For --mode design: twist_comprehensive_exome, twist_comprehensive_exome_ucsc2021, twist_exome_v2')
   .option('--owner <biowallet>', 'Owner biowallet of the report (default: the signer)')
   .option('--wait', 'Poll until the job finishes')
   .option('--json', 'Emit JSON')
@@ -5273,6 +5273,27 @@ refIndexCmd
   .option('--wait', 'Poll until done or failed')
   .option('--json', 'Emit JSON')
   .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('refindex' as any, id, options); });
+
+const libProfileCmd = program
+  .command('library-profile')
+  .description('What the reads of one library say about how it was sequenced (read lengths, instrument, flowcell and lane from the read names, index sequences, quality range, pair order), read on a CPU worker through biofs-node; it never names the capture kit');
+libProfileCmd
+  .command('submit <caseId>')
+  .description('Submit the profile: the worker reads the first N records of each FASTQ in file order, after a known-answer self test')
+  .requiredOption('--fastq <biocids...>', 'The FASTQs of one library by biocid: R1 then R2 of each pair (lanes of the library in order)')
+  .option('--single', 'The FASTQs are not pairs')
+  .option('--records <n>', 'Records read from the start of each file (default 10000, 100 to 200000)')
+  .requiredOption('--code-sha256 <hex>', 'SHA-256 of library_profile.py as pinned; the worker refuses any other code')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: LibraryProfileOptions) => { await libraryProfileSubmitCommand(caseId, options); });
+libProfileCmd
+  .command('status <job>')
+  .description('Show a library-profile job')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('library_profile' as any, id, options); });
 
 const twinCmd = program
   .command('twin')

@@ -2,13 +2,13 @@ import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { registry, REGISTRY_SHA256, buildParabricksBody, registerParabricksCommands, PbrunRaw, buildTemplateBody } from '../src/commands/parabricks';
+import { registry, REGISTRY_SHA256, buildParabricksBody, registerParabricksCommands, PbrunRaw, buildTemplateBody, templateKits } from '../src/commands/parabricks';
 
 const W = '0x5f5a60EaEf242c0D51A21c703f520347b96Ed19a';
 const bc = (type: string, name: string) => `biocid://genobank/${W}/${type}/${name}`;
 const SIG = '0xsig';
 const NODE_REGISTRY = path.join(__dirname, '..', '..', 'biofs-node-sync-20261107', 'repo', 'neoantigen', 'pbrun_registry.json');
-const EXPECTED_SHA = 'f79d12edf88e38ab812345551a1b3443687d0e545f0130ea98fe4e5459e2ea90';     // 19 November 2026: template_validation (germline_wes_v1 governed_run_passed), template bodies unchanged
+const EXPECTED_SHA = '2e6fa14b29d725ea7a6a19b98906f61b3f2cac0d5fe531da5b4b93c859aeac4c';     // 19 November 2026: capture_kits of hg38_noalt (Twist Comprehensive Exome, Twist Exome 2.0) outside the template bodies, template sha256 unchanged
 
 function program(): Command {
   const p = new Command();
@@ -275,6 +275,15 @@ describe('pbrun template: the node operates a frozen template; the CLI sends onl
     expect(() => buildTemplateBody('germline_wes_v1', 'C1', { ...raw, inFq: ['gs://b/R1.fastq.gz', 'gs://b/R2.fastq.gz'] }, W, SIG)).toThrow(/not a biocid/);
     expect(() => buildTemplateBody('germline_wes_v1', 'Maria Lopez', raw, W, SIG)).toThrow(/case identifier/);
     expect(() => buildTemplateBody('germline_wes_v1', 'C1', { ...raw, libraryPerPair: ['A', 'B'] }, W, SIG)).toThrow(/library-per-pair/);
+  });
+  it('a catalog capture kit of the template\'s reference is accepted by name; the template body and its sha256 do not change', () => {
+    const b = buildTemplateBody('germline_wes_v1', 'C1', { ...raw, kit: 'twist_comprehensive_exome' }, W, SIG);
+    expect(b.kit).toBe('twist_comprehensive_exome');
+    expect(Object.keys(templateKits(registry.templates!.germline_wes_v1)).sort()).toEqual(['agilent_v8', 'twist_comprehensive_exome', 'twist_exome_v2']);
+    expect(templateKits(registry.templates!.germline_wes_v1).twist_exome_v2).toBe((registry as any).capture_kits.hg38_noalt.twist_exome_v2);
+    expect(() => buildTemplateBody('germline_wes_v1', 'C1', { ...raw, kit: 'twist_core_exome' }, W, SIG)).toThrow(/twist_comprehensive_exome/);
+    expect(() => buildTemplateBody('germline_wgs_v1', 'C1', { ...raw, kit: 'twist_exome_v2' }, W, SIG)).toThrow(/no capture kit/);
+    expect(registry.template_sha256!.germline_wes_v1).toBe('ec77f5814e0a141aaace41acc26e44a6fb325b9abcb15148111920ef02c3e84b');
   });
   it('the catalog this CLI carries holds the two frozen templates with their pins', () => {
     expect(Object.keys(registry.templates || {}).sort()).toEqual(['germline_wes_v1', 'germline_wgs_v1']);

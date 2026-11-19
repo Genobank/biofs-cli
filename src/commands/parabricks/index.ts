@@ -25,7 +25,7 @@ import { jobLogCommand } from '../job-view';
 export interface PbrunFlag { class: 'in' | 'out' | 'pass' | 'engine' | 'unsupported'; nargs: number | '*' | null; repeatable: boolean; required: boolean; group: string; metavar: string; aliases: string[]; desc: string; kind?: string; optional?: boolean; needs?: string[]; reason?: string; biodata_type?: string; shape?: string }
 export interface PbrunTool { family: string; main: string | null; fastq: boolean; align: boolean; somatic_fastq: boolean; index_only: boolean; category: string; doc_sha256: string; validation: { status: string; record: string | null }; flags: Record<string, PbrunFlag> }
 export interface PbrunTemplate { assay: string; tool: string; status: string; frozen: string; image: string; image_digest: string; reference: string; inputs: Record<string, string[]>; kit_flag: string | null; kits: Record<string, string>; flags: Record<string, unknown>; outputs: string[]; platform: string; rg_id: string }
-export interface PbrunRegistry { schema: string; docs_version: string; image_version: string; references: Record<string, any>; refdirs: Record<string, any>; already_a_verb: Record<string, string>; tools: Record<string, PbrunTool>; templates?: Record<string, PbrunTemplate>; template_sha256?: Record<string, string>; template_validation?: Record<string, { status: string; date: string | null; evidence: string | null }> }
+export interface PbrunRegistry { schema: string; docs_version: string; image_version: string; references: Record<string, any>; refdirs: Record<string, any>; already_a_verb: Record<string, string>; tools: Record<string, PbrunTool>; templates?: Record<string, PbrunTemplate>; template_sha256?: Record<string, string>; template_validation?: Record<string, { status: string; date: string | null; evidence: string | null }>; capture_kits?: Record<string, Record<string, string>> }
 
 export const registry = registryJson as unknown as PbrunRegistry;
 export const REGISTRY_SHA256: string = crypto.createHash('sha256').update(fs.readFileSync(require.resolve('./registry.json'))).digest('hex');
@@ -218,6 +218,12 @@ export function rawFromCommand(cmd: Command, meta: PbrunTool): PbrunRaw {
 // read-group form. This verb sends only the per-run fields; the node expands them from its catalog and the worker re-checks the expansion against its own copy.
 export interface TemplateRaw { inFq: string[]; sampleName: string; library: string; libraryPerPair?: string[]; kit?: string; outName: string; owner?: string; wait?: boolean; json?: boolean; check?: boolean }
 
+/** The capture kits a template accepts: its own (the frozen kit) and the catalog's capture_kits of its reference (19 November 2026), as the node's templateKits. */
+export function templateKits(t: PbrunTemplate, reg: PbrunRegistry = registry): Record<string, string> {
+  const key = Object.keys(reg.references || {}).find((k) => String((reg.references[k] || {}).biocid || '').toLowerCase() === String(t.reference).toLowerCase());
+  return { ...((key && (reg.capture_kits || {})[key]) || {}), ...t.kits };
+}
+
 export function buildTemplateBody(templateId: string, caseId: string, raw: TemplateRaw, wallet: string, signature: string, reg: PbrunRegistry = registry, sha: string = REGISTRY_SHA256): Record<string, unknown> {
   const t = (reg.templates || {})[templateId];
   if (!t) throw new Error(`unknown template ${templateId} (${Object.keys(reg.templates || {}).sort().join(', ')}): see biofs pbrun templates`);
@@ -236,7 +242,8 @@ export function buildTemplateBody(templateId: string, caseId: string, raw: Templ
     body.pair_libraries = pl;
   }
   if (t.kit_flag !== null) {
-    if (!raw.kit || !(raw.kit in t.kits)) throw new Error(`${templateId} is a ${t.assay} template: --kit must be one of ${Object.keys(t.kits).sort().join(', ')}`);
+    const kits = templateKits(t, reg);
+    if (!raw.kit || !(raw.kit in kits)) throw new Error(`${templateId} is a ${t.assay} template: --kit must be one of ${Object.keys(kits).sort().join(', ')}`);
     body.kit = raw.kit;
   } else if (raw.kit) throw new Error(`${templateId} is a ${t.assay} template: it takes no capture kit`);
   return body;
@@ -273,9 +280,9 @@ export function registerParabricksCommands(program: Command): void {
     .option('--json', 'Emit JSON')
     .action((o: { json?: boolean }) => {
       const ts = registry.templates || {};
-      if (o.json) { console.log(JSON.stringify({ registry_sha256: REGISTRY_SHA256, templates: ts, template_sha256: registry.template_sha256 || {}, template_validation: registry.template_validation || {} }, null, 2)); return; }
+      if (o.json) { console.log(JSON.stringify({ registry_sha256: REGISTRY_SHA256, templates: ts, template_sha256: registry.template_sha256 || {}, template_validation: registry.template_validation || {}, capture_kits: registry.capture_kits || {} }, null, 2)); return; }
       for (const [id, t] of Object.entries(ts)) {
-        console.log(`${chalk.cyan(id.padEnd(18))} ${t.assay.padEnd(4)} ${t.tool.padEnd(22)} ${(((registry.template_validation || {})[id] || {}).status || t.status).padEnd(20)} kits: ${Object.keys(t.kits).join(', ') || '-'}  sha ${((registry.template_sha256 || {})[id] || '').slice(0, 12)}`);
+        console.log(`${chalk.cyan(id.padEnd(18))} ${t.assay.padEnd(4)} ${t.tool.padEnd(22)} ${(((registry.template_validation || {})[id] || {}).status || t.status).padEnd(20)} kits: ${t.kit_flag === null ? '-' : Object.keys(templateKits(t)).join(', ')}  sha ${((registry.template_sha256 || {})[id] || '').slice(0, 12)}`);
         console.log(chalk.gray(`  ${t.image}@${t.image_digest.slice(0, 19)}  flags ${Object.entries(t.flags).map(([f, v]) => (v === true ? f : `${f} ${v}`)).join(' ')}`));
       }
     });
@@ -285,7 +292,7 @@ export function registerParabricksCommands(program: Command): void {
     .requiredOption('--sample-name <name>', 'Sample name (SM of every read group)')
     .requiredOption('--library <name>', 'Library name (LB; read-group ID and PU are <library>.<n>)')
     .option('--library-per-pair <names...>', 'One library name per FASTQ pair, when libraries are pooled')
-    .option('--kit <name>', 'Capture kit of a WES template (e.g. agilent_v8)')
+    .option('--kit <name>', 'Capture kit of a WES template: its frozen kit (agilent_v8) or a catalog kit of its reference (twist_comprehensive_exome, twist_exome_v2); see biofs pbrun templates')
     .requiredOption('--out-name <stem>', 'Stem of every output file name')
     .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
     .option('--check', 'Print the request and send nothing')

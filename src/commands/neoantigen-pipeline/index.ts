@@ -386,7 +386,7 @@ async function auth() {
   };
 }
 
-type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture' | 'windows' | 'rescore' | 'acmg' | 'refindex' | 'vcfcompare' | 'alphagenome' | 'twin';
+type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture' | 'windows' | 'rescore' | 'acmg' | 'refindex' | 'vcfcompare' | 'alphagenome' | 'twin' | 'library_profile';
 const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: string }> = {
   evidence: { post: 'neoantigen_evidence', status: 'neoantigen_evidence_status', id: 'neoantigen_job_id', verb: 'neoantigen-evidence' },
   design: { post: 'neoantigen_design', status: 'neoantigen_design_status', id: 'neoantigen_job_id', verb: 'neoantigen-design' },
@@ -406,6 +406,7 @@ const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: stri
   vcfcompare: { post: 'neoantigen_vcfcompare', status: 'neoantigen_vcfcompare_status', id: 'neoantigen_job_id', verb: 'vcf-compare' },
   alphagenome: { post: 'neoantigen_alphagenome', status: 'neoantigen_alphagenome_status', id: 'neoantigen_job_id', verb: 'alphagenome' },
   twin: { post: 'neoantigen_twin', status: 'neoantigen_twin_status', id: 'neoantigen_job_id', verb: 'twin' },
+  library_profile: { post: 'neoantigen_library_profile', status: 'neoantigen_library_profile_status', id: 'neoantigen_job_id', verb: 'library-profile' },
 };
 
 async function fetchStatus(kind: Kind, id: string, headers: Record<string, string>): Promise<any> {
@@ -846,9 +847,10 @@ export function buildRefIndexBody(caseId: string, o: RefIndexOptions, wallet: st
   if (o.mode && o.mode !== 'index') {
     // known_sites: copies of catalog known-sites VCFs restricted to the reference's contigs, checked record by record and written create-only beside the reference
     // intervals: copies of catalog capture designs (target Regions BEDs) restricted to the reference's contigs, checked line by line, written create-only beside the reference
-    const SOURCES: Record<string, string[]> = { known_sites: ['dbsnp138', 'known_indels', 'mills_1000g'], intervals: ['agilent_v8_regions'] };
+    // design (19 November 2026): vendor capture designs fetched from their publisher over https, pinned by sha256 and size, restricted to the reference's contigs, checked, written create-only
+    const SOURCES: Record<string, string[]> = { known_sites: ['dbsnp138', 'known_indels', 'mills_1000g'], intervals: ['agilent_v8_regions'], design: ['twist_comprehensive_exome', 'twist_comprehensive_exome_ucsc2021', 'twist_exome_v2'] };
     const known = SOURCES[String(o.mode)];
-    if (!known) throw new Error('--mode must be index (default), known_sites or intervals');
+    if (!known) throw new Error('--mode must be index (default), known_sites, intervals or design');
     const src = (o.sources || []).flatMap((x) => String(x).split(',')).map((x) => x.trim()).filter(Boolean);
     if (!src.length || src.some((x) => !known.includes(x)) || new Set(src).size !== src.length) throw new Error(`--sources must be distinct names of ${known.join(', ')}`);
     body.mode = String(o.mode);
@@ -863,6 +865,40 @@ export async function refIndexSubmitCommand(caseId: string, options: RefIndexOpt
     await submit('refindex', buildRefIndexBody(caseId, options, a.wallet, a.signature), a.headers, options);
   } catch (e: any) {
     Logger.error(`reference-index submit failed: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+export interface LibraryProfileOptions {
+  fastq: string[];
+  records?: string;
+  single?: boolean;
+  codeSha256: string;
+  owner?: string;
+  wait?: boolean;
+  json?: boolean;
+}
+
+/** What the reads of one library say about how it was sequenced: the first N records of each FASTQ (read lengths, Illumina read-name fields, index sequences, quality range, pair order).
+ *  Descriptive only: it never names the capture kit or the laboratory's protocol. Runs on a CPU worker through biofs-node. */
+export function buildLibraryProfileBody(caseId: string, o: LibraryProfileOptions, wallet: string, signature: string): Record<string, unknown> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
+  const fq = (o.fastq || []).flatMap((x) => String(x).split(',')).map((x) => x.trim()).filter(Boolean);
+  for (const b of fq) if (!BIOCID_RE.test(b)) throw new Error(`--fastq: ${b} is not a biocid (a gs:// path, URL or file name is never accepted)`);
+  if (fq.length < 1 || fq.length > 16 || new Set(fq.map((b) => b.toLowerCase())).size !== fq.length) throw new Error('--fastq takes 1 to 16 distinct FASTQ biocids');
+  const paired = o.single !== true;
+  if (paired && fq.length % 2) throw new Error('--fastq takes the two mates of each pair, R1 then R2 (an even number), or use --single');
+  const records = o.records === undefined ? 10000 : Number(o.records);
+  if (!Number.isInteger(records) || records < 100 || records > 200000) throw new Error('--records must be an integer from 100 to 200000');
+  return { wallet: ownerOr(o.owner, wallet), signature, case_id: caseId, fastq_biocids: fq, paired, records, code_sha256: parseSha256('--code-sha256', o.codeSha256), executor: 'worker' };
+}
+
+export async function libraryProfileSubmitCommand(caseId: string, options: LibraryProfileOptions): Promise<void> {
+  try {
+    const a = await auth();
+    await submit('library_profile', buildLibraryProfileBody(caseId, options, a.wallet, a.signature), a.headers, options);
+  } catch (e: any) {
+    Logger.error(`library-profile submit failed: ${e.message}`);
     process.exit(1);
   }
 }

@@ -6,6 +6,12 @@
   "gs://genobank-references/",
   "gs://deepvariant-fastq-to-vcf-genobank-app/reference/"
  ],
+ "capture_kits": {
+  "hg38_noalt": {
+   "twist_comprehensive_exome": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/target-intervals/Twist_Comprehensive_Exome_Covered_Targets_hg38.noalt.bed",
+   "twist_exome_v2": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/target-intervals/Twist_Exome_v2.0.2_Covered_Targets_hg38.noalt.bed"
+  }
+ },
  "docs_version": "4.8.0",
  "image_version": "4.8.0-1",
  "options_sha256": "db1f487096eab42d3c2185343bacc9deded521eeab904c42e215d56f5bb58a5e",
@@ -152,6 +158,36 @@
       "Mills_and_1000G_gold_standard.indels.hg38.noalt.vcf.gz.tbi": "XATJJRxIqW5H4daJ/RphYg=="
      },
      "object": "gs://deepvariant-fastq-to-vcf-genobank-app/reference/pacbio/human_GRCh38_no_alt_analysis_set/known_sites/Mills_and_1000G_gold_standard.indels.hg38.noalt.vcf.gz"
+    },
+    "twist_comprehensive_exome": {
+     "biocid": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/target-intervals/Twist_Comprehensive_Exome_Covered_Targets_hg38.noalt.bed",
+     "biodata_type": "target_intervals",
+     "file": "Twist_Comprehensive_Exome_Covered_Targets_hg38.noalt.bed",
+     "index": null,
+     "md5": {
+      "Twist_Comprehensive_Exome_Covered_Targets_hg38.noalt.bed": "/TpXxF0GDPV6vjxLU1vqHg=="
+     },
+     "object": "gs://deepvariant-fastq-to-vcf-genobank-app/reference/pacbio/human_GRCh38_no_alt_analysis_set/target_intervals/Twist_Comprehensive_Exome_Covered_Targets_hg38.noalt.bed"
+    },
+    "twist_comprehensive_exome_ucsc2021": {
+     "biocid": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/target-intervals/Twist_ComprehensiveExome_targets_hg38_ucsc2021.noalt.bed",
+     "biodata_type": "target_intervals",
+     "file": "Twist_ComprehensiveExome_targets_hg38_ucsc2021.noalt.bed",
+     "index": null,
+     "md5": {
+      "Twist_ComprehensiveExome_targets_hg38_ucsc2021.noalt.bed": "RAUGndUo4jb8mPvcg+NaZA=="
+     },
+     "object": "gs://deepvariant-fastq-to-vcf-genobank-app/reference/pacbio/human_GRCh38_no_alt_analysis_set/target_intervals/Twist_ComprehensiveExome_targets_hg38_ucsc2021.noalt.bed"
+    },
+    "twist_exome_v2": {
+     "biocid": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/target-intervals/Twist_Exome_v2.0.2_Covered_Targets_hg38.noalt.bed",
+     "biodata_type": "target_intervals",
+     "file": "Twist_Exome_v2.0.2_Covered_Targets_hg38.noalt.bed",
+     "index": null,
+     "md5": {
+      "Twist_Exome_v2.0.2_Covered_Targets_hg38.noalt.bed": "yDdzIc79pNnhRErKP7o2VQ=="
+     },
+     "object": "gs://deepvariant-fastq-to-vcf-genobank-app/reference/pacbio/human_GRCh38_no_alt_analysis_set/target_intervals/Twist_Exome_v2.0.2_Covered_Targets_hg38.noalt.bed"
     }
    },
    "biocid": "biocid://genobank/0xf54d5ea2eb0e93d46e8bd925e0104162b8737722/reference-genome/human_GRCh38_no_alt_analysis_set.fasta",
