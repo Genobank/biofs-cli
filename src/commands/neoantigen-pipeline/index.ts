@@ -916,7 +916,7 @@ export function buildRefIndexBody(caseId: string, o: RefIndexOptions, wallet: st
     // known_sites: copies of catalog known-sites VCFs restricted to the reference's contigs, checked record by record and written create-only beside the reference
     // intervals: copies of catalog capture designs (target Regions BEDs) restricted to the reference's contigs, checked line by line, written create-only beside the reference
     // design (19 November 2026): vendor capture designs fetched from their publisher over https, pinned by sha256 and size, restricted to the reference's contigs, checked, written create-only
-    const SOURCES: Record<string, string[]> = { known_sites: ['dbsnp138', 'known_indels', 'mills_1000g'], intervals: ['agilent_v8_regions'], design: ['twist_comprehensive_exome', 'twist_comprehensive_exome_ucsc2021', 'twist_exome_v2'] };
+    const SOURCES: Record<string, string[]> = { known_sites: ['dbsnp138', 'known_indels', 'mills_1000g', 'gnomad_af_only'], intervals: ['agilent_v8_regions'], design: ['twist_comprehensive_exome', 'twist_comprehensive_exome_ucsc2021', 'twist_exome_v2'] };
     const known = SOURCES[String(o.mode)];
     if (!known) throw new Error('--mode must be index (default), known_sites, intervals or design');
     const src = (o.sources || []).flatMap((x) => String(x).split(',')).map((x) => x.trim()).filter(Boolean);

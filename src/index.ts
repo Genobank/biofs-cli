@@ -5294,7 +5294,7 @@ refIndexCmd
   .requiredOption('--reference <name>', 'Catalog reference: hg38_noalt')
   .requiredOption('--code-sha256 <hex>', 'SHA-256 of refindex.py as pinned; the worker refuses any other code')
   .option('--mode <mode>', 'index (default: BWA index and dictionary), known_sites (copies of the catalog known-sites VCFs restricted to the reference\'s contigs, checked record by record), intervals (copies of the catalog capture designs restricted to the reference\'s contigs, checked line by line) or design (vendor capture designs fetched from their publisher, pinned by sha256, restricted to the reference\'s contigs)')
-  .option('--sources <names...>', 'For --mode known_sites: dbsnp138, known_indels, mills_1000g. For --mode intervals: agilent_v8_regions. For --mode design: twist_comprehensive_exome, twist_comprehensive_exome_ucsc2021, twist_exome_v2')
+  .option('--sources <names...>', 'For --mode known_sites: dbsnp138, known_indels, mills_1000g, gnomad_af_only (its AF values are also compared record by record). For --mode intervals: agilent_v8_regions. For --mode design: twist_comprehensive_exome, twist_comprehensive_exome_ucsc2021, twist_exome_v2')
   .option('--owner <biowallet>', 'Owner biowallet of the report (default: the signer)')
   .option('--wait', 'Poll until the job finishes')
   .option('--json', 'Emit JSON')
