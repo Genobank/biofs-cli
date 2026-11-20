@@ -200,6 +200,7 @@ import { pipelineRunWesCommand, PipelineRunWesOptions } from './commands/pipelin
 import { routeCheckCommand, routeHealCommand } from './commands/route';
 import { routeAnchorCommand, RouteAnchorOptions } from './commands/route/anchor';
 import { annotateStatusCommand, AnnotateStatusOptions } from './commands/annotate/status';
+import { annotateCancelCommand, AnnotateCancelOptions } from './commands/annotate/cancel';
 import { createX402Command } from './commands/x402';
 import { interpretSubmitCommand, InterpretSubmitOptions } from './commands/interpret/submit';
 import { interpretStatusCommand, InterpretStatusOptions } from './commands/interpret/status';
@@ -1491,6 +1492,20 @@ annotateCmd
       await annotateStatusCommand(jobId, options);
     } catch (error) {
       Logger.error(`Status check failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// annotate cancel - stop a running OpenCRAVAT annotation job (owner or node admin; the node also stops a stalled job by itself)
+annotateCmd
+  .command('cancel <job_id>')
+  .description('Stop a running OpenCRAVAT annotation job (the node checks that you own it); the job ends as failed with "cancelled by <wallet>"')
+  .option('--json', 'Output as JSON')
+  .action(async (jobId: string, options: AnnotateCancelOptions) => {
+    try {
+      await annotateCancelCommand(jobId, options);
+    } catch (error) {
+      Logger.error(`Cancel failed: ${error}`);
       process.exit(1);
     }
   });
