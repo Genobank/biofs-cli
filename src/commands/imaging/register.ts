@@ -29,6 +29,7 @@ import ora from 'ora';
 import axios from 'axios';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { getCredentials } from '../../lib/auth/credentials';
 import { Logger } from '../../lib/utils/logger';
@@ -206,7 +207,7 @@ export function imagingRegisterAdviseCommand(manifestPath: string, purpose?: str
     process.env.IMAGING_REGISTER_CONTRACT,
     path.resolve(__dirname, '../../../containers/imaging-register/frame_contract.py'),
     path.resolve(process.cwd(), 'containers/imaging-register/frame_contract.py'),
-    '/Users/danieluribe/Downloads/imaging-register-v23/frame_contract.py',
+    path.join(os.homedir(), 'Downloads', 'imaging-register-v23', 'frame_contract.py'),
   ].filter((p): p is string => !!p);
   const script = candidates.find((p) => fs.existsSync(p));
   if (!script) {
