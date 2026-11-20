@@ -39,6 +39,43 @@ function detectTool(filename: string): 'bcftools' | 'samtools' | 'seqkit' | null
   return null;
 }
 
+/**
+ * The tool argv for `biofs pipe`. When a region is asked for and the tool is bcftools, the region is also applied here as a
+ * streaming targets filter (`-t chr:start-end`): the htsget server may return the whole file for a region query (found
+ * 19 November 2026, a region read of a somatic VCF came back from chr1), and `-r` cannot be used on a stream with no index.
+ * samtools cannot filter an unindexed stream by region, so for reads the caller is told the region was not applied here.
+ */
+export function buildPipeArgs(
+  tool: 'bcftools' | 'samtools' | 'seqkit',
+  extra: string[],
+  region?: string,
+): { args: string[]; regionAppliedClientSide: boolean; regionNote?: string } {
+  const clean = (extra || []).filter((x) => x !== '--');
+  if (tool === 'seqkit') {
+    let args = clean.length ? clean : ['stats'];
+    if (args[0] === 'stats' || !clean.length) {
+      args = ['stats', '-'];
+    } else if (!args.includes('-')) {
+      args = [...args, '-'];
+    }
+    return { args, regionAppliedClientSide: false, regionNote: region ? 'region is ignored for FASTQ streams' : undefined };
+  }
+  if (region && tool === 'bcftools') {
+    const userTargets = clean.some((x) => x === '-t' || x === '--targets' || x === '-r' || x === '--regions' || x.startsWith('--targets=') || x.startsWith('--regions='));
+    if (userTargets) {
+      return { args: ['view', ...clean, '-'], regionAppliedClientSide: false, regionNote: 'region given and a -t/-r passed to bcftools; only the bcftools argument is applied here' };
+    }
+    return { args: ['view', '-t', region, ...clean, '-'], regionAppliedClientSide: true };
+  }
+  return {
+    args: ['view', ...clean, '-'],
+    regionAppliedClientSide: false,
+    regionNote: region && tool === 'samtools'
+      ? 'region forwarded to htsget only; samtools cannot filter an unindexed stream, so if the server returns the whole file every read is shown'
+      : undefined,
+  };
+}
+
 export async function pipeCommand(rawId: string, options: PipeOptions = {}): Promise<void> {
   try {
     const resolved = await resolveTele(rawId, {
@@ -59,20 +96,12 @@ export async function pipeCommand(rawId: string, options: PipeOptions = {}): Pro
     if (tool === 'samtools') requireTool('samtools', installHint('samtools'));
     if (tool === 'seqkit') requireTool('seqkit', installHint('seqkit'));
 
-    const extra = (options.extra || []).filter((x) => x !== '--');
-    let args: string[];
-    if (tool === 'seqkit') {
-      args = extra.length ? extra : ['stats'];
-      if (!args.includes('-') && args[0] !== 'stats') {
-        /* leave as-is */
-      }
-      if (args[0] === 'stats' || !extra.length) {
-        args = ['stats', '-'];
-      } else if (!args.includes('-')) {
-        args = [...args, '-'];
-      }
-    } else {
-      args = ['view', ...extra, '-'];
+    const built = buildPipeArgs(tool, options.extra || [], options.region);
+    const args = built.args;
+    if (built.regionAppliedClientSide && !options.quiet) {
+      process.stderr.write(`pipe: region ${options.region} applied by bcftools view -t on the stream (streaming targets filter)\n`);
+    } else if (built.regionNote) {
+      process.stderr.write(`pipe: WARNING ${built.regionNote}\n`);
     }
 
     const code = await telePipe(rawId, tool, args, {
