@@ -14,7 +14,7 @@
  */
 import { Logger } from '../lib/utils/logger';
 import { teleStreamStdout, TeleCommonOpts } from '../lib/tele/core';
-import { nodeRegionEligible, streamNodeRegionToStdout } from '../lib/tele/region_node';
+import { nodeRegionEligible, nodeWholeEligible, tryOpenNodeWhole, streamNodeRegionToStdout } from '../lib/tele/region_node';
 import { resolveAlias } from '../lib/aliases/store';
 import { HtsgetKind } from '../lib/htsget/client';
 
@@ -40,6 +40,14 @@ export async function streamCommand(rawId: string, options: StreamOptions = {}):
       // The region is cut by biofs-node with the index beside the file (GET /agent/region_read): a valid BAM or bgzipped VCF of that region only.
       await streamNodeRegionToStdout(aliasId, options.region as string, { quiet: options.quiet });
       return;
+    }
+    if (!options.viaHtsget && !options.annotated && nodeWholeEligible(aliasId, options.region) && options.start === undefined && options.end === undefined && !options.referenceName) {
+      // No region: biofs-node streams the exact bytes of the owner's own registered BAM, VCF or BCF; a biocid it does not hold (404) or a format it does not serve (415) keeps htsget.
+      const opened = await tryOpenNodeWhole(aliasId);
+      if (opened) {
+        await streamNodeRegionToStdout(aliasId, undefined, { quiet: options.quiet, opened });
+        return;
+      }
     }
     await teleStreamStdout(rawId, {
       kind: options.kind,

@@ -17,6 +17,23 @@ export function nodeRegionEligible(id: string, region?: string): boolean {
   return !!region && /^biocid:\/\//i.test(String(id || '')) && REGION_RE.test(region.trim());
 }
 
+/** A biocid read with no region: the node streams the exact bytes of the owner's own registered BAM, VCF or BCF (20 November 2026), owner and consent checked. */
+export function nodeWholeEligible(id: string, region?: string): boolean {
+  return !region && /^biocid:\/\//i.test(String(id || ''));
+}
+
+/** Open a whole-file read at the node, or null when the node does not serve it (404: no registry row for this biocid; 415: a format it does not serve, such as FASTQ), so the
+ *  caller keeps the htsget path for those. Any other refusal (consent revoked, a server error) is thrown with the node's reason. */
+export async function tryOpenNodeWhole(biocid: string, base = BIOFS_NODE_BASE): Promise<{ stream: Readable; format: string; region: string } | null> {
+  try {
+    return await openNodeRegion(biocid, undefined, base);
+  } catch (e: any) {
+    // 400 "region must be contig:start-end" is a node that predates whole-file reads: htsget as before
+    if (/region_read refused \((404|415)\)|region_read refused \(400\): region must be/.test(String(e?.message || ''))) return null;
+    throw e;
+  }
+}
+
 async function readAll(stream: Readable): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const c of stream) chunks.push(Buffer.from(c as Buffer));
@@ -24,11 +41,11 @@ async function readAll(stream: Readable): Promise<string> {
 }
 
 /** The node's response stream for one region, or an error carrying the node's status and reason. */
-export async function openNodeRegion(biocid: string, region: string, base = BIOFS_NODE_BASE): Promise<{ stream: Readable; format: string; region: string }> {
+export async function openNodeRegion(biocid: string, region: string | undefined, base = BIOFS_NODE_BASE): Promise<{ stream: Readable; format: string; region: string }> {
   const creds = await getCredentials();
   if (!creds?.wallet_address || !creds?.user_signature) throw new Error('Not authenticated. Run: biofs login');
   const r = await axios.get(`${base}/region_read`, {
-    params: { biocid, region: region.trim() },
+    params: region ? { biocid, region: region.trim() } : { biocid },
     headers: { 'X-Biofs-Wallet': creds.wallet_address, 'X-Biofs-Signature': creds.user_signature },
     responseType: 'stream', timeout: 0, maxContentLength: Infinity, maxBodyLength: Infinity, validateStatus: () => true,
   });
@@ -38,12 +55,12 @@ export async function openNodeRegion(biocid: string, region: string, base = BIOF
     try { msg = JSON.parse(body).error || msg; } catch { /* not JSON */ }
     throw new Error(`biofs-node region_read refused (${r.status}): ${msg}`);
   }
-  return { stream: r.data as Readable, format: String(r.headers['x-format'] || ''), region: String(r.headers['x-region'] || region) };
+  return { stream: r.data as Readable, format: String(r.headers['x-format'] || ''), region: String(r.headers['x-region'] || region || 'whole') };
 }
 
 /** Pipe the node's region into a local tool's stdin; resolves with the tool's exit code. */
-export async function pipeNodeRegionToCommand(biocid: string, region: string, command: string, args: string[], opts: { quiet?: boolean; label?: string } = {}): Promise<number> {
-  const { stream, format, region: cut } = await openNodeRegion(biocid, region);
+export async function pipeNodeRegionToCommand(biocid: string, region: string | undefined, command: string, args: string[], opts: { quiet?: boolean; label?: string; opened?: { stream: Readable; format: string; region: string } } = {}): Promise<number> {
+  const { stream, format, region: cut } = opts.opened ?? await openNodeRegion(biocid, region);
   if (!opts.quiet) process.stderr.write(`${opts.label || `pipe → ${command} ${args.slice(0, 4).join(' ')}`} ← biofs-node region_read ${format} ${cut}\n`);
   return new Promise((resolve, reject) => {
     const tool = spawn(command, args, { stdio: ['pipe', 'inherit', 'inherit'] });
@@ -56,8 +73,8 @@ export async function pipeNodeRegionToCommand(biocid: string, region: string, co
 }
 
 /** Write the node's region to stdout (binary safe). */
-export async function streamNodeRegionToStdout(biocid: string, region: string, opts: { quiet?: boolean } = {}): Promise<void> {
-  const { stream, format, region: cut } = await openNodeRegion(biocid, region);
+export async function streamNodeRegionToStdout(biocid: string, region: string | undefined, opts: { quiet?: boolean; opened?: { stream: Readable; format: string; region: string } } = {}): Promise<void> {
+  const { stream, format, region: cut } = opts.opened ?? await openNodeRegion(biocid, region);
   if (!opts.quiet) process.stderr.write(`stream: biofs-node region_read ${format} ${cut}\n`);
   await new Promise<void>((resolve, reject) => {
     stream.on('error', reject);

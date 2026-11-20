@@ -18,7 +18,7 @@ import {
   installHint,
   TeleCommonOpts,
 } from '../lib/tele/core';
-import { nodeRegionEligible, pipeNodeRegionToCommand } from '../lib/tele/region_node';
+import { nodeRegionEligible, nodeWholeEligible, tryOpenNodeWhole, pipeNodeRegionToCommand } from '../lib/tele/region_node';
 import { resolveAlias } from '../lib/aliases/store';
 
 export interface PipeOptions extends TeleCommonOpts {
@@ -91,6 +91,18 @@ export async function pipeCommand(rawId: string, options: PipeOptions = {}): Pro
       if (!options.quiet) process.stderr.write(`pipe: region ${options.region} cut by biofs-node with the index beside the file${tool === 'bcftools' ? ' (and kept by bcftools view -t)' : ''}\n`);
       const code = await pipeNodeRegionToCommand(aliasId, options.region as string, tool, built.args, { quiet: options.quiet, label: `pipe → ${tool} ${built.args.slice(0, 4).join(' ')}` });
       process.exit(code);
+    }
+    if (!options.viaHtsget && !options.annotated && nodeWholeEligible(aliasId, options.region)) {
+      // No region: biofs-node streams the exact bytes of the owner's own registered BAM, VCF or BCF (owner and consent checked there). A biocid the node does not hold (404)
+      // or a format it does not serve (415, FASTQ) keeps the htsget path below.
+      const opened = await tryOpenNodeWhole(aliasId);
+      if (opened) {
+        const wholeTool = options.tool ?? detectTool(aliasId) ?? (opened.format === 'BAM' ? 'samtools' : 'bcftools');
+        requireTool(wholeTool, installHint(wholeTool));
+        const wholeArgs = buildPipeArgs(wholeTool, options.extra || [], undefined).args;
+        const wholeCode = await pipeNodeRegionToCommand(aliasId, undefined, wholeTool, wholeArgs, { quiet: options.quiet, label: `pipe → ${wholeTool} ${wholeArgs.slice(0, 4).join(' ')}`, opened });
+        process.exit(wholeCode);
+      }
     }
     const resolved = await resolveTele(rawId, {
       kind: options.kind,

@@ -31,3 +31,32 @@ describe('region reads through biofs-node', () => {
     expect(code).toBe(0);
   });
 });
+
+describe('whole-file reads through biofs-node', () => {
+  it('a biocid with no region is eligible; an alias or a region is not', () => {
+    const { nodeWholeEligible } = require('../src/lib/tele/region_node');
+    expect(nodeWholeEligible(B, undefined)).toBe(true);
+    expect(nodeWholeEligible(B, 'chr1:1-2')).toBe(false);
+    expect(nodeWholeEligible('my-alias', undefined)).toBe(false);
+  });
+
+  it('sends no region parameter and returns the stream', async () => {
+    const { tryOpenNodeWhole } = require('../src/lib/tele/region_node');
+    get.mockResolvedValueOnce({ status: 200, data: Readable.from([Buffer.from('x')]), headers: { 'x-format': 'VCFTXT', 'x-region': 'whole' } });
+    const r = await tryOpenNodeWhole(B);
+    expect(r.format).toBe('VCFTXT');
+    expect(get.mock.calls[get.mock.calls.length - 1][1].params).toEqual({ biocid: B });
+  });
+
+  it('404 and 415 fall back to htsget (null); a revoked consent is thrown', async () => {
+    const { tryOpenNodeWhole } = require('../src/lib/tele/region_node');
+    get.mockResolvedValueOnce({ status: 404, data: Readable.from([Buffer.from('{"error":"not found"}')]), headers: {} });
+    expect(await tryOpenNodeWhole(B)).toBeNull();
+    get.mockResolvedValueOnce({ status: 415, data: Readable.from([Buffer.from('{"error":"not served"}')]), headers: {} });
+    expect(await tryOpenNodeWhole(B)).toBeNull();
+    get.mockResolvedValueOnce({ status: 400, data: Readable.from([Buffer.from('{"error":"region must be contig:start-end (1-based, inclusive)"}')]), headers: {} });
+    expect(await tryOpenNodeWhole(B)).toBeNull();
+    get.mockResolvedValueOnce({ status: 403, data: Readable.from([Buffer.from('{"error":"consent revoked"}')]), headers: {} });
+    await expect(tryOpenNodeWhole(B)).rejects.toThrow(/403.*consent revoked/);
+  });
+});
