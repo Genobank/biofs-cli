@@ -71,6 +71,7 @@ export async function resolveCommand(
         Logger.warning(`No routes found for: ${identifier}`);
         console.log(chalk.gray('  This biocid has no routes registered on BioRoutes (Sequentia chain 15132025).'));
         console.log(chalk.gray('  The file may exist in legacy storage — try: biofs files'));
+        console.log(chalk.gray('  A job output registered by biofs-node (a report, a stats table) has no BioRoutes route: read it with biofs view <biocid> or biofs register-derived read <biocid>.'));
       }
       return;
     }

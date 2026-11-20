@@ -72,22 +72,30 @@ export function sha256Hex(buf: Buffer): string {
 
 /** Read a small derived biofile of your own back through biofs-node (owner match, consent not revoked, 5 MB cap, SHA-256 checked by the node);
  *  the bytes are checked here against the node's X-Sha256 header before anything is written. Primary biodata is never served this way. */
+/** The bytes of a small derived biofile (a job report, a table, a stats file) through biofs-node: the node checks owner or operator, consent, the 5 MB cap and the
+ *  registered SHA-256; the bytes are checked again here against the node's X-Sha256 header. Throws with the node's status and message on any refusal. */
+export async function fetchDerivedBytes(biocid: string): Promise<{ body: Buffer; sha256: string }> {
+  if (!BIOCID_RE.test(biocid || '')) throw new Error('not a biocid');
+  const credentials = await getCredentials();
+  if (!credentials) throw new Error('Not authenticated. Run "biofs login" first.');
+  const r = await axios.get(`${BIOFS_NODE_BASE}/derived_read`, {
+    params: { biocid },
+    headers: { 'X-Biofs-Wallet': credentials.wallet_address, 'X-Biofs-Signature': credentials.user_signature },
+    timeout: 120_000, responseType: 'arraybuffer', validateStatus: (s) => s < 500,
+  });
+  if (r.status >= 400) throw new Error(`${r.status}: ${Buffer.from(r.data).toString('utf8').slice(0, 200)}`);
+  const body = Buffer.from(r.data);
+  const got = sha256Hex(body);
+  const want = String(r.headers['x-sha256'] || '');
+  if (!want) throw new Error('the node sent no X-Sha256: refusing to trust unverified bytes');
+  if (got !== want) throw new Error(`SHA-256 mismatch: node says ${want}, received ${got}`);
+  return { body, sha256: got };
+}
+
 export async function readDerivedCommand(biocid: string, options: { out?: string }): Promise<void> {
   try {
     validateReadArgs(biocid, options.out);
-    const credentials = await getCredentials();
-    if (!credentials) throw new Error('Not authenticated. Run "biofs login" first.');
-    const r = await axios.get(`${BIOFS_NODE_BASE}/derived_read`, {
-      params: { biocid },
-      headers: { 'X-Biofs-Wallet': credentials.wallet_address, 'X-Biofs-Signature': credentials.user_signature },
-      timeout: 120_000, responseType: 'arraybuffer', validateStatus: (s) => s < 500,
-    });
-    if (r.status >= 400) throw new Error(`${r.status}: ${Buffer.from(r.data).toString('utf8').slice(0, 200)}`);
-    const body = Buffer.from(r.data);
-    const got = sha256Hex(body);
-    const want = String(r.headers['x-sha256'] || '');
-    if (!want) throw new Error('the node sent no X-Sha256: refusing to trust unverified bytes');
-    if (got !== want) throw new Error(`SHA-256 mismatch: node says ${want}, received ${got}`);
+    const { body, sha256: got } = await fetchDerivedBytes(biocid);
     if (options.out) {
       fs.writeFileSync(options.out, body, { mode: 0o600 });
       console.log(`${chalk.green('saved')} ${options.out}  sha256 ${got}  ${body.length} bytes`);

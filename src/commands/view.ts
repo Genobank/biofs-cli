@@ -4,6 +4,7 @@ import { GenoBankAPIClient } from '../lib/api/client';
 import { Logger } from '../lib/utils/logger';
 import { BioCIDParser } from '../lib/biofiles/biocid';
 import { isHeavyGenomicName } from '../lib/biofiles/filetype';
+import { fetchDerivedBytes } from './register-derived';
 
 export interface ViewOptions {
   lines?: number;      // Number of lines to display (default: all)
@@ -37,14 +38,52 @@ export async function viewCommand(
     }
 
     // Get file content
-    const result = await api.viewFile({
-      biocid_or_filename: biocidOrFilename,
-      max_lines: options.lines || 0  // 0 = all lines
-    });
+    let result: any;
+    let legacyError = '';
+    try {
+      result = await api.viewFile({
+        biocid_or_filename: biocidOrFilename,
+        max_lines: options.lines || 0  // 0 = all lines
+      });
+      if (result.status === 'Failure') legacyError = String(result.status_details?.message || 'not found');
+    } catch (e: any) {
+      legacyError = e?.message || String(e);
+    }
 
-    if (result.status === 'Failure') {
-      spinner.fail(chalk.red(`Error: ${result.status_details.message}`));
-      process.exit(1);
+    if (legacyError) {
+      // A job output registered by biofs-node (a report, a stats table) is not in the legacy file index: read it through the node instead (owner or operator, consent,
+      // 5 MB cap, SHA-256 checked by the node and again here). Primary biodata never comes this way.
+      if (!isBioCID) {
+        spinner.fail(chalk.red(`Error: ${legacyError}`));
+        process.exit(1);
+      }
+      spinner.text = 'Not in the legacy file index; reading through biofs-node...';
+      let node: { body: Buffer; sha256: string };
+      try {
+        node = await fetchDerivedBytes(biocidOrFilename);
+      } catch (e: any) {
+        spinner.fail(chalk.red(`Error: legacy index: ${legacyError}; biofs-node: ${e?.message || e}`));
+        process.exit(1);
+      }
+      const text = node.body.toString('utf8');
+      const all = text.split('\n');
+      const shown = options.lines ? all.slice(0, Number(options.lines)).join('\n') : text;
+      spinner.succeed(chalk.green('✅ File Content Retrieved (biofs-node)'));
+      console.log('');
+      console.log(chalk.bold('📄 File Information:'));
+      console.log(chalk.gray(`   BioCID: ${biocidOrFilename}`));
+      console.log(chalk.gray(`   Size: ${formatFileSize(node.body.length)}`));
+      console.log(chalk.gray(`   SHA-256: ${node.sha256} (checked by biofs-node and by this verb)`));
+      console.log('');
+      console.log(chalk.bold('📋 Content:'));
+      console.log(chalk.dim('─'.repeat(80)));
+      if (options.format === 'pretty') displayPrettyContent(shown, ''); else console.log(shown);
+      console.log(chalk.dim('─'.repeat(80)));
+      console.log('');
+      console.log(chalk.gray(`   Total lines: ${all.length}`));
+      if (options.lines && all.length > Number(options.lines)) console.log(chalk.yellow(`   Showing first ${options.lines} lines (use --lines to show more)`));
+      console.log('');
+      return;
     }
 
     const data = result.status_details;
