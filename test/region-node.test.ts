@@ -1,4 +1,4 @@
-import { Readable } from 'stream';
+import { Readable, Writable } from 'stream';
 
 jest.mock('axios', () => ({ __esModule: true, default: { get: jest.fn() } }));
 jest.mock('../src/lib/auth/credentials', () => ({ getCredentials: jest.fn(async () => ({ wallet_address: '0x' + '1'.repeat(40), user_signature: '0xsig' })) }));
@@ -58,5 +58,15 @@ describe('whole-file reads through biofs-node', () => {
     expect(await tryOpenNodeWhole(B)).toBeNull();
     get.mockResolvedValueOnce({ status: 403, data: Readable.from([Buffer.from('{"error":"consent revoked"}')]), headers: {} });
     await expect(tryOpenNodeWhole(B)).rejects.toThrow(/403.*consent revoked/);
+  });
+  it('a result larger than the pipe buffer reaches a slow reader whole (found 20 Nov 2026: the output stopped at 65,536 bytes)', async () => {
+    const chunk = Buffer.alloc(65536, 'a');
+    const total = 48;
+    const src = Readable.from((function* () { for (let i = 0; i < total; i++) yield chunk; })());
+    let got = 0;
+    const slow = new Writable({ write(c, _e, cb) { got += c.length; setTimeout(cb, 2); } });
+    const code = await pipeNodeRegionToCommand(B, undefined, 'cat', [], { quiet: true, out: slow, opened: { stream: src, format: 'VCF', region: 'whole' } });
+    expect(code).toBe(0);
+    expect(got).toBe(total * 65536);
   });
 });

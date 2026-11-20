@@ -59,15 +59,25 @@ export async function openNodeRegion(biocid: string, region: string | undefined,
 }
 
 /** Pipe the node's region into a local tool's stdin; resolves with the tool's exit code. */
-export async function pipeNodeRegionToCommand(biocid: string, region: string | undefined, command: string, args: string[], opts: { quiet?: boolean; label?: string; opened?: { stream: Readable; format: string; region: string } } = {}): Promise<number> {
+export async function pipeNodeRegionToCommand(biocid: string, region: string | undefined, command: string, args: string[], opts: { quiet?: boolean; label?: string; opened?: { stream: Readable; format: string; region: string }; out?: NodeJS.WritableStream } = {}): Promise<number> {
   const { stream, format, region: cut } = opts.opened ?? await openNodeRegion(biocid, region);
+  const out = opts.out ?? process.stdout;
   if (!opts.quiet) process.stderr.write(`${opts.label || `pipe → ${command} ${args.slice(0, 4).join(' ')}`} ← biofs-node region_read ${format} ${cut}\n`);
   return new Promise((resolve, reject) => {
-    const tool = spawn(command, args, { stdio: ['pipe', 'inherit', 'inherit'] });
+    // The tool's stdout is copied here with backpressure instead of being inherited: an inherited stdout pipe shares Node's non-blocking flag, and a large result (found
+    // 20 November 2026: bcftools view of a 3.6 MB bgzip VCF into `| wc`) stopped at 65,536 bytes with 'cannot write to (null)', a silent truncation of a count.
+    const tool = spawn(command, args, { stdio: ['pipe', 'pipe', 'inherit'] });
     tool.stdin!.on('error', () => { /* the tool closed its input early (head, -c): not an error of the stream */ });
+    out.on('error', () => { /* the reader closed early (head): stop quietly */ tool.kill(); });
     stream.on('error', (e) => { tool.kill(); reject(e); });
     tool.on('error', reject);
-    tool.on('exit', (code) => resolve(code ?? 0));
+    tool.stdout!.pipe(out, { end: false });
+    tool.on('close', (code) => {
+      const done = () => resolve(code ?? 0);
+      // every byte of the tool is queued on `out` by now; wait until `out` has taken all of it (process.stdout writes synchronously to a pipe or file on POSIX, so this is immediate there)
+      const settle = () => { if (!((out as any).writableLength > 0)) done(); else setTimeout(settle, 5); };
+      settle();
+    });
     stream.pipe(tool.stdin!);
   });
 }
