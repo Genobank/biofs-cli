@@ -30,6 +30,7 @@ export interface AnnotateSubmitOptions {
   vcfUri?: string;    // explicit gs:// override; passes through as vcf_gs_uri (discouraged: biodata is named by biocid)
   vcfBiocid?: string; // the input named by its biocid; biofs-node resolves it through biocid_registry
   annotators?: string;
+  keepAllFilters?: boolean; // keep every record whatever its FILTER label (a FilterMutectCalls VCF), so vcfinfo__filter carries the label
   assembly?: string;
   quiet?: boolean;
   json?: boolean;
@@ -90,6 +91,7 @@ export function buildAnnotateBody(biosampleSerial: string | undefined, options: 
     body.package = 'custom';
     body.annotator_list = names.join(' ');
   }
+  if (options.keepAllFilters) body.keep_all_filters = true;
   if (biosampleSerial) body.biosample_serial = biosampleSerial;
   if (options.vcfBiocid) body.vcf_biocid = options.vcfBiocid;
   if (options.vcfUri) body.vcf_gs_uri = options.vcfUri;

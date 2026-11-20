@@ -1463,6 +1463,7 @@ annotateCmd
   .option('--vcf-path <path>', 'Manual VCF path override')
   .option('--vcf-uri <uri>', 'GCS or S3 URI for a freshly-minted VCF (skips discovery; used by biofs pipeline)')
   .option('--annotators <list>', 'Custom annotators (comma-separated), defaults to all 146')
+  .option('--keep-all-filters', 'Keep every record whatever its FILTER label (a FilterMutectCalls VCF), so vcfinfo__filter carries the label; default keeps PASS and "." only')
   .option('--package <package>', 'Analysis package (rare_coding, hereditary_cancer, splicing, drug_interaction, pathogenic, wes_default, wgs_default)', 'rare_coding')
   .option('--phenotype <text>', 'Clinical phenotype description for AI analysis')
   .option('--assembly <genome>', 'Reference genome (hg38, hg19)', 'hg38')

@@ -24,6 +24,10 @@ describe('annotate submit input', () => {
     expect(() => buildAnnotateBody(undefined, { vcfBiocid: B, annotators: 'clinvar;rm' }, W, 's')).toThrow(/not an annotator module name/);
     expect(() => buildAnnotateBody(undefined, { vcfBiocid: B, annotators: 'clinvar,clinvar' }, W, 's')).toThrow(/duplicate/);
   });
+  it('keep-all-filters is sent only when asked, as a boolean true', () => {
+    expect(buildAnnotateBody(undefined, { vcfBiocid: B }, W, 's').keep_all_filters).toBeUndefined();
+    expect(buildAnnotateBody(undefined, { vcfBiocid: B, keepAllFilters: true }, W, 's').keep_all_filters).toBe(true);
+  });
   it('signs the status read; an unauthenticated caller is refused before any request', () => {
     expect(signedHeaders({ wallet_address: W, user_signature: '0xsig' })).toEqual({ 'X-Biofs-Wallet': W, 'X-Biofs-Signature': '0xsig' });
     expect(() => signedHeaders(null)).toThrow(/Not authenticated/);
