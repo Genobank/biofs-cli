@@ -1047,6 +1047,7 @@ export async function windowsSubmitCommand(caseId: string, options: WindowsOptio
 
 export interface RescoreOptions {
   peptides: string;
+  presentation?: boolean;
   class1?: string[];
   class2?: string[];
   codeSha256: string;
@@ -1058,16 +1059,26 @@ export interface RescoreOptions {
   json?: boolean;
 }
 
-/** Peptides from a TSV with the header peptide_id<TAB>peptide. Nothing is repaired: a malformed row is an error. */
-export function parsePeptidesTsv(text: string): { id: string; peptide: string }[] {
+export interface RescorePeptide { id: string; peptide: string; n_flank?: string; c_flank?: string }
+
+/** Peptides from a TSV with the header peptide_id<TAB>peptide. Nothing is repaired: a malformed row is an error. With presentation, the header also holds the columns n_flank and c_flank (0 to 15 residues each, may be empty). */
+export function parsePeptidesTsv(text: string, presentation = false): RescorePeptide[] {
   const lines = text.split(/\r?\n/).filter((l) => l.length > 0);
   if (lines.length < 2) throw new Error('--peptides must be a TSV with the header peptide_id<TAB>peptide and at least one row');
   const head = lines[0].split('\t');
   if (head[0] !== 'peptide_id' || head[1] !== 'peptide') throw new Error('--peptides: the first line must be the header peptide_id<TAB>peptide');
+  const ni = head.indexOf('n_flank'), ci = head.indexOf('c_flank');
+  if (presentation && (ni < 0 || ci < 0)) throw new Error('--presentation: the header must also hold the columns n_flank and c_flank (0 to 15 residues each, may be empty)');
   return lines.slice(1).map((l, i) => {
     const f = l.split('\t');
     if (f.length < 2 || !f[0] || !f[1]) throw new Error(`--peptides: row ${i + 2} has no peptide_id and peptide`);
-    return { id: f[0], peptide: f[1].trim().toUpperCase() };
+    const row: RescorePeptide = { id: f[0], peptide: f[1].trim().toUpperCase() };
+    if (presentation) {
+      row.n_flank = (f[ni] || '').trim().toUpperCase();
+      row.c_flank = (f[ci] || '').trim().toUpperCase();
+      if (!/^[ACDEFGHIKLMNPQRSTVWY]{0,15}$/.test(row.n_flank) || !/^[ACDEFGHIKLMNPQRSTVWY]{0,15}$/.test(row.c_flank)) throw new Error(`--peptides: row ${i + 2} has a flank of more than 15 residues or with a character outside the 20 standard amino acids`);
+    }
+    return row;
   });
 }
 
@@ -1078,17 +1089,26 @@ export function peptidesSha256(peps: { peptide: string }[]): string {
   return h.digest('hex');
 }
 
-/** Binding of caller peptides on caller alleles (MHCflurry class I) and molecules (MHCnuggets class II), under the registered rescore protocol. */
-export function buildRescoreBody(caseId: string, o: RescoreOptions, wallet: string, signature: string, peps: { id: string; peptide: string }[]): Record<string, unknown> {
+/** SHA-256 of the distinct 'n_flank|peptide|c_flank' lines, sorted, one per line: the second pin of a presentation job (rescore.peptides_flanks_sha256 on the worker). */
+export function peptidesFlanksSha256(peps: { peptide: string; n_flank?: string; c_flank?: string }[]): string {
+  const h = createHash('sha256');
+  for (const l of [...new Set(peps.map((q) => `${(q.n_flank || '').toUpperCase()}|${q.peptide.toUpperCase()}|${(q.c_flank || '').toUpperCase()}`))].sort()) h.update(`${l}\n`);
+  return h.digest('hex');
+}
+
+/** Binding of caller peptides on caller alleles (MHCflurry class I) and molecules (MHCnuggets class II), under the registered rescore protocol. With presentation, also the class I processing and presentation scores with the flanks of each peptide. */
+export function buildRescoreBody(caseId: string, o: RescoreOptions, wallet: string, signature: string, peps: RescorePeptide[]): Record<string, unknown> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error('caseId must be a case identifier of letters, digits, _ or - (never a person name)');
   const split = (v?: string[]) => ([] as string[]).concat(v || []).flatMap((x) => String(x).split(',')).map((x) => x.trim()).filter(Boolean);
   const c1 = split(o.class1), c2 = split(o.class2);
   if (c1.length + c2.length < 1) throw new Error('give at least one --class1 allele (HLA-A*02:01) or --class2 molecule (HLA-DRB104:02)');
   const rec = Number(o.ledgerRecord);
   if (!Number.isInteger(rec) || rec < 1) throw new Error('--ledger-record must be the pre-registration ledger record number');
+  if (o.presentation && c1.length < 1) throw new Error('--presentation needs at least one --class1 allele');
   return {
     wallet: ownerOr(o.owner, wallet), signature, case_id: caseId,
     peptides: peps, peptides_sha256: peptidesSha256(peps), class1_alleles: c1, class2_molecules: c2,
+    ...(o.presentation ? { presentation: true, peptides_flanks_sha256: peptidesFlanksSha256(peps) } : {}),
     code_sha256: parseSha256('--code-sha256', o.codeSha256),
     protocol_sha256: parseSha256('--protocol-sha256', o.protocolSha256),
     ledger_record: rec,
@@ -1099,7 +1119,7 @@ export function buildRescoreBody(caseId: string, o: RescoreOptions, wallet: stri
 export async function rescoreSubmitCommand(caseId: string, options: RescoreOptions): Promise<void> {
   try {
     const a = await auth();
-    const peps = parsePeptidesTsv(fs.readFileSync(options.peptides, 'utf8'));
+    const peps = parsePeptidesTsv(fs.readFileSync(options.peptides, 'utf8'), !!options.presentation);
     await submit('rescore', buildRescoreBody(caseId, options, a.wallet, a.signature, peps), a.headers, options);
   } catch (e: any) {
     Logger.error(`rescore submit failed: ${e.message}`);

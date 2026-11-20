@@ -5454,7 +5454,8 @@ const rescoreCmd = program
 rescoreCmd
   .command('submit <caseId>')
   .description('Submit the peptide list; it is hash-pinned, a known-answer self test runs first, and an unsupported allele is named, never replaced')
-  .requiredOption('--peptides <file>', 'TSV with the header peptide_id<TAB>peptide')
+  .requiredOption('--peptides <file>', 'TSV with the header peptide_id<TAB>peptide (with --presentation also the columns n_flank and c_flank)')
+  .option('--presentation', 'Also score class I processing and presentation (MHCflurry presentation predictor): every allele singly, with the flanks of the n_flank and c_flank columns (0 to 15 residues of the peptide\'s own source sequence); a second pin covers the flanks')
   .option('--class1 <alleles...>', 'Class I alleles, for example HLA-A*02:01 (comma separated or repeated)')
   .option('--class2 <molecules...>', 'Class II molecules in MHCnuggets names, for example HLA-DRB104:02 or HLA-DPA101:03-DPB102:01')
   .requiredOption('--code-sha256 <hex>', 'SHA-256 of rescore.py as registered; the worker refuses any other code')
