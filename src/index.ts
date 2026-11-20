@@ -164,6 +164,7 @@ import { inventoryDelegateCommand, DelegateOptions } from './commands/inventory-
 import { jobsCommand, jobLogCommand, JobsOptions, JobLogOptions } from './commands/job-view';
 import { inventoryListCommand, InventoryListOptions } from './commands/inventory-list';
 import { readcountSubmitCommand, ReadcountOptions } from './commands/readcount';
+import { bamprepSubmitCommand, BamprepOptions } from './commands/bamprep';
 import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, captureSubmitCommand, CaptureOptions, acmgSubmitCommand, AcmgOptions, refIndexSubmitCommand, RefIndexOptions, libraryProfileSubmitCommand, LibraryProfileOptions, twinClassifySubmitCommand, TwinOptions, vcfCompareSubmitCommand, VcfCompareOptions, windowsSubmitCommand, WindowsOptions, rescoreSubmitCommand, RescoreOptions, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions, rankV5SubmitCommand, RankV5Options } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { neoantigenFabricateCommand, NeoantigenFabricateOptions } from './commands/neoantigen/fabricate';
@@ -5244,6 +5245,28 @@ readcountCmd
   .option('--wait', 'Poll until done or failed')
   .option('--json', 'Emit JSON')
   .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('readcount' as any, id, options); });
+
+const bamprepCmd = program
+  .command('bamprep')
+  .description('Coordinate-sort (only when the header says the BAM is not sorted) and index one BAM you own, on a worker; the source is only read, the sorted copy and the index are new registered files with it as parent (dispatched through biofs-node, samtools only)');
+bamprepCmd
+  .command('submit <caseId>')
+  .description('Sort (when needed) and index a BAM; flagstat before and after must be equal in every category and the index record count equal to the file, or the job fails')
+  .requiredOption('--bam <biocid>', 'The biocid of the BAM you own')
+  .option('--sort <mode>', 'auto (default: sort only when the header does not say coordinate), never or always')
+  .option('--threads <n>', 'samtools threads, 1 to 16 (default 4)')
+  .option('--name <file>', 'Output file name stem (default: the BAM file name)')
+  .requiredOption('--code-sha256 <hex>', 'SHA-256 of bamprep.py as pinned; the worker refuses any other code')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: BamprepOptions) => { await bamprepSubmitCommand(caseId, options); });
+bamprepCmd
+  .command('status <job>')
+  .description('Show a bamprep job')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('bamprep' as any, id, options); });
 
 const acmgCmd = program
   .command('acmg-triage')
