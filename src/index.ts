@@ -163,6 +163,7 @@ import { alphagenomeSubmitCommand, AlphaGenomeOptions } from './commands/alphage
 import { inventoryDelegateCommand, DelegateOptions } from './commands/inventory-delegate';
 import { jobsCommand, jobLogCommand, JobsOptions, JobLogOptions } from './commands/job-view';
 import { inventoryListCommand, InventoryListOptions } from './commands/inventory-list';
+import { readcountSubmitCommand, ReadcountOptions } from './commands/readcount';
 import { neoantigenEvidenceSubmitCommand, neoantigenDesignSubmitCommand, neoantigenHlaSubmitCommand, neoantigenFusionSubmitCommand, neoantigenIndelSubmitCommand, neoantigenStatusCommand, synapsePullSubmitCommand, publicFetchSubmitCommand, teslaGateSubmitCommand, identitySubmitCommand, captureSubmitCommand, CaptureOptions, acmgSubmitCommand, AcmgOptions, refIndexSubmitCommand, RefIndexOptions, libraryProfileSubmitCommand, LibraryProfileOptions, twinClassifySubmitCommand, TwinOptions, vcfCompareSubmitCommand, VcfCompareOptions, windowsSubmitCommand, WindowsOptions, rescoreSubmitCommand, RescoreOptions, IdentityOptions, NeoantigenEvidenceOptions, NeoantigenDesignOptions, NeoantigenHlaOptions, NeoantigenFusionOptions, NeoantigenIndelOptions, SynapsePullOptions, PublicFetchOptions, TeslaGateOptions, rankV5SubmitCommand, RankV5Options } from './commands/neoantigen-pipeline';
 import { onrampHttpsSubmitCommand, onrampHttpsStatusCommand, OnrampHttpsOptions } from './commands/onramp-https';
 import { neoantigenFabricateCommand, NeoantigenFabricateOptions } from './commands/neoantigen/fabricate';
@@ -5215,6 +5216,31 @@ captureCmd
   .option('--wait', 'Poll until done or failed')
   .option('--json', 'Emit JSON')
   .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('capture' as any, id, options); });
+
+const readcountCmd = program
+  .command('readcount')
+  .description('How many reads carry each allele at named positions in 1 to 8 alignments: bcftools mpileup on a worker, every SNV count cross-checked against htslib\'s own counter (dispatched through biofs-node, decision support only)');
+readcountCmd
+  .command('submit <caseId>')
+  .description('Count reads at the sites in each alignment; each REF is checked against the catalog genome first and the job fails if the two counters disagree')
+  .requiredOption('--bam <pairs...>', 'label=biocid of an alignment (BAM) you own, 1 to 8, for example tumor=biocid://genobank/0x.../bam/....tumor.bam')
+  .option('--ref <genome>', 'Catalog genome the alignments were aligned to: hg38_noalt, hg38, hs37d5 or hg19')
+  .option('--ref-for <pairs...>', 'label=genome for an alignment aligned to another genome than --ref')
+  .option('--site <specs...>', 'chrom:pos:REF:ALT[:label], VCF style (an indel carries its anchor base), for example chr12:25245350:C:T:KRAS_G12D')
+  .option('--sites-file <tsv>', 'Tab-separated chrom, pos, REF, ALT and an optional label per line (# lines and a chrom header are skipped)')
+  .option('--min-mapq <n>', 'Minimum mapping quality of a counted read (default 20)')
+  .option('--min-baseq <n>', 'Minimum base quality of a counted base, 1 to 60 (default 20)')
+  .requiredOption('--code-sha256 <hex>', 'SHA-256 of readcount.py as pinned; the worker refuses any other code')
+  .option('--owner <biowallet>', 'Owner biowallet when an operator runs the job for a custodial biowallet (default: the signer)')
+  .option('--wait', 'Poll until the job finishes')
+  .option('--json', 'Emit JSON')
+  .action(async (caseId: string, options: ReadcountOptions) => { await readcountSubmitCommand(caseId, options); });
+readcountCmd
+  .command('status <job>')
+  .description('Show a readcount job')
+  .option('--wait', 'Poll until done or failed')
+  .option('--json', 'Emit JSON')
+  .action(async (id: string, options: { wait?: boolean; json?: boolean }) => { await neoantigenStatusCommand('readcount' as any, id, options); });
 
 const acmgCmd = program
   .command('acmg-triage')

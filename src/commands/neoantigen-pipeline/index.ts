@@ -453,7 +453,7 @@ async function auth() {
   };
 }
 
-type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture' | 'windows' | 'rescore' | 'acmg' | 'refindex' | 'vcfcompare' | 'alphagenome' | 'twin' | 'library_profile' | 'rank_v5';
+type Kind = 'evidence' | 'design' | 'hla' | 'fusion' | 'indel' | 'synapse' | 'tesla_gate' | 'parabricks' | 'public_fetch' | 'identity' | 'capture' | 'windows' | 'rescore' | 'acmg' | 'refindex' | 'vcfcompare' | 'alphagenome' | 'twin' | 'library_profile' | 'rank_v5' | 'readcount';
 const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: string }> = {
   evidence: { post: 'neoantigen_evidence', status: 'neoantigen_evidence_status', id: 'neoantigen_job_id', verb: 'neoantigen-evidence' },
   design: { post: 'neoantigen_design', status: 'neoantigen_design_status', id: 'neoantigen_job_id', verb: 'neoantigen-design' },
@@ -475,6 +475,7 @@ const ROUTE: Record<Kind, { post: string; status: string; id: string; verb: stri
   twin: { post: 'neoantigen_twin', status: 'neoantigen_twin_status', id: 'neoantigen_job_id', verb: 'twin' },
   library_profile: { post: 'neoantigen_library_profile', status: 'neoantigen_library_profile_status', id: 'neoantigen_job_id', verb: 'library-profile' },
   rank_v5: { post: 'neoantigen_rank_v5', status: 'neoantigen_rank_v5_status', id: 'neoantigen_job_id', verb: 'rank-v5' },
+  readcount: { post: 'neoantigen_readcount', status: 'neoantigen_readcount_status', id: 'neoantigen_job_id', verb: 'readcount' },
 };
 
 async function fetchStatus(kind: Kind, id: string, headers: Record<string, string>): Promise<any> {
