@@ -14,6 +14,8 @@
  */
 import { Logger } from '../lib/utils/logger';
 import { teleStreamStdout, TeleCommonOpts } from '../lib/tele/core';
+import { nodeRegionEligible, streamNodeRegionToStdout } from '../lib/tele/region_node';
+import { resolveAlias } from '../lib/aliases/store';
 import { HtsgetKind } from '../lib/htsget/client';
 
 export interface StreamOptions {
@@ -23,6 +25,7 @@ export interface StreamOptions {
   htsgetUrl?: string;
   annotated?: boolean;
   region?: string;
+  viaHtsget?: boolean;
   referenceName?: string;
   /** CLI may pass strings; coerced to number in streamCommand */
   start?: number | string;
@@ -32,6 +35,12 @@ export interface StreamOptions {
 
 export async function streamCommand(rawId: string, options: StreamOptions = {}): Promise<void> {
   try {
+    const aliasId = resolveAlias(rawId);
+    if (!options.viaHtsget && !options.annotated && nodeRegionEligible(aliasId, options.region)) {
+      // The region is cut by biofs-node with the index beside the file (GET /agent/region_read): a valid BAM or bgzipped VCF of that region only.
+      await streamNodeRegionToStdout(aliasId, options.region as string, { quiet: options.quiet });
+      return;
+    }
     await teleStreamStdout(rawId, {
       kind: options.kind,
       quiet: options.quiet,

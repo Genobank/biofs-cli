@@ -49,7 +49,9 @@ interface SubmitResponse {
   oc_job_id: string;
   status: string;
   sqlite_biocid: string;
-  sqlite_biocid_key: string;
+  sqlite_biocid_key?: string;
+  sqlite_version?: number;
+  earlier_versions?: string[];
   output_gs_uri: string;
   expected_runtime_min: number;
   error?: string;
@@ -130,7 +132,11 @@ export async function annotateSubmitCommand(
       console.log(JSON.stringify(submit, null, 2));
     } else if (!options.quiet) {
       console.log(chalk.gray('  pre-allocated biocid: ' + submit.sqlite_biocid));
-      console.log(chalk.gray('  pre-allocated key:    ' + submit.sqlite_biocid_key.slice(0, 18) + '…'));
+      if (submit.sqlite_biocid_key) console.log(chalk.gray('  pre-allocated key:    ' + submit.sqlite_biocid_key.slice(0, 18) + '…'));
+      if (submit.sqlite_version && submit.sqlite_version > 1) {
+        console.log(chalk.yellow(`  version ${submit.sqlite_version}: this VCF was annotated before; the earlier annotation(s) stay untouched:`));
+        for (const b of submit.earlier_versions || []) console.log(chalk.gray('    ' + b));
+      }
       console.log(chalk.gray('  ETA: ' + submit.expected_runtime_min + ' min'));
     }
 

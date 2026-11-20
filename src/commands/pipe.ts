@@ -18,6 +18,8 @@ import {
   installHint,
   TeleCommonOpts,
 } from '../lib/tele/core';
+import { nodeRegionEligible, pipeNodeRegionToCommand } from '../lib/tele/region_node';
+import { resolveAlias } from '../lib/aliases/store';
 
 export interface PipeOptions extends TeleCommonOpts {
   extra?: string[];
@@ -25,6 +27,7 @@ export interface PipeOptions extends TeleCommonOpts {
   quiet?: boolean;
   htsgetUrl?: string;
   region?: string;
+  viaHtsget?: boolean;
 }
 
 function detectTool(filename: string): 'bcftools' | 'samtools' | 'seqkit' | null {
@@ -78,6 +81,17 @@ export function buildPipeArgs(
 
 export async function pipeCommand(rawId: string, options: PipeOptions = {}): Promise<void> {
   try {
+    const aliasId = resolveAlias(rawId);
+    if (!options.viaHtsget && nodeRegionEligible(aliasId, options.region)) {
+      // The region is cut by biofs-node with the index beside the file (GET /agent/region_read): only that region's reads or records cross the network.
+      const tool = options.tool ?? detectTool(aliasId) ?? 'bcftools';
+      if (tool === 'seqkit') throw new Error('a region read serves BAM and VCF files, not FASTQ');
+      requireTool(tool, installHint(tool));
+      const built = buildPipeArgs(tool, options.extra || [], tool === 'bcftools' ? options.region : undefined);
+      if (!options.quiet) process.stderr.write(`pipe: region ${options.region} cut by biofs-node with the index beside the file${tool === 'bcftools' ? ' (and kept by bcftools view -t)' : ''}\n`);
+      const code = await pipeNodeRegionToCommand(aliasId, options.region as string, tool, built.args, { quiet: options.quiet, label: `pipe → ${tool} ${built.args.slice(0, 4).join(' ')}` });
+      process.exit(code);
+    }
     const resolved = await resolveTele(rawId, {
       kind: options.kind,
       quiet: options.quiet,
